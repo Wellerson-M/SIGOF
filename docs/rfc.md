@@ -94,7 +94,7 @@ O projeto é baseado em uma demanda real observada na empresa **Aceville Transpo
 - desorganização contínua no fluxo de solicitações
 - dificuldade de controle e acompanhamento em tempo real
 - retrabalho e perda significativa de eficiência
-- demora média de 2-5 dias para resolver uma ocorrência
+- demora média de 2-7 dias para resolver uma ocorrência
 
 ### Observação de Processo Real
 
@@ -112,7 +112,7 @@ A necessidade da solução é evidenciada por:
 
 - **Volume diário:** 20-30 solicitações por dia na empresa observada
 - **Dificuldades recorrentes:** mencionadas em 100% das conversas com a equipe
-- **Impacto mensurável:** perda estimada de 15-20 horas/semana com retrabalho
+- **Impacto mensurável:** perda estimada de 5-10 horas/semana com retrabalho
 - **Demanda de clientes:** múltiplos relatos de insatisfação pelo tempo de resolução
 
 ---
@@ -149,12 +149,12 @@ Foram analisadas **4 soluções** que tentam resolver problemas similares:
 
 ### Comparação
 
-| Solução | Pontos Fortes | Limitações | Custo |
-|---------|---------------|-----------|-------|
-| Jira | Customização; Escalabilidade | Genérico; Complexo | $$$ |
-| Freshdesk | Interface amigável; Integrado | Sem lógica de frete | $$ |
-| Zendesk | Relatórios avançados; Escalável | Muito genérico | $$$ |
-| Planilhas | Livre; Fácil | Sem segurança; Pouco profissional | $ |
+| Solução | Pontos Fortes | Limitações |
+|---------|---------------|-----------|
+| Jira | Customização; Escalabilidade | Genérico; Complexo | 
+| Freshdesk | Interface amigável; Integrado | Sem lógica de frete |
+| Zendesk | Relatórios avançados; Escalável | Muito genérico | 
+| Planilhas | Livre; Fácil | Sem segurança; Pouco profissional | 
 
 ### Diferencial do Projeto SIGOF
 
