@@ -1,0 +1,39 @@
+@startuml C4_Componentes_SIGOF
+' =========================================================
+'  SIGOF - C4 Nivel 3: Diagrama de Componentes (API Backend)
+'  Notacao oficial C4 (cores/formas automaticas)
+'  Renderize em: https://www.plantuml.com/plantuml
+' =========================================================
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Diagrama de Componentes (Nivel 3) - API Backend do SIGOF
+
+Container(spa, "Aplicacao Web (SPA)", "React / Next.js", "Interface do usuario")
+ContainerDb(db, "Banco de Dados", "PostgreSQL", "Persistencia")
+System_Ext(email, "Servico de E-mail", "SendGrid")
+
+Container_Boundary(api, "API Backend (Node.js / Express)") {
+    Component(auth,  "Auth",               "Controller + Service", "Login, JWT, recuperacao de senha e RBAC")
+    Component(solic, "Solicitacao",        "Controller + Service", "Ciclo de vida das solicitacoes")
+    Component(msg,   "Mensagem",           "Controller + Service", "Chat entre analista e solicitante")
+    Component(valid, "ValidadorCTe",       "Service",              "Valida CTe/NF e detecta duplicidade")
+    Component(notif, "NotificacaoService", "Service",              "Dispara notificacoes")
+    Component(relat, "RelatorioService",   "Service",              "Gera relatorios e KPIs")
+    Component(repo,  "Repositorios",       "ORM",                  "Acesso a dados filtrado por empresa_id")
+}
+
+Rel(spa, auth,  "Autentica via", "REST/JSON")
+Rel(spa, solic, "Gerencia solicitacoes via", "REST/JSON")
+Rel(spa, msg,   "Troca mensagens via", "REST/JSON")
+Rel(solic, valid, "Valida CTe/NF e duplicidade com")
+Rel(solic, notif, "Aciona ao mudar status")
+Rel(solic, relat, "Fornece dados para")
+Rel(auth, repo,  "Le e grava dados via")
+Rel(solic, repo, "Le e grava dados via")
+Rel(msg, repo,   "Le e grava dados via")
+Rel(relat, repo, "Consulta dados via")
+Rel(repo, db,    "Le e grava", "SQL/TCP")
+Rel(notif, email, "Envia e-mail via", "HTTPS")
+
+LAYOUT_WITH_LEGEND()
+@enduml

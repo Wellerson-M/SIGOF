@@ -1,0 +1,31 @@
+@startuml C4_Containers_SIGOF
+' =========================================================
+'  SIGOF - C4 Nivel 2: Diagrama de Containers
+'  Notacao oficial C4 (cores/formas automaticas)
+'  Renderize em: https://www.plantuml.com/plantuml
+' =========================================================
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Diagrama de Containers (Nivel 2) - SIGOF
+
+Person(user, "Usuario interno", "Solicitante, analista, supervisor ou administrador")
+
+System_Boundary(sigof, "SIGOF") {
+    Container(spa, "Aplicacao Web (SPA)", "React / Next.js", "Interface responsiva acessada pelo navegador")
+    Container(api, "API Backend", "Node.js / Express", "Regras de negocio, autenticacao e orquestracao")
+    ContainerDb(db, "Banco de Dados", "PostgreSQL", "Solicitacoes, usuarios, mensagens e historico")
+    ContainerDb(cache, "Cache", "Redis", "Cache de filas e dashboards (RNF02)")
+}
+
+System_Ext(email, "Servico de E-mail", "SendGrid (SMTP)")
+System_Ext(s3, "Storage de Anexos", "AWS S3")
+
+Rel(user, spa, "Usa", "HTTPS")
+Rel(spa, api, "Faz chamadas para", "REST / JSON / HTTPS")
+Rel(api, db, "Le e grava", "SQL / TCP")
+Rel(api, cache, "Le e grava", "Redis protocol")
+Rel(api, email, "Envia notificacoes via", "HTTPS")
+Rel(api, s3, "Armazena anexos em", "HTTPS")
+
+LAYOUT_WITH_LEGEND()
+@enduml

@@ -1,0 +1,31 @@
+@startuml C4_Contexto_SIGOF
+' =========================================================
+'  SIGOF - C4 Nivel 1: Diagrama de Contexto
+'  Notacao oficial C4 (cores/formas automaticas)
+'  Renderize em: https://www.plantuml.com/plantuml
+' =========================================================
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Diagrama de Contexto (Nivel 1) - SIGOF
+
+Person(solicitante, "Solicitante", "Funcionario do Financeiro/Comercial que abre e acompanha solicitacoes")
+Person(analista, "Analista de Reversoes", "Recebe, processa e resolve as ocorrencias de frete")
+Person(supervisor, "Supervisor", "Acompanha metricas, prioriza e monitora a equipe")
+Person(admin, "Administrador", "Gerencia usuarios, perfis e parametros da empresa")
+
+System(sigof, "SIGOF", "Plataforma web de gestao de ocorrencias de frete (correcoes de CTe)")
+
+System_Ext(email, "Servico de E-mail", "SendGrid / SMTP - envia notificacoes internas")
+System_Ext(storage, "Storage de Anexos", "AWS S3 - armazena documentos comprobatorios")
+
+Rel(solicitante, sigof, "Abre e acompanha solicitacoes", "HTTPS")
+Rel(analista, sigof, "Assume e resolve solicitacoes", "HTTPS")
+Rel(supervisor, sigof, "Acompanha metricas e prioriza", "HTTPS")
+Rel(admin, sigof, "Gerencia usuarios e perfis", "HTTPS")
+Rel(sigof, email, "Envia notificacoes", "SMTP/HTTPS")
+Rel(sigof, storage, "Armazena e recupera anexos", "HTTPS")
+Rel_Back(solicitante, email, "Notifica por e-mail", "SMTP")
+
+' Layout: 2 elementos por linha deixa o contexto mais legivel
+LAYOUT_WITH_LEGEND()
+@enduml

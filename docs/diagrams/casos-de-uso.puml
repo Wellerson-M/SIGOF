@@ -1,42 +1,43 @@
-@startuml casos-de-uso-sigof
-' Diagrama de Casos de Uso (UML) — SIGOF
-' Atores representados com o "bonequinho" (stick figure) padrão UML.
-' Para exportar: cole este conteudo em https://www.plantuml.com/plantuml
-' ou use a extensao PlantUML no VS Code -> exportar PNG para docs/assets/casos-de-uso.png
-
+@startuml Casos_de_Uso_SIGOF
 left to right direction
-skinparam packageStyle rectangle
 skinparam shadowing false
-skinparam usecase {
-  BackgroundColor #E8F1FB
-  BorderColor #1168BD
-}
+skinparam packageStyle rectangle
+skinparam nodesep 18
+skinparam ranksep 80
 skinparam actor {
-  BorderColor #08427B
+    BackgroundColor #FFFFFF
+    BorderColor #08427B
 }
+skinparam usecase {
+    BackgroundColor #E8F1FB
+    BorderColor #1168BD
+    FontColor #0B2E4F
+    ArrowColor #707070
+}
+
+title Diagrama de Casos de Uso - SIGOF
 
 actor "Solicitante\n(Financeiro / Comercial)" as Sol
-actor "Analista de Reversoes" as Ana
-actor "Supervisor" as Sup
-actor "Administrador" as Adm
+actor "Analista de\nReversoes"               as Ana
+actor "Supervisor"                            as Sup
+actor "Administrador"                         as Adm
 
-rectangle "SIGOF — Sistema de Gestao de Ocorrencias de Frete" {
-  usecase "Criar solicitacao" as UC1
-  usecase "Anexar documentos" as UC2
-  usecase "Consultar status" as UC3
-  usecase "Trocar mensagens" as UC4
-  usecase "Visualizar historico" as UC5
-  usecase "Assumir solicitacao" as UC6
-  usecase "Atualizar status" as UC7
-  usecase "Finalizar solicitacao" as UC8
-  usecase "Identificar duplicidade" as UC9
-  usecase "Priorizar solicitacoes" as UC10
-  usecase "Gerar relatorios" as UC11
-  usecase "Gerenciar usuarios e perfis" as UC12
+rectangle "SIGOF" {
+    usecase "Criar solicitacao"            as UC1
+    usecase "Anexar documentos"            as UC2
+    usecase "Identificar duplicidade"      as UC9
+    usecase "Consultar status"             as UC3
+    usecase "Trocar mensagens"             as UC4
+    usecase "Visualizar historico"         as UC5
+    usecase "Assumir solicitacao"          as UC6
+    usecase "Atualizar status"             as UC7
+    usecase "Finalizar solicitacao"        as UC8
+    usecase "Priorizar solicitacoes"       as UC10
+    usecase "Gerar relatorios"             as UC11
+    usecase "Gerenciar usuarios e perfis"  as UC12
 }
 
 Sol --> UC1
-Sol --> UC2
 Sol --> UC3
 Sol --> UC4
 Sol --> UC5
@@ -54,7 +55,6 @@ Sup --> UC11
 
 Adm --> UC12
 
-UC1 ..> UC2 : <<include>>
 UC1 ..> UC9 : <<include>>
-UC6 ..> UC7 : <<extend>>
+UC2 ..> UC1 : <<extend>>
 @enduml

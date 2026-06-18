@@ -44,14 +44,6 @@ O **MVP** é validado internamente na Aceville (parceira de extensão), e a arqu
 
 # 1. Visão do Produto e Impacto (O Problema)
 
-O objetivo desta seção é responder uma pergunta fundamental:
-
-**Este projeto resolve um problema real ou é apenas um exercício técnico?**
-
-A resposta é clara: **o SIGOF resolve um problema concreto em transportadoras de todo o Brasil.**
-
----
-
 ## 1.1 Contexto e Problema
 
 O setor logístico de transportadoras lida frequentemente com a necessidade de correções em documentos de transporte eletrônico (CTe), como reversões de frete, troca de pagador, ajustes fiscais e inconsistências operacionais.
@@ -188,7 +180,7 @@ Além das soluções comerciais analisadas no benchmark, o SIGOF se apoia em tr�
 - **Gestão de serviços de TI (ITIL/ITSM):** conceitos de gestão de incidentes, priorização e ciclo de vida de uma solicitação.
 - **Transformação digital em processos logísticos:** estudos sobre digitalização de processos manuais em transportadoras e seus ganhos de eficiência e rastreabilidade.
 
-> **A completar (NP2):** inclua aqui 2 a 3 referências acadêmicas reais (artigos, monografias ou livros) sobre esses temas. Busque no **Google Scholar** / periódicos por termos como *"sistema de gestão de chamados"*, *"help desk ITIL"*, *"digitalização de processos logísticos"*. Para cada trabalho, descreva em 2–3 linhas o que ele aborda e como se relaciona com o SIGOF, e adicione a citação completa na seção 8 (Referências).
+> **Pendente (NP2):** incluir 2 a 3 referências acadêmicas sobre esses temas, com breve descrição da relação com o SIGOF, e citá-las na seção 8.
 
 ---
 
@@ -338,43 +330,9 @@ Para não comprometer essa evolução, duas decisões já são incorporadas desd
 
 ### Diagrama de Casos de Uso (UML)
 
-O diagrama UML de casos de uso — com os **atores representados pelo "bonequinho"** (stick figure) padrão, elipses de casos de uso, fronteira do sistema e relacionamentos `<<include>>`/`<<extend>>` — está versionado como código-fonte em [`diagrams/casos-de-uso.puml`](diagrams/casos-de-uso.puml).
+![Diagrama de casos de uso do SIGOF](diagrams/casosDeUso.png)
 
-Para gerar a imagem: cole o conteúdo do arquivo em [plantuml.com/plantuml](https://www.plantuml.com/plantuml) (ou use a extensão PlantUML no VS Code) e exporte como PNG para `docs/assets/casos-de-uso.png`. Em seguida, insira a imagem aqui:
-
-```markdown
-![Diagrama de casos de uso do SIGOF](assets/casos-de-uso.png)
-```
-
-> A prévia abaixo (Mermaid) renderiza diretamente no GitHub para conferência rápida dos atores e casos, mas **não substitui** a versão UML com bonequinho exigida pela banca — esta deve ser a imagem gerada a partir do arquivo `.puml`.
-
-```mermaid
-flowchart LR
-    Sol([Solicitante])
-    Ana([Analista])
-    Sup([Supervisor])
-    Adm([Administrador])
-
-    subgraph SIGOF[Casos de Uso - SIGOF]
-        UC1[Criar solicitação]
-        UC2[Anexar documentos]
-        UC3[Consultar status]
-        UC4[Trocar mensagens]
-        UC5[Visualizar histórico]
-        UC6[Assumir solicitação]
-        UC7[Atualizar status]
-        UC8[Finalizar solicitação]
-        UC9[Identificar duplicidade]
-        UC10[Priorizar solicitações]
-        UC11[Gerar relatórios]
-        UC12[Gerenciar usuários e perfis]
-    end
-
-    Sol --> UC1 & UC2 & UC3 & UC4 & UC5
-    Ana --> UC3 & UC4 & UC5 & UC6 & UC7 & UC8 & UC9
-    Sup --> UC5 & UC10 & UC11
-    Adm --> UC12
-```
+Os atores (Solicitante, Analista, Supervisor e Administrador) interagem com os casos de uso dentro da fronteira do SIGOF. O relacionamento `<<include>>` indica que **Criar solicitação** sempre dispara **Identificar duplicidade**; o `<<extend>>` indica que **Anexar documentos** é um comportamento opcional de **Criar solicitação**. Código-fonte versionado em [`diagrams/casos-de-uso.puml`](diagrams/casos-de-uso.puml).
 
 ---
 
@@ -701,104 +659,31 @@ A arquitetura é documentada seguindo o **C4 model** de Simon Brown ([c4model.co
 | 🟦 Azul-claro, caixa | **Componente** (módulo interno de um container) |
 | ⤍ Linha tracejada rotulada | **Relação** (intenção + tecnologia/protocolo) |
 
-> Os diagramas abaixo usam a sintaxe nativa **C4** do Mermaid (`C4Context`/`C4Container`/`C4Component`), que renderiza automaticamente as formas e cores padrão do C4 (figura de pessoa, cilindro de banco, sistemas externos em cinza e fronteira do sistema).
+Os diagramas são gerados em **PlantUML com a biblioteca [C4-PlantUML](https://github.com/plantuml-stdlib/C4-PlantUML)** e o código-fonte está versionado em `docs/diagrams/`.
 
 ### Nível 1: Diagrama de Contexto
 
-Mostra o SIGOF como uma caixa central, cercado pelos seus usuários (todos internos à Aceville) e pelos sistemas externos com que se integra. Detalhe técnico não é o foco aqui — é a visão "de longe" do sistema.
+Mostra o SIGOF como uma caixa central, cercado pelos seus usuários (todos internos à Aceville) e pelos sistemas externos com que se integra — a visão "de longe" do sistema.
 
-```mermaid
-C4Context
-    title Diagrama de Contexto (Nivel 1) - SIGOF
+![Diagrama de Contexto (Nível 1) do SIGOF](diagrams/contexto.png)
 
-    Person(solicitante, "Solicitante", "Funcionario do Financeiro/Comercial que abre e acompanha solicitacoes")
-    Person(analista, "Analista de Reversoes", "Recebe, processa e resolve as ocorrencias de frete")
-    Person(supervisor, "Supervisor", "Acompanha metricas, prioriza e monitora a equipe")
-    Person(admin, "Administrador", "Gerencia usuarios, perfis e parametros da empresa")
-
-    System(sigof, "SIGOF", "Plataforma web de gestao de ocorrencias de frete (correcoes de CTe)")
-
-    System_Ext(email, "Servico de E-mail", "SendGrid / SMTP - envia notificacoes internas")
-    System_Ext(storage, "Storage de Anexos", "AWS S3 - armazena documentos comprobatorios")
-
-    Rel(solicitante, sigof, "Abre e acompanha solicitacoes", "HTTPS")
-    Rel(analista, sigof, "Assume e resolve solicitacoes", "HTTPS")
-    Rel(supervisor, sigof, "Acompanha metricas e prioriza", "HTTPS")
-    Rel(admin, sigof, "Gerencia usuarios e perfis", "HTTPS")
-    Rel(sigof, email, "Envia notificacoes", "SMTP/HTTPS")
-    Rel(sigof, storage, "Armazena e recupera anexos", "HTTPS")
-    Rel(email, solicitante, "Notifica por e-mail", "SMTP")
-
-    UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
-```
+Código-fonte: [`diagrams/c4-contexto.puml`](diagrams/c4-contexto.puml).
 
 ### Nível 2: Diagrama de Containers
 
 Amplia o SIGOF e mostra como as responsabilidades estão distribuídas entre os containers (aplicações e armazéns de dados) e as principais escolhas de tecnologia.
 
-```mermaid
-C4Container
-    title Diagrama de Containers (Nivel 2) - SIGOF
+![Diagrama de Containers (Nível 2) do SIGOF](diagrams/container.png)
 
-    Person(user, "Usuario interno", "Solicitante, analista, supervisor ou administrador")
-
-    System_Boundary(sigof, "SIGOF") {
-        Container(spa, "Aplicacao Web (SPA)", "React / Next.js", "Interface responsiva acessada pelo navegador")
-        Container(api, "API Backend", "Node.js / Express", "Regras de negocio, autenticacao e orquestracao")
-        ContainerDb(db, "Banco de Dados", "PostgreSQL", "Solicitacoes, usuarios, mensagens e historico")
-        ContainerDb(cache, "Cache", "Redis", "Cache de filas e dashboards (RNF02)")
-    }
-
-    System_Ext(email, "Servico de E-mail", "SendGrid (SMTP)")
-    System_Ext(s3, "Storage de Anexos", "AWS S3")
-
-    Rel(user, spa, "Usa", "HTTPS")
-    Rel(spa, api, "Faz chamadas para", "REST / JSON / HTTPS")
-    Rel(api, db, "Le e grava", "SQL / TCP")
-    Rel(api, cache, "Le e grava", "Redis protocol")
-    Rel(api, email, "Envia notificacoes via", "HTTPS")
-    Rel(api, s3, "Armazena anexos em", "HTTPS")
-
-    UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
-```
+Código-fonte: [`diagrams/c4-containers.puml`](diagrams/c4-containers.puml).
 
 ### Nível 3: Diagrama de Componentes (API Backend)
 
 Amplia o container **API Backend** e mostra seus principais componentes internos e responsabilidades.
 
-```mermaid
-C4Component
-    title Diagrama de Componentes (Nivel 3) - API Backend do SIGOF
+![Diagrama de Componentes (Nível 3) — API Backend do SIGOF](diagrams/componentes.png)
 
-    Container(spa, "Aplicacao Web (SPA)", "React / Next.js", "Interface do usuario")
-    ContainerDb(db, "Banco de Dados", "PostgreSQL", "Persistencia")
-    System_Ext(email, "Servico de E-mail", "SendGrid")
-
-    Container_Boundary(api, "API Backend (Node.js / Express)") {
-        Component(auth, "Auth (Controller + Service)", "Node.js", "Login, JWT, recuperacao de senha e RBAC")
-        Component(solic, "Solicitacao (Controller + Service)", "Node.js", "Ciclo de vida das solicitacoes")
-        Component(msg, "Mensagem (Controller + Service)", "Node.js", "Chat entre analista e solicitante")
-        Component(valid, "ValidadorCTe", "Node.js", "Valida CTe/NF e detecta duplicidade")
-        Component(notif, "NotificacaoService", "Node.js", "Dispara notificacoes")
-        Component(relat, "RelatorioService", "Node.js", "Gera relatorios e KPIs")
-        Component(repo, "Repositorios", "Node.js / ORM", "Acesso a dados filtrado por empresa_id")
-    }
-
-    Rel(spa, auth, "Autentica via", "REST/JSON")
-    Rel(spa, solic, "Gerencia solicitacoes via", "REST/JSON")
-    Rel(spa, msg, "Troca mensagens via", "REST/JSON")
-    Rel(solic, valid, "Valida com")
-    Rel(solic, notif, "Aciona")
-    Rel(solic, relat, "Alimenta")
-    Rel(auth, repo, "Usa")
-    Rel(solic, repo, "Usa")
-    Rel(msg, repo, "Usa")
-    Rel(relat, repo, "Usa")
-    Rel(repo, db, "Le e grava", "SQL/TCP")
-    Rel(notif, email, "Envia e-mail via", "HTTPS")
-
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
-```
+Código-fonte: [`diagrams/c4-componentes.puml`](diagrams/c4-componentes.puml).
 
 ---
 
