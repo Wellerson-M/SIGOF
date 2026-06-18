@@ -2,11 +2,13 @@
 
 ## Sobre o Projeto
 
-O **SIGOF** é uma aplicação web desenvolvida com o objetivo de centralizar e organizar o processo de gestão de ocorrências relacionadas a fretes em transportadoras.
+O **SIGOF** é uma aplicação web interna desenvolvida para centralizar e organizar o processo de gestão de ocorrências de frete na **Aceville Transportes**.
 
-O sistema foi idealizado a partir de uma necessidade real observada no ambiente de trabalho, onde solicitações de reversão de frete, correções de CTe e ajustes operacionais são realizadas de forma descentralizada, utilizando múltiplos canais como e-mail, WhatsApp e ligações telefônicas.
+O sistema surgiu de uma necessidade real observada no ambiente de trabalho: solicitações de reversão de frete, correções de CTe e ajustes operacionais são comunicadas internamente de forma caótica — e-mails vagos sem número de CTe ou NF, fila de atendimento desordenada e analistas perdendo tempo caçando informações incompletas.
 
-Essa falta de padronização gera problemas como desorganização, retrabalho, dificuldade de rastreamento e atraso no atendimento.
+O SIGOF substitui esse fluxo por um sistema de tickets estruturado, de uso exclusivo dos funcionários internos da Aceville.
+
+> **Visão de produto:** o MVP é validado internamente na Aceville (parceira de extensão do projeto), mas a arquitetura é desenhada como **multi-tenant**, permitindo a evolução para um produto SaaS voltado a transportadoras pequenas e médias. Detalhes na [RFC, seção 1.7](docs/rfc.md).
 
 ---
 
@@ -25,14 +27,15 @@ Desenvolver uma plataforma que permita:
 
 ## Problema
 
-Atualmente, o processo de gestão de ocorrências de frete apresenta:
+Atualmente, a comunicação interna de ocorrências de frete apresenta:
 
-- Solicitações espalhadas em diferentes canais
-- Falta de controle e priorização
-- Dificuldade em identificar responsáveis
+- E-mails vagos sem CTe, NF ou contexto mínimo ("favor reverter")
+- Analista precisa caçar manualmente a informação nos históricos de e-mail
+- Fila desordenada — quem cobra retorno sobe na fila, não quem tem mais urgência
+- Falta de controle e priorização clara
 - Risco de duplicidade de solicitações
 - Dependência de colaboradores específicos
-- Uso de controles manuais (papel)
+- Ausência de histórico estruturado e auditável
 
 ---
 
@@ -51,11 +54,12 @@ O SIGOF propõe a criação de um sistema web que:
 
 ## Público-Alvo
 
-- Transportadoras
-- Equipes de logística
-- Setores de faturamento
-- Colaboradores internos (financeiro, comercial)
-- Clientes que necessitam solicitar correções de frete
+Uso exclusivamente interno — funcionários da Aceville Transportes:
+
+- **Analistas de Reversões** — recebem e resolvem os tickets
+- **Financeiro** — abre tickets ao identificar divergências em cobranças
+- **Vendedores / Comercial** — abre tickets ao receber reclamações de clientes
+- **Supervisores** — acompanham métricas e priorizam demandas
 
 ---
 

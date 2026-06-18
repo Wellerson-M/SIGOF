@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SIGOF - Dashboard do Analista de Reversões</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-tint": "#405f91",
+                      "on-tertiary": "#ffffff",
+                      "primary-fixed-dim": "#a9c7ff",
+                      "on-tertiary-fixed": "#360f00",
+                      "surface": "#faf9fe",
+                      "on-primary-fixed-variant": "#264778",
+                      "surface-container-highest": "#e3e2e7",
+                      "primary": "#001736",
+                      "surface-dim": "#dad9de",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-fixed": "#d6e3ff",
+                      "on-secondary-fixed": "#0b1c30",
+                      "on-surface-variant": "#43474f",
+                      "primary-container": "#002b5b",
+                      "on-error": "#ffffff",
+                      "on-primary-container": "#7594ca",
+                      "secondary-container": "#d0e1fb",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#1a1c1f",
+                      "tertiary-container": "#4f1c02",
+                      "surface-bright": "#faf9fe",
+                      "on-primary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed-variant": "#713619",
+                      "secondary": "#505f76",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "outline-variant": "#c4c6d0",
+                      "inverse-primary": "#a9c7ff",
+                      "surface-container": "#eeedf2",
+                      "surface-container-low": "#f4f3f8",
+                      "inverse-surface": "#2f3034",
+                      "on-secondary-container": "#54647a",
+                      "surface-variant": "#e3e2e7",
+                      "on-tertiary-container": "#cd805d",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "tertiary-fixed": "#ffdbcd",
+                      "error": "#ba1a1a",
+                      "on-primary-fixed": "#001b3d",
+                      "on-background": "#1a1c1f",
+                      "background": "#faf9fe",
+                      "on-error-container": "#93000a",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "outline": "#747780",
+                      "inverse-on-surface": "#f1f0f5",
+                      "surface-container-high": "#e8e7ec",
+                      "tertiary": "#2f0c00",
+                      "secondary-fixed": "#d3e4fe"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "inline_padding": "12px",
+                      "sidebar_width": "260px",
+                      "container_padding": "32px",
+                      "base": "8px",
+                      "card_gap": "24px",
+                      "stack_padding": "16px"
+              },
+              "fontFamily": {
+                      "headline-md": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "display": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "label-md": ["Inter"],
+                      "body-md": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "title-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-md": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                      "headline-lg": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                      "display": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                      "label-sm": ["11px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                      "label-md": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                      "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                      "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                      "title-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "600" }]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen w-screen overflow-hidden flex">
+<nav class="fixed left-0 top-0 bottom-0 w-[260px] flex flex-col bg-primary dark:bg-primary border-r border-outline-variant/10 transition-all duration-200 ease-in-out z-20">
+<div class="flex items-center gap-4 px-6 py-8 border-b border-outline-variant/10">
+<span class="material-symbols-outlined text-[32px] text-primary-fixed" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+<div>
+<h1 class="font-display text-display font-bold text-primary-fixed leading-none">SIGOF</h1>
+<p class="font-label-sm text-label-sm text-primary-fixed-dim mt-1">Gestão de Frete</p>
+</div>
+</div>
+<div class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed border-l-4 border-primary-fixed-dim bg-on-primary-fixed-variant/20 hover:bg-on-primary-fixed-variant/10" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed transition-colors hover:bg-on-primary-fixed-variant/10 border-l-4 border-transparent" href="#">
+<span class="material-symbols-outlined">assignment_late</span>
+<span class="font-label-md text-label-md">Ocorrências</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed transition-colors hover:bg-on-primary-fixed-variant/10 border-l-4 border-transparent" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-md text-label-md">Relatórios</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed transition-colors hover:bg-on-primary-fixed-variant/10 border-l-4 border-transparent" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Configurações</span>
+</a>
+</div>
+<div class="p-4 border-t border-outline-variant/10">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed transition-colors hover:bg-on-primary-fixed-variant/10 rounded" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Sair</span>
+</a>
+</div>
+</nav>
+<div class="flex-1 flex flex-col ml-[260px] h-screen overflow-hidden bg-surface">
+<header class="flex justify-between items-center px-container_padding h-16 w-full border-b border-outline-variant bg-surface dark:bg-surface-dim z-10 shrink-0">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors">menu</span>
+<span class="font-headline-lg text-headline-lg font-bold text-primary">SIGOF</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-surface-container-low border border-surface-variant rounded-full px-4 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md font-body-md w-64 placeholder:text-outline p-0" placeholder="Buscar protocolo..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors duration-150">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors duration-150">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-sm font-bold ml-2 cursor-pointer border border-outline-variant">
+                        AR
+                    </div>
+</div>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto p-container_padding flex flex-col gap-8">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Fila de Solicitações</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Gerencie e assuma ocorrências de reversão de frete.</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label-md text-label-md text-on-surface-variant">Última atualização: Hoje, 10:42</span>
+<button class="p-2 bg-surface-container border border-surface-variant rounded hover:bg-surface-container-high transition-colors flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">refresh</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-card_gap">
+<div class="bg-surface-container-lowest p-stack_padding rounded-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border-t-4 border-t-primary flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Novas</span>
+<span class="material-symbols-outlined text-primary bg-primary-fixed/30 p-1.5 rounded text-[20px]">inbox</span>
+</div>
+<span class="font-display text-display text-on-surface">42</span>
+</div>
+<div class="bg-surface-container-lowest p-stack_padding rounded-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border-t-4 border-t-on-tertiary-container flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Em andamento</span>
+<span class="material-symbols-outlined text-on-tertiary-container bg-tertiary-fixed/30 p-1.5 rounded text-[20px]">hourglass_empty</span>
+</div>
+<span class="font-display text-display text-on-surface">18</span>
+</div>
+<div class="bg-surface-container-lowest p-stack_padding rounded-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border-t-4 border-t-secondary flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Aguardando doc.</span>
+<span class="material-symbols-outlined text-secondary bg-surface-variant/50 p-1.5 rounded text-[20px]">pending_actions</span>
+</div>
+<span class="font-display text-display text-on-surface">07</span>
+</div>
+<div class="bg-surface-container-lowest p-stack_padding rounded-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border-t-4 border-t-primary-container flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Resolvidas hoje</span>
+<span class="material-symbols-outlined text-primary-container bg-secondary-fixed/50 p-1.5 rounded text-[20px]">task_alt</span>
+</div>
+<span class="font-display text-display text-on-surface">24</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border border-surface-variant overflow-hidden flex flex-col">
+<div class="p-stack_padding border-b border-surface-variant bg-surface flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border border-surface-variant rounded py-2 pl-3 pr-8 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary w-40">
+<option>Todos os Status</option>
+<option>Novo</option>
+<option>Em andamento</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+</div>
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border border-surface-variant rounded py-2 pl-3 pr-8 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary w-40">
+<option>Todas Prioridades</option>
+<option>Urgente</option>
+<option>Alta</option>
+<option>Média</option>
+<option>Baixa</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-on-surface">Apenas Minha Fila</span>
+<button class="w-10 h-6 bg-surface-variant rounded-full relative flex items-center px-1 cursor-pointer hover:bg-outline-variant transition-colors">
+<div class="w-4 h-4 bg-on-surface-variant rounded-full shadow-sm"></div>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-surface-variant">
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant">Protocolo</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant">Solicitante</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant">Tipo</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant">Prioridade</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant">Status</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant">SLA</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant text-right">Ação</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-variant">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8891</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Logística Sul LTDA</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Avaria no Transporte</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-error-container text-on-error-container border border-error/20">Urgente</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-error">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">error</span>
+<span class="font-label-md text-label-md">0h 15m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8892</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Distribuidora ABC</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Extravio</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-tertiary-fixed text-on-tertiary-fixed-variant border border-tertiary-container/20">Alta</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span class="font-label-md text-label-md">1h 30m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8895</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Varejo Rápido</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Cobrança Indevida</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-secondary-container text-on-secondary-container border border-secondary/20">Média</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span class="font-label-md text-label-md">4h 00m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8898</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Comércio Irmãos</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Atraso na Entrega</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-surface-container-high text-on-surface-variant border border-outline-variant/50">Baixa</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span class="font-label-md text-label-md">12h 00m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8901</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Indústria Apex</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Devolução Parcial</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-tertiary-fixed text-on-tertiary-fixed-variant border border-tertiary-container/20">Alta</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span class="font-label-md text-label-md">0h 45m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8902</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Mercado Central</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Avaria no Transporte</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-secondary-container text-on-secondary-container border border-secondary/20">Média</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span class="font-label-md text-label-md">5h 20m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium">REV-2023-8905</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">E-commerce Brasil</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Extravio</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-error-container text-on-error-container border border-error/20">Urgente</span>
+</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Novo</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1.5 text-error">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">error</span>
+<span class="font-label-md text-label-md">-0h 10m</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary-fixed">Assumir</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t border-surface-variant bg-surface flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Mostrando 1 a 7 de 42 registros</span>
+<div class="flex items-center gap-1">
+<button class="p-1.5 text-outline hover:text-on-surface transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-[20px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-primary-fixed text-on-primary-fixed font-label-md text-label-md">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md transition-colors">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md transition-colors">3</button>
+<span class="text-on-surface-variant px-1">...</span>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md transition-colors">6</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<div class="h-8 shrink-0"></div>
+</main>
+</div>
+</body></html>

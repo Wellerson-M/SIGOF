@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Detalhes da Solicitação - SIGOF</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for chat */
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background-color: #e3e2e7;
+            border-radius: 20px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-tint": "#405f91",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed-dim": "#a9c7ff",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface": "#faf9fe",
+                        "on-primary-fixed-variant": "#264778",
+                        "surface-container-highest": "#e3e2e7",
+                        "primary": "#001736",
+                        "surface-dim": "#dad9de",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed": "#d6e3ff",
+                        "on-secondary-fixed": "#0b1c30",
+                        "on-surface-variant": "#43474f",
+                        "primary-container": "#002b5b",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#7594ca",
+                        "secondary-container": "#d0e1fb",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#1a1c1f",
+                        "tertiary-container": "#4f1c02",
+                        "surface-bright": "#faf9fe",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#713619",
+                        "secondary": "#505f76",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "outline-variant": "#c4c6d0",
+                        "inverse-primary": "#a9c7ff",
+                        "surface-container": "#eeedf2",
+                        "surface-container-low": "#f4f3f8",
+                        "inverse-surface": "#2f3034",
+                        "on-secondary-container": "#54647a",
+                        "surface-variant": "#e3e2e7",
+                        "on-tertiary-container": "#cd805d",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "tertiary-fixed": "#ffdbcd",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#001b3d",
+                        "on-background": "#1a1c1f",
+                        "background": "#faf9fe",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "outline": "#747780",
+                        "inverse-on-surface": "#f1f0f5",
+                        "surface-container-high": "#e8e7ec",
+                        "tertiary": "#2f0c00",
+                        "secondary-fixed": "#d3e4fe"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        full: "9999px"
+                    },
+                    spacing: {
+                        inline_padding: "12px",
+                        sidebar_width: "260px",
+                        container_padding: "32px",
+                        base: "8px",
+                        card_gap: "24px",
+                        stack_padding: "16px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "title-lg": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-md": ["20px", { lineHeight: "1.4", fontWeight: "600" }],
+                        "headline-lg": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+                        "display": ["32px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "label-sm": ["11px", { lineHeight: "1.2", fontWeight: "600" }],
+                        "label-md": ["12px", { lineHeight: "1.2", fontWeight: "500" }],
+                        "body-md": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "title-lg": ["18px", { lineHeight: "1.5", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen font-body-md overflow-x-hidden">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 bottom-0 w-[260px] flex flex-col bg-primary dark:bg-primary border-r border-outline-variant/10 transition-all duration-200 ease-in-out z-50 md:flex hidden">
+<div class="px-container_padding py-8 flex flex-col gap-2">
+<h1 class="font-display text-display font-bold text-primary-fixed">SIGOF</h1>
+<p class="font-label-sm text-label-sm text-primary-fixed-dim uppercase tracking-wider">Gestão de Frete</p>
+</div>
+<div class="flex-1 px-4 py-6 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-primary-fixed border-l-4 border-primary-fixed-dim bg-on-primary-fixed-variant/20 rounded-r-DEFAULT transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined icon-fill">assignment_late</span>
+<span class="font-label-md text-label-md">Ocorrências</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-md text-label-md">Relatórios</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Configurações</span>
+</a>
+</div>
+<div class="mt-auto px-4 py-6">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container hover:text-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Sair</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="hidden md:flex justify-between items-center px-container_padding ml-[260px] h-16 w-[calc(100%-260px)] border-b border-outline-variant bg-surface dark:bg-surface-dim z-40 fixed top-0 transition-colors duration-150">
+<div class="flex-1 max-w-md ml-4">
+<!-- Search left placeholder -->
+</div>
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-colors duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-colors duration-150">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdE88Ovstem7OML5otS_lxqVulkgT3z3tGodAKI9EIH_WZPnXZIF5bcN_T4A34rrwyw1PT9pC5Bp0hPF7nczhuUOpuR7WJ06u5CEl3n9AQCQhwt7bznzpn-2qOXA6meJhDJiE1k3_7Kfy_Xvrkp_lDEGHtLoSpIFdGzEhguKeENuhp6ovEf8GPw4xiwty_ZWB5j4AEigHrwi3fNM9a69vVlBztsc0k5ujUmUS-fMTd6824pxKK7ZUfnoooi9fBZh5eW5csheJ_VFlS"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="md:ml-[260px] md:pt-16 min-h-screen p-container_padding bg-background transition-all">
+<div class="max-w-[1400px] mx-auto">
+<!-- Page Header / Top Action Bar -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<a class="text-on-surface-variant hover:text-primary transition-colors flex items-center" href="#">
+<span class="material-symbols-outlined">arrow_back</span>
+</a>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">SOL-2026-04-0001</h2>
+</div>
+<div class="flex gap-2 ml-9">
+<span class="px-2 py-1 rounded bg-secondary-container text-on-secondary-container font-label-md text-label-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">pending</span> Em análise
+                        </span>
+<span class="px-2 py-1 rounded bg-error-container text-on-error-container font-label-md text-label-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Alta
+                        </span>
+</div>
+</div>
+<div class="flex gap-3 w-full md:w-auto ml-9 md:ml-0">
+<button class="flex-1 md:flex-none px-4 py-2 border border-outline-variant text-on-surface bg-surface hover:bg-surface-container transition-colors rounded font-label-md text-label-md">
+                        Assumir
+                    </button>
+<button class="flex-1 md:flex-none px-4 py-2 border border-outline-variant text-on-surface bg-surface hover:bg-surface-container transition-colors rounded font-label-md text-label-md">
+                        Atualizar status
+                    </button>
+<button class="flex-1 md:flex-none px-4 py-2 bg-primary-container text-on-primary border border-transparent hover:opacity-90 transition-opacity rounded font-label-md text-label-md">
+                        Finalizar
+                    </button>
+</div>
+</div>
+<!-- Two Column Layout -->
+<div class="flex flex-col lg:flex-row gap-card_gap">
+<!-- Left Column (70%) -->
+<div class="w-full lg:w-[70%] flex flex-col gap-card_gap">
+<!-- Dados da Solicitação -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+<h3 class="font-title-lg text-title-lg text-on-surface mb-6 flex items-center gap-2 pb-4 border-b border-surface-variant">
+<span class="material-symbols-outlined text-primary">info</span>
+                            Dados da Solicitação
+                        </h3>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-8">
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Solicitante</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">Carlos Mendes</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Área</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">Logística Filial SP</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Tipo</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">Alteração de Pagador</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">CTe</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">352604000111222333444555666</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">NF</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">889922</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Pagador Correto</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">12.345.678/0001-90</span>
+</div>
+<div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col gap-2 mt-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Descrição</span>
+<p class="font-body-md text-body-md text-on-surface bg-surface-container-low p-4 rounded border border-outline-variant/30 leading-relaxed">
+                                    O CTe foi emitido com o pagador CIF (Remetente), porém a negociação comercial aprovada para esta carga específica prevê frete FOB (Destinatário). Solicito a emissão de carta de correção ou cancelamento/reemissão do CTe apontando o CNPJ 12.345.678/0001-90 como responsável pelo frete, conforme e-mail de autorização em anexo.
+                                </p>
+</div>
+</div>
+</section>
+<!-- Anexos -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+<div class="flex justify-between items-center mb-6 pb-4 border-b border-surface-variant">
+<h3 class="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">attachment</span>
+                                Anexos
+                            </h3>
+<button class="text-primary hover:bg-primary-fixed hover:text-on-primary-fixed px-3 py-1.5 rounded text-sm font-medium transition-colors">
+                                Adicionar
+                            </button>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+<!-- File Card 1 -->
+<div class="group relative flex flex-col items-center p-4 border border-outline-variant rounded hover:border-primary-fixed-dim hover:bg-surface-container-low transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">picture_as_pdf</span>
+<span class="font-label-md text-label-md text-on-surface text-center truncate w-full">CTe_Original.pdf</span>
+<span class="font-label-sm text-label-sm text-outline mt-1">245 KB</span>
+<button class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-on-surface-variant hover:text-error transition-all">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+<!-- File Card 2 -->
+<div class="group relative flex flex-col items-center p-4 border border-outline-variant rounded hover:border-primary-fixed-dim hover:bg-surface-container-low transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">image</span>
+<span class="font-label-md text-label-md text-on-surface text-center truncate w-full">Autorizacao.jpg</span>
+<span class="font-label-sm text-label-sm text-outline mt-1">1.2 MB</span>
+<button class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-on-surface-variant hover:text-error transition-all">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Linha do Tempo -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+<h3 class="font-title-lg text-title-lg text-on-surface mb-6 flex items-center gap-2 pb-4 border-b border-surface-variant">
+<span class="material-symbols-outlined text-primary">history</span>
+                            Histórico
+                        </h3>
+<div class="relative border-l-2 border-surface-variant ml-4 pl-6 pb-2 space-y-8">
+<!-- Timeline Item 1 -->
+<div class="relative">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-surface-container-lowest border-2 border-primary flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Status atualizado para 'Em análise'</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant px-2 py-0.5 bg-surface-container rounded-full">Automático</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">12/04/2026 - 14:32</span>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-surface-container-lowest border-2 border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px] text-outline-variant">add</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Solicitação criada</span>
+<span class="font-label-sm text-label-sm text-primary">Carlos Mendes</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">12/04/2026 - 14:30</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column (30%) - Conversa -->
+<div class="w-full lg:w-[30%] flex flex-col h-[800px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.02)] overflow-hidden">
+<!-- Chat Header -->
+<div class="p-4 border-b border-surface-variant bg-surface flex justify-between items-center">
+<h3 class="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">chat</span>
+                            Discussão
+                        </h3>
+<span class="px-2 py-1 bg-surface-container-high rounded text-xs font-medium text-on-surface-variant">2 mensagens</span>
+</div>
+<!-- Chat Body -->
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-6 chat-scroll bg-[#f8fafc]">
+<!-- Message Solicitante -->
+<div class="flex flex-col gap-1 items-start max-w-[85%]">
+<div class="flex items-center gap-2 ml-1">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[10px] font-bold">CM</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Carlos Mendes</span>
+<span class="font-label-sm text-label-sm text-outline text-[10px]">14:35</span>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/50 p-3 rounded-2xl rounded-tl-sm shadow-sm text-body-md text-on-surface">
+                                Olá, adicionei a autorização no anexo. A transportadora está cobrando a emissão rápida.
+                            </div>
+</div>
+<!-- Message Analista (Self) -->
+<div class="flex flex-col gap-1 items-end max-w-[85%] self-end">
+<div class="flex items-center gap-2 mr-1 flex-row-reverse">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-[10px] font-bold">EU</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Você</span>
+<span class="font-label-sm text-label-sm text-outline text-[10px]">15:10</span>
+</div>
+<div class="bg-primary-fixed-dim text-on-primary-fixed p-3 rounded-2xl rounded-tr-sm shadow-sm text-body-md">
+                                Recebido, Carlos. Vou validar a carta de correção junto ao fiscal e já retorno.
+                            </div>
+</div>
+</div>
+<!-- Chat Input -->
+<div class="p-4 border-t border-surface-variant bg-surface">
+<div class="relative border border-outline-variant rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all bg-surface-container-lowest">
+<textarea class="w-full bg-transparent border-none focus:ring-0 resize-none p-3 pb-10 text-body-md text-on-surface placeholder-on-surface-variant/50" placeholder="Digite uma mensagem ou nota interna..." rows="2"></textarea>
+<div class="absolute bottom-2 right-2 flex gap-2">
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container rounded transition-colors" title="Anexar arquivo no chat">
+<span class="material-symbols-outlined text-[20px]">attach_file</span>
+</button>
+<button class="p-1.5 bg-primary text-on-primary hover:bg-primary-container rounded transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">send</span>
+</button>
+</div>
+</div>
+<div class="mt-2 flex justify-between items-center px-1">
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Nota interna (visível só para analistas)</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
