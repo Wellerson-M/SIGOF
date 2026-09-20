@@ -1,0 +1,232 @@
+// Modelo de dados do SIGOF (RFC seções 5.2 e 5.5).
+//
+// Toda tabela de negócio carrega `empresaId`, que é a chave de isolamento
+// multi-tenant. O filtro por empresa é aplicado no backend a partir do
+// usuário autenticado — nunca a partir de parâmetro enviado pelo cliente.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// A connection string é definida em prisma.config.ts (Prisma 7+).
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- Enums
+
+enum Perfil {
+  SOLICITANTE
+  ANALISTA
+  SUPERVISOR
+  ADMIN
+}
+
+enum Area {
+  FINANCEIRO
+  COMERCIAL
+  OPERACIONAL
+}
+
+enum TipoOcorrencia {
+  REVERSAO
+  TROCA_PAGADOR
+  AJUSTE_FISCAL
+  OUTRO
+}
+
+enum StatusSolicitacao {
+  NOVO
+  EM_ANDAMENTO
+  AGUARDANDO_DOC
+  ESCALADO
+  RESOLVIDO
+  CANCELADO
+}
+
+enum Prioridade {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+// ------------------------------------------------------------- Entidades
+
+/// Transportadora. No MVP existe apenas a Aceville, mas é a chave que
+/// viabiliza a evolução para SaaS multi-transportadora (RFC seção 1.7).
+model Empresa {
+  id          String   @id @default(uuid())
+  razaoSocial String   @map("razao_social")
+  cnpj        String   @unique
+  ativa       Boolean  @default(true)
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  usuarios     Usuario[]
+  solicitacoes Solicitacao[]
+  sequencias   SequenciaProtocolo[]
+
+  @@map("empresas")
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  empresaId String   @map("empresa_id")
+  nome      String
+  email     String
+  senhaHash String   @map("senha_hash")
+  perfil    Perfil
+  area      Area?
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  solicitacoesAbertas    Solicitacao[]      @relation("SolicitacoesAbertas")
+  solicitacoesAtribuidas Solicitacao[]      @relation("SolicitacoesAtribuidas")
+  mensagens              Mensagem[]
+  historicos             StatusHistorico[]
+  notificacoes           Notificacao[]
+  anexos                 Anexo[]
+
+  // O e-mail é único dentro da empresa, não globalmente: em um cenário
+  // multi-tenant, a mesma pessoa pode existir em duas transportadoras.
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@map("usuarios")
+}
+
+model Solicitacao {
+  id        String @id @default(uuid())
+  empresaId String @map("empresa_id")
+
+  /// Formato SOL-AAAA-MM-NNNN. Único por empresa (não globalmente), para
+  /// que cada transportadora tenha sua própria numeração no modelo SaaS.
+  protocolo String
+
+  solicitanteId String  @map("solicitante_id")
+  responsavelId String? @map("responsavel_id")
+
+  tipo           TipoOcorrencia
+  cte            String?
+  nf             String?
+  pagadorCorreto String?        @map("pagador_correto")
+  descricao      String
+
+  status     StatusSolicitacao @default(NOVO)
+  prioridade Prioridade        @default(MEDIA)
+
+  // --- Controle de SLA (RFC seções 2.5 e 3.2) ---
+  // O prazo é calculado em minutos úteis a partir da abertura. Enquanto a
+  // solicitação fica em AGUARDANDO_DOC o relógio para: `slaPausadoEm` marca
+  // o início da pausa e `slaMinutosPausados` acumula o tempo já pausado.
+  slaVenceEm         DateTime? @map("sla_vence_em")
+  slaPausadoEm       DateTime? @map("sla_pausado_em")
+  slaMinutosPausados Int       @default(0) @map("sla_minutos_pausados")
+
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+  resolvidoEm DateTime? @map("resolvido_em")
+
+  empresa     Empresa @relation(fields: [empresaId], references: [id])
+  solicitante Usuario @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])
+  responsavel Usuario? @relation("SolicitacoesAtribuidas", fields: [responsavelId], references: [id])
+
+  mensagens    Mensagem[]
+  anexos       Anexo[]
+  historicos   StatusHistorico[]
+  notificacoes Notificacao[]
+
+  @@unique([empresaId, protocolo])
+  // Índices que sustentam a detecção de duplicidade (RF09): a busca é
+  // sempre por empresa + documento dentro da janela de 7 dias.
+  @@index([empresaId, cte])
+  @@index([empresaId, nf])
+  @@index([empresaId, status])
+  @@map("solicitacoes")
+}
+
+/// Contador de protocolo por empresa/ano/mês.
+///
+/// Uma linha por competência, incrementada dentro da mesma transação que
+/// cria a solicitação. Isso evita que duas aberturas simultâneas recebam o
+/// mesmo número — o que aconteceria com uma contagem do tipo
+/// `SELECT COUNT(*) + 1`.
+model SequenciaProtocolo {
+  empresaId String @map("empresa_id")
+  ano       Int
+  mes       Int
+  ultimo    Int    @default(0)
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  @@id([empresaId, ano, mes])
+  @@map("sequencias_protocolo")
+}
+
+model Mensagem {
+  id            String   @id @default(uuid())
+  solicitacaoId String   @map("solicitacao_id")
+  autorId       String   @map("autor_id")
+  conteudo      String
+  /// true = comentário interno entre analistas; false = visível ao solicitante
+  interna       Boolean  @default(false)
+  criadoEm      DateTime @default(now()) @map("criado_em")
+
+  solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
+  autor       Usuario     @relation(fields: [autorId], references: [id])
+
+  @@index([solicitacaoId])
+  @@map("mensagens")
+}
+
+model Anexo {
+  id            String   @id @default(uuid())
+  solicitacaoId String   @map("solicitacao_id")
+  enviadoPorId  String   @map("enviado_por_id")
+  nomeArquivo   String   @map("nome_arquivo")
+  /// Chave no storage S3-compatível, prefixada por empresa (RFC seção 5.5)
+  chaveStorage  String   @map("chave_storage")
+  tipoMime      String   @map("tipo_mime")
+  tamanhoBytes  Int      @map("tamanho_bytes")
+  criadoEm      DateTime @default(now()) @map("criado_em")
+
+  solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
+  enviadoPor  Usuario     @relation(fields: [enviadoPorId], references: [id])
+
+  @@index([solicitacaoId])
+  @@map("anexos")
+}
+
+/// Trilha de auditoria imutável das mudanças de status (RNF09).
+/// Registros são apenas inseridos, nunca alterados ou removidos.
+model StatusHistorico {
+  id             String             @id @default(uuid())
+  solicitacaoId  String             @map("solicitacao_id")
+  autorId        String             @map("autor_id")
+  statusAnterior StatusSolicitacao? @map("status_anterior")
+  statusNovo     StatusSolicitacao  @map("status_novo")
+  observacao     String?
+  criadoEm       DateTime           @default(now()) @map("criado_em")
+
+  solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
+  autor       Usuario     @relation(fields: [autorId], references: [id])
+
+  @@index([solicitacaoId])
+  @@map("status_historicos")
+}
+
+model Notificacao {
+  id            String   @id @default(uuid())
+  usuarioId     String   @map("usuario_id")
+  solicitacaoId String   @map("solicitacao_id")
+  mensagem      String
+  lida          Boolean  @default(false)
+  criadoEm      DateTime @default(now()) @map("criado_em")
+
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
+
+  @@index([usuarioId, lida])
+  @@map("notificacoes")
+}
