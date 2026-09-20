@@ -1,0 +1,22 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/http/server.ts'],
+      // Quality gate da RFC seção 5.6: mínimo de 75% no backend.
+      // O pipeline reprova o merge se a cobertura cair abaixo disso.
+      thresholds: {
+        lines: 75,
+        functions: 75,
+        branches: 75,
+        statements: 75,
+      },
+    },
+  },
+});

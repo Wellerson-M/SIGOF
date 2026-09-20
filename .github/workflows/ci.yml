@@ -1,0 +1,43 @@
+# Pipeline de integração contínua do SIGOF (RFC seção 5.9).
+# Roda a cada push e pull request; o merge na main depende da aprovação
+# deste workflow (quality gate).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — lint, typecheck e testes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Verificação de tipos (tsc)
+        run: npm run typecheck
+
+      - name: Testes + cobertura (mínimo 75% — RFC 5.6)
+        run: npm run test:coverage
+
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high
+        continue-on-error: true

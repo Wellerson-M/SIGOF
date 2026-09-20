@@ -1,0 +1,47 @@
+# Ambiente de desenvolvimento do SIGOF (RFC seção 5.8).
+# Sobe as dependências de infraestrutura; a API roda fora do compose
+# durante o desenvolvimento (npm run dev), para manter o hot reload.
+#
+#   docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sigof-postgres
+    environment:
+      POSTGRES_USER: sigof
+      POSTGRES_PASSWORD: sigof
+      POSTGRES_DB: sigof
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigof -d sigof"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Storage de anexos S3-compatível. Substitui o AWS S3 em desenvolvimento
+  # sem alterar a aplicação (RFC seção 5.4).
+  minio:
+    image: minio/minio:latest
+    container_name: sigof-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: sigof
+      MINIO_ROOT_PASSWORD: sigof-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  minio-data:
