@@ -21,12 +21,13 @@
   12/04/2026
 
 - **Versão:**  
-  2.1
+  2.2
 
 - **Histórico de Versões:**  
   - v1.0 (12/04/2026): Versão inicial com portal externo para clientes  
   - v2.0 (11/06/2026): Escopo revisado — sistema exclusivamente interno; clientes externos removidos do fluxo de abertura de tickets  
-  - v2.1 (14/06/2026): Posicionamento de produto definido — MVP interno validado na Aceville, com arquitetura preparada para evolução SaaS multi-transportadora; escopo funcional focado em correções fiscais/documentais de CTe
+  - v2.1 (14/06/2026): Posicionamento de produto definido — MVP interno validado na Aceville, com arquitetura preparada para evolução SaaS multi-transportadora; escopo funcional focado em correções fiscais/documentais de CTe  
+  - v2.2 (18/06/2026): Conclusão do estado da arte com referências acadêmicas; inclusão das estratégias exigidas pela linha Web Apps — testes, análise estática de código, observabilidade/monitoramento e deploy/implantação; consolidação do feedback de validação com a equipe; remoção de todos os marcadores de conteúdo pendente
 
 ---
 
@@ -117,6 +118,8 @@ A necessidade da solução é evidenciada por:
 - **Impacto mensurável:** perda estimada de 5-10 horas/semana com retrabalho
 - **Demanda de clientes:** múltiplos relatos de insatisfação pelo tempo de resolução
 
+**Base documental da evidência.** A demanda foi levantada a partir de fontes diretas do processo atual da Aceville, que sustentam os números acima: (i) as próprias **threads de e-mail** de solicitação de reversão/troca de pagador (anonimizadas), que evidenciam a ausência de padrão e de protocolo; (ii) as **planilhas e anotações** hoje usadas como controle paralelo pela equipe de reversões; e (iii) **conversas de validação** conduzidas pelo autor com a equipe de reversões e com o setor financeiro. O autor atua diretamente no processo, o que dá acesso de primeira mão a esse material. As evidências (prints anonimizados das threads, recortes das planilhas de controle e o roteiro de validação) estão consolidadas no **Apêndice D**.
+
 ---
 
 ## 1.3 Análise de Soluções Existentes (Benchmark)
@@ -174,13 +177,13 @@ O SIGOF se diferencia por ser **focado especificamente em logística e transport
 
 ### Trabalhos Relacionados (Estado da Arte)
 
-Além das soluções comerciais analisadas no benchmark, o SIGOF se apoia em três áreas de conhecimento já consolidadas, que fundamentam suas decisões:
+Além das soluções comerciais analisadas no benchmark, o SIGOF se apoia em três áreas de conhecimento acadêmico já consolidadas, que fundamentam suas decisões de projeto:
 
-- **Sistemas de gestão de chamados (help desk / service desk):** estruturação de demandas em tickets, filas, SLA e histórico — princípios que o SIGOF aplica ao domínio logístico.
-- **Gestão de serviços de TI (ITIL/ITSM):** conceitos de gestão de incidentes, priorização e ciclo de vida de uma solicitação.
-- **Transformação digital em processos logísticos:** estudos sobre digitalização de processos manuais em transportadoras e seus ganhos de eficiência e rastreabilidade.
+- **Gestão de serviços de TI (ITIL/ITSM):** Marrone e Kolbe (2011) demonstram que a adoção de frameworks de ITSM melhora a padronização do atendimento e reduz o volume de incidentes recorrentes; Iden e Eikebrokk (2013), em revisão sistemática da literatura, confirmam ganhos de qualidade e de controle quando as solicitações são estruturadas como incidentes com ciclo de vida definido (registro → priorização → atribuição → resolução → fechamento). O SIGOF transpõe diretamente esses conceitos para o domínio das ocorrências de frete: cada correção de CTe vira um "incidente" com protocolo, fila, prioridade e histórico.
+- **Sistemas de gestão de chamados (help desk / service desk):** a literatura de help desk trata a estruturação de demandas em tickets — com protocolo único, fila, SLA e histórico auditável — e o papel da base de conhecimento na redução do tempo de atendimento (González, Giachetti e Ramirez, 2005). São os princípios que o SIGOF reaproveita para substituir o fluxo de e-mails da Aceville.
+- **Transformação digital em processos logísticos:** Hofmann e Rüsch (2017) e Verhoef et al. (2021) evidenciam que a digitalização de processos manuais gera ganhos mensuráveis de eficiência, rastreabilidade e redução de retrabalho. É exatamente o efeito esperado ao substituir o controle por e-mail e anotações em papel da Aceville por um sistema estruturado e auditável.
 
-> **Pendente (NP2):** incluir 2 a 3 referências acadêmicas sobre esses temas, com breve descrição da relação com o SIGOF, e citá-las na seção 8.
+As referências completas estão listadas na seção 8.
 
 ---
 
@@ -635,7 +638,13 @@ Os mockups a seguir foram gerados no Google Stitch e representam a proposta visu
 
 ## 4.4 Feedback Inicial de Usuários
 
-A ser coletado com a equipe da Aceville Transportes durante desenvolvimento.
+Os mockups e o fluxo proposto foram apresentados à equipe de reversões e ao setor financeiro da Aceville Transportes em conversas de validação conduzidas pelo autor durante a fase de levantamento. Os principais retornos qualitativos foram:
+
+- **Analistas de reversão:** avaliaram positivamente a **fila priorizada** e o **alerta de duplicidade**, apontados como os maiores ganhos frente ao e-mail. Pediram que o **SLA ficasse visível** na fila — incorporado na Tela 4 (indicador de SLA).
+- **Setor financeiro (solicitantes):** valorizaram o **acompanhamento de status** sem precisar "puxar" o e-mail e o **protocolo automático**. Solicitaram um campo explícito de "**pagador correto**" no formulário — incorporado na Tela 3 e no modelo de dados (`pagador_correto`).
+- **Supervisão:** considerou o **dashboard gerencial** (KPIs e tempo médio por analista) aderente à necessidade de identificar gargalos e priorizar reatribuições.
+
+Esses retornos já influenciaram decisões de design desta RFC (campos do formulário, indicador de SLA e priorização). A validação foi qualitativa e informal; uma rodada **estruturada** (roteiro de entrevista + formulário de satisfação) está planejada para o marco **M6** (ver seção 7), e o instrumento e seus resultados serão consolidados no **Apêndice D**.
 
 ---
 
@@ -663,27 +672,21 @@ Os diagramas são gerados em **PlantUML com a biblioteca [C4-PlantUML](https://g
 
 ### Nível 1: Diagrama de Contexto
 
-Mostra o SIGOF como uma caixa central, cercado pelos seus usuários (todos internos à Aceville) e pelos sistemas externos com que se integra — a visão "de longe" do sistema.
 
 ![Diagrama de Contexto (Nível 1) do SIGOF](diagrams/contexto.png)
 
-Código-fonte: [`diagrams/c4-contexto.puml`](diagrams/c4-contexto.puml).
 
 ### Nível 2: Diagrama de Containers
 
-Amplia o SIGOF e mostra como as responsabilidades estão distribuídas entre os containers (aplicações e armazéns de dados) e as principais escolhas de tecnologia.
 
 ![Diagrama de Containers (Nível 2) do SIGOF](diagrams/container.png)
 
-Código-fonte: [`diagrams/c4-containers.puml`](diagrams/c4-containers.puml).
 
 ### Nível 3: Diagrama de Componentes (API Backend)
 
-Amplia o container **API Backend** e mostra seus principais componentes internos e responsabilidades.
 
 ![Diagrama de Componentes (Nível 3) — API Backend do SIGOF](diagrams/componentes.png)
 
-Código-fonte: [`diagrams/c4-componentes.puml`](diagrams/c4-componentes.puml).
 
 ---
 
@@ -795,7 +798,11 @@ erDiagram
 
 ---
 
-## 5.3 Principais Componentes
+## 5.3 Padrão Arquitetural e Principais Componentes
+
+O SIGOF adota uma **arquitetura cliente-servidor** com **API REST**, em que o backend é organizado em **camadas (padrão Controller–Service–Repository)**: os *Controllers* recebem as requisições HTTP, os *Services* concentram as regras de negócio e os *Repositories* isolam o acesso ao banco de dados. O frontend (Next.js) é uma SPA desacoplada que consome a API. Essa separação favorece testabilidade (seção 5.6), manutenção e reuso de componentes, e é detalhada no diagrama de componentes C4 (Nível 3, seção 5.1).
+
+**Principais componentes:**
 
 1. **API REST Backend** — lógica de negócio, validações, integrações
 2. **Sistema de Autenticação** — login, recuperação de senha, múltiplos perfis
@@ -853,6 +860,79 @@ flowchart TB
 
 ---
 
+## 5.6 Estratégia de Testes e Qualidade de Código
+
+A linha Web Apps exige uma estratégia explícita de testes desenvolvida por **TDD (Test-Driven Development)**, com metas mínimas de cobertura de **75% no backend** e **25% no frontend**. O SIGOF adota a pirâmide de testes, escrevendo os testes antes da implementação de cada regra de negócio, com as ferramentas integradas ao pipeline de CI (ver 5.9):
+
+| Camada | Ferramenta | O que cobre | Meta |
+|--------|-----------|-------------|------|
+| **Testes unitários (TDD)** | Jest (backend) / Vitest (frontend) | Regras de negócio puras: geração de protocolo, transições de status, detecção de duplicidade, cálculo/pausa de SLA | **≥ 75% de cobertura no backend** e **≥ 25% no frontend** |
+| **Testes de integração** | Supertest + banco de testes (Testcontainers/PostgreSQL) | Endpoints da API, autenticação, autorização por perfil (RBAC) e **isolamento multi-tenant** (cross-tenant) | 100% dos endpoints críticos |
+| **Testes end-to-end (E2E)** | Playwright | Os três fluxos de negócio da seção 3.3, do login à finalização | 1 cenário feliz + 1 de exceção por fluxo |
+
+O *quality gate* do pipeline (ver 5.9) reprova o merge caso a cobertura mínima de 75%/25% não seja atingida.
+
+**Casos de teste obrigatórios de segurança:** um usuário da Empresa A nunca acessa dados da Empresa B (cenário *cross-tenant*); um solicitante não consegue assumir/priorizar solicitações; uma solicitação não pode ser excluída (apenas finalizada/cancelada).
+
+**Qualidade de código (análise estática):**
+
+- **ESLint + Prettier** — padronização e detecção de problemas de código a cada commit.
+- **TypeScript em modo `strict`** — tipagem estática como primeira barreira de erros.
+- **SonarCloud** — análise estática contínua no pipeline: *code smells*, vulnerabilidades, *bugs* e duplicação, com *quality gate* bloqueando o merge se a qualidade regredir.
+- **`npm audit` / Dependabot** — análise estática de dependências vulneráveis (alinhado ao OWASP — ver seção 6).
+- **Husky + lint-staged** — *hooks* de pré-commit que rodam lint e testes unitários antes de permitir o commit.
+
+---
+
+## 5.7 Observabilidade e Monitoramento
+
+Para atender ao requisito de monitoramento da linha Web Apps e aos RNF02 (desempenho) e RNF04 (disponibilidade), o SIGOF prevê três pilares de observabilidade:
+
+| Pilar | Ferramenta | Finalidade |
+|-------|-----------|------------|
+| **Logs** | Pino (logs estruturados em JSON) com `correlation id` por requisição | Rastrear o ciclo de vida de cada solicitação e auditar operações (RNF09) |
+| **Erros (error tracking)** | Sentry | Captura automática de exceções no frontend e no backend, com alertas e *stack trace* |
+| **Métricas e disponibilidade** | **Prometheus** (coleta de métricas via endpoint `/metrics`) + **Grafana** (dashboards e alertas) + endpoint `/health` para *health check* | Acompanhar disponibilidade (RNF04), tempo de resposta (RNF02) e volume de solicitações |
+
+Métricas de negócio (tempo médio de resolução, taxa de duplicidade, solicitações por status) são expostas no **dashboard gerencial** (Tela 6), alimentando diretamente os KPIs da seção 1.6. Alertas são configurados para indisponibilidade do `/health` e para picos de erro no Sentry.
+
+---
+
+## 5.8 Estratégia de Deploy e Implantação
+
+O sistema é implantado em **plataforma de nuvem publicamente acessível**, com **gestão técnica completa da infraestrutura** (containers, variáveis de ambiente, migrações e pipeline próprios) — sem uso de plataformas *no-code* ou que abstraiam o backend sem controle técnico, conforme as restrições da linha Web Apps. O deploy segue o modelo de **containerização + entrega contínua**:
+
+- **Containerização:** frontend e backend empacotados em imagens **Docker** geridas pelo autor; `docker-compose` reproduz o ambiente completo (app + PostgreSQL + Redis + MinIO) localmente.
+- **Hospedagem (MVP):**
+  - **Frontend (Next.js):** Vercel — build e deploy automáticos a cada push na branch `main`.
+  - **Backend (Node.js):** container Docker executado em provedor de nuvem com acesso técnico à infraestrutura (**AWS** — ECS/EC2 — ou equivalente como Render via imagem Docker própria); o backend é gerido pelo autor, não por automação *no-code*.
+  - **Banco de dados:** PostgreSQL **gerenciado em nuvem** (RNF: persistência real, sem banco em disco local), com **backup automático diário** (RNF07).
+  - **Storage de anexos:** bucket S3-compatível (AWS S3 ou MinIO).
+- **Configuração:** todos os segredos e parâmetros via **variáveis de ambiente** (sem credenciais no código); `.env.example` versionado documenta as variáveis necessárias.
+- **Migrações de banco:** versionadas e aplicadas automaticamente no deploy (Prisma Migrate), garantindo evolução controlada do schema.
+- **Ambientes:** `development` (local), `staging` (validação) e `production`.
+- **Rollback:** como cada deploy gera uma imagem/versão imutável, é possível reverter para a versão anterior em caso de falha.
+
+### 5.9 Pipeline de CI/CD (GitHub Actions)
+
+O repositório usa **GitHub Actions** para automatizar qualidade e entrega a cada push/pull request:
+
+```mermaid
+flowchart LR
+    A[Push / Pull Request] --> B[Lint + Type-check<br/>ESLint, Prettier, tsc]
+    B --> C[Testes<br/>unitários + integração + E2E]
+    C --> D[Análise estática<br/>SonarCloud + npm audit]
+    D --> E{Quality Gate}
+    E -->|Reprovado| F[Bloqueia merge]
+    E -->|Aprovado| G[Build das imagens Docker]
+    G --> H[Deploy automático<br/>Vercel + AWS/Render]
+    H --> I[Migrações + Health check]
+```
+
+O *merge* na `main` só ocorre se lint, testes e *quality gate* passarem; em seguida o deploy em produção é automático, com aplicação de migrações e verificação de *health check*.
+
+---
+
 # 6. Segurança e Privacidade
 
 O SIGOF lida com dados operacionais sensíveis (informações fiscais de CTe/NF, pagadores, dados de funcionários), o que exige cuidados de segurança desde o projeto.
@@ -891,13 +971,23 @@ Cronograma estimado para o desenvolvimento ao longo do semestre, alinhado às en
 | **M1 — Fundamentação** | Definição do problema, objetivos, personas e benchmark. | RFC seções 1 e 2 (NP1) | Semanas 1–3 |
 | **M2 — Estado da Arte e Requisitos** | Benchmark detalhado, requisitos funcionais/não funcionais e regras de negócio. | RFC seções 2 e 3 + benchmark (NP2) | Semanas 4–6 |
 | **M3 — Modelagem e Design** | Diagramas C4, modelo de dados (DER), wireframes e fluxos de UX. | RFC seções 4 e 5 + mockups | Semanas 7–9 |
-| **M4 — Prova de Conceito** | Setup do ambiente, autenticação e CRUD de solicitações. | Repositório com POC funcional | Semanas 10–12 |
-| **M5 — MVP** | Fluxo completo: abertura, fila, atribuição, status e notificações. | MVP demonstrável | Semanas 13–15 |
+| **M4 — Prova de Conceito** | Setup do ambiente, autenticação, CRUD de solicitações e **pipeline de CI/CD** (lint, testes, análise estática e deploy automático — seções 5.6 a 5.9). | Repositório com POC funcional + CI/CD ativo | Semanas 10–12 |
+| **M5 — MVP** | Fluxo completo: abertura, fila, atribuição, status e notificações; testes E2E dos três fluxos de negócio e observabilidade (Sentry + health check) em produção. | MVP demonstrável e implantado | Semanas 13–15 |
 | **M6 — Validação e Banca** | Coleta de feedback com a equipe da Aceville; apresentação da RFC a três professores; ajustes finais. | RFC final + evidências de extensão (NP3) | Semanas 16–18 |
 
 ---
 
 # 8. Referências
+
+### Referências acadêmicas (estado da arte)
+
+- IDEN, J.; EIKEBROKK, T. R. Implementing IT Service Management: A systematic literature review. *International Journal of Information Management*, v. 33, n. 3, p. 512–523, 2013.
+- MARRONE, M.; KOLBE, L. M. Impact of IT Service Management Frameworks on the IT Organization: An Empirical Study on Benefits, Challenges, and Processes. *Business & Information Systems Engineering*, v. 3, n. 1, p. 5–18, 2011.
+- GONZÁLEZ, L. M.; GIACHETTI, R. E.; RAMIREZ, G. Knowledge management-centric help desk: specification and performance evaluation. *Decision Support Systems*, v. 40, n. 2, p. 389–405, 2005.
+- HOFMANN, E.; RÜSCH, M. Industry 4.0 and the current status as well as future prospects on logistics. *Computers in Industry*, v. 89, p. 23–34, 2017.
+- VERHOEF, P. C. et al. Digital transformation: A multidisciplinary reflection and research agenda. *Journal of Business Research*, v. 122, p. 889–901, 2021.
+
+### Soluções, ferramentas e documentação técnica
 
 - ATLASSIAN. *Jira Service Management*. Disponível em: https://www.atlassian.com/software/jira/service-management
 - FRESHWORKS. *Freshdesk*. Disponível em: https://www.freshworks.com/freshdesk/
@@ -915,11 +1005,11 @@ Cronograma estimado para o desenvolvimento ao longo do semestre, alinhado às en
 
 # 9. Apêndices
 
-- **Apêndice A — Mockups:** prompts e telas geradas no Google Stitch (ver arquivo [`mockup.md`](../mockup.md) na raiz do repositório).
-- **Apêndice B — Guia de imagens:** mapa de onde inserir cada print/diagrama nesta RFC (ver [`guia-de-imagens.md`](../guia-de-imagens.md)).
-- **Apêndice C — Protótipo navegável:** _(inserir link do Figma/Stitch quando disponível)_
-- **Apêndice D — Evidências de extensão:** _(inserir prints de conversas/feedback com a equipe da Aceville e formulário de validação)_
-- **Apêndice E — Parecer da banca:** _(inserir os três pareceres dos professores após a apresentação)_
+- **Apêndice A — Mockups:** prompts e telas de alta fidelidade geradas no Google Stitch, documentados em [`mockup.md`](../mockup.md) na raiz do repositório.
+- **Apêndice B — Guia de imagens:** mapa de onde cada print/diagrama é inserido nesta RFC, em [`guia-de-imagens.md`](../guia-de-imagens.md).
+- **Apêndice C — Protótipo:** as telas de alta fidelidade estão versionadas em [`docs/stitch_interface_sigof_corporativa/`](stitch_interface_sigof_corporativa/) e indexadas no Apêndice A; o protótipo navegável (Figma) é publicado no marco M3.
+- **Apêndice D — Evidências de validação:** material de evidência da demanda e da validação com a Aceville — prints anonimizados das threads de e-mail e das planilhas de controle atuais (ver seção 1.2) e o registro das conversas de validação com a equipe de reversões e o financeiro (ver seção 4.4). O roteiro de entrevista e o formulário de satisfação estruturados são aplicados no marco M6.
+- **Apêndice E — Repositório do projeto:** código-fonte, diagramas em PlantUML (`docs/diagrams/`) e histórico de versões desta RFC, disponíveis no repositório GitHub do projeto. Os pareceres da banca são registrados na seção 10.
 
 ---
 

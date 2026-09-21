@@ -87,7 +87,11 @@ Uso exclusivamente interno — funcionários da Aceville Transportes:
 
 ## Status do Projeto
 
-🚧 Em fase de planejamento (RFC - Projeto de Portfólio)
+🚧 Em desenvolvimento — RFC fechada (v2.2) e backend iniciado.
+
+O domínio (protocolo, máquina de estados, duplicidade e SLA), o modelo de dados e a infraestrutura do projeto estão implementados e testados, em Pull Requests aguardando merge. A camada de API e o frontend ainda não começaram.
+
+Estado detalhado e próximos passos em **[CONTINUIDADE.md](CONTINUIDADE.md)**.
 
 ---
 
@@ -96,3 +100,4 @@ Uso exclusivamente interno — funcionários da Aceville Transportes:
 A documentação completa do projeto pode ser encontrada em:
 
 - **[RFC Completa](docs/rfc.md)** - Especificação técnica detalhada, requisitos, arquitetura e planejamento do projeto
+- **[Continuidade](CONTINUIDADE.md)** - Estado atual, pendências conhecidas, como rodar o projeto e próximos passos
