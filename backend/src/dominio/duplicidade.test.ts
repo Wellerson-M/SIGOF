@@ -37,8 +37,23 @@ function candidata(parcial: Partial<Parameters<typeof haDuplicidade>[0]> = {}) {
 }
 
 describe('normalizarDocumento', () => {
-  it('ignora pontuação, espaços e caixa', () => {
-    expect(normalizarDocumento('cte 12.345')).toBe('CTE12345');
+  it('mantém só os dígitos, descartando prefixo, pontuação e espaços', () => {
+    expect(normalizarDocumento('cte 12.345')).toBe('12345');
+    expect(normalizarDocumento('CT-e nº 12.345')).toBe('12345');
+    expect(normalizarDocumento('NF-e 555')).toBe('555');
+  });
+
+  it('extrai o número de uma chave de acesso de 44 dígitos', () => {
+    // UF 42, 2609, CNPJ, modelo 57, série 001, número 000012345, ...
+    const chave = '4226091234567800019957001000012345100000001' + '0';
+
+    expect(chave).toHaveLength(44);
+    expect(normalizarDocumento(chave)).toBe('12345');
+    expect(normalizarDocumento(chave.replace(/(\d{4})/g, '$1 '))).toBe('12345');
+  });
+
+  it('não confunde número comprido com chave de acesso', () => {
+    expect(normalizarDocumento('123456789012')).toBe('123456789012');
   });
 
   it('ignora zeros à esquerda', () => {
@@ -58,6 +73,16 @@ describe('encontrarDuplicidades', () => {
 
     expect(motivos).toHaveLength(1);
     expect(motivos[0]?.documento).toBe('CTE');
+  });
+
+  it('acusa mesmo CTe quando um tem prefixo "CTE" e o outro não', () => {
+    // Caso apontado no code review: o prefixo impedia a detecção.
+    const motivos = encontrarDuplicidades(candidata({ cte: 'CTE 12.345' }), [
+      solicitacao({ cte: '12345' }),
+    ]);
+
+    expect(motivos).toHaveLength(1);
+    expect(motivos[0]?.valor).toBe('12345');
   });
 
   it('acusa mesmo CTe digitado com formatação diferente', () => {

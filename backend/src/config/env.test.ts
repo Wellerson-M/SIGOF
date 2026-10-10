@@ -16,8 +16,6 @@ describe('carregarEnv', () => {
 
     expect(env.NODE_ENV).toBe('development');
     expect(env.PORT).toBe(3333);
-    expect(env.SLA_ATENDIMENTO_INICIAL_MINUTOS).toBe(240);
-    expect(env.JANELA_DUPLICIDADE_DIAS).toBe(7);
   });
 
   it('converte variáveis numéricas de texto para número', () => {
@@ -39,9 +37,9 @@ describe('carregarEnv', () => {
   });
 
   it('rejeita NODE_ENV fora dos ambientes previstos', () => {
-    expect(() => carregarEnv({ ...envValido, NODE_ENV: 'homologacao' })).toThrow(
-      /NODE_ENV/,
-    );
+    expect(() =>
+      carregarEnv({ ...envValido, NODE_ENV: 'homologacao' }),
+    ).toThrow(/NODE_ENV/);
   });
 
   it('usa process.env quando nenhuma fonte é informada', () => {

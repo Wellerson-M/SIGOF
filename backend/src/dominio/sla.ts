@@ -11,33 +11,46 @@
  *  - a pausa precisa devolver ao prazo exatamente o tempo útil consumido
  *    durante a espera, e não o tempo corrido.
  *
- * O expediente é fixo em UTC-3 (America/Sao_Paulo). O Brasil não adota
- * horário de verão desde 2019, então um offset fixo é suficiente e evita
- * depender de base de fusos.
+ * O expediente vem dos parâmetros de cada empresa (início, fim, dias úteis
+ * e fuso IANA), porque cada transportadora tem o seu horário.
+ *
+ * O deslocamento do fuso é resolvido uma vez, no instante de referência de
+ * cada cálculo. Os fusos brasileiros não têm horário de verão desde 2019,
+ * então o deslocamento é constante; um fuso com horário de verão teria
+ * erro de até 1 hora num prazo que atravesse a troca.
  */
 
 export interface Expediente {
-  /** Hora de início do expediente, no fuso local (0-23). */
-  horaInicio: number;
-  /** Hora de término do expediente, no fuso local (1-24). */
-  horaFim: number;
+  /** Início do expediente em minutos desde a meia-noite local (480 = 08:00). */
+  inicioMinuto: number;
+  /** Fim do expediente em minutos desde a meia-noite local (1080 = 18:00). */
+  fimMinuto: number;
   /** Dias úteis, no padrão de `Date.getDay()` — 0 é domingo. */
   diasUteis: readonly number[];
-  /** Deslocamento do fuso local em relação ao UTC, em minutos. */
-  offsetMinutos: number;
+  /** Fuso IANA, ex.: "America/Sao_Paulo". */
+  fusoHorario: string;
+}
+
+/** Os parâmetros de expediente como estão gravados na `Empresa`. */
+export interface ParametrosDeExpediente {
+  fusoHorario: string;
+  expedienteInicioMinuto: number;
+  expedienteFimMinuto: number;
+  diasUteis: readonly number[];
 }
 
 export const EXPEDIENTE_PADRAO: Expediente = {
-  horaInicio: 8,
-  horaFim: 18,
+  inicioMinuto: 8 * 60,
+  fimMinuto: 18 * 60,
   diasUteis: [1, 2, 3, 4, 5],
-  offsetMinutos: -180,
+  fusoHorario: 'America/Sao_Paulo',
 };
 
-/** Prazo de atendimento inicial: 4 horas úteis (RFC seção 2.5). */
+/** Prazo de atendimento inicial padrão: 4 horas úteis (RFC seção 2.5). */
 export const SLA_ATENDIMENTO_INICIAL_MINUTOS = 240;
 
 const MINUTO_EM_MS = 60 * 1000;
+const MINUTOS_POR_DIA = 24 * 60;
 
 export class SlaInvalidoError extends Error {
   constructor(mensagem: string) {
@@ -46,21 +59,89 @@ export class SlaInvalidoError extends Error {
   }
 }
 
+/** Converte os parâmetros gravados na empresa para o formato do cálculo. */
+export function expedienteDaEmpresa(
+  parametros: ParametrosDeExpediente,
+): Expediente {
+  return {
+    inicioMinuto: parametros.expedienteInicioMinuto,
+    fimMinuto: parametros.expedienteFimMinuto,
+    diasUteis: parametros.diasUteis,
+    fusoHorario: parametros.fusoHorario,
+  };
+}
+
 // ------------------------------------------------------------- Internos
 //
 // As funções abaixo trabalham com uma data "local": o instante deslocado
 // pelo offset, de forma que os getters UTC devolvam a hora de parede.
 
 function validarExpediente(expediente: Expediente): void {
-  if (expediente.horaInicio >= expediente.horaFim) {
+  const { inicioMinuto, fimMinuto, diasUteis } = expediente;
+
+  if (
+    !Number.isInteger(inicioMinuto) ||
+    !Number.isInteger(fimMinuto) ||
+    inicioMinuto < 0 ||
+    fimMinuto > MINUTOS_POR_DIA
+  ) {
     throw new SlaInvalidoError(
-      'A hora de início do expediente deve ser anterior à de término',
+      'O expediente deve estar entre 00:00 e 24:00, em minutos inteiros',
     );
   }
 
-  if (expediente.diasUteis.length === 0) {
+  if (inicioMinuto >= fimMinuto) {
+    throw new SlaInvalidoError(
+      'O início do expediente deve ser anterior ao término',
+    );
+  }
+
+  if (diasUteis.length === 0) {
     throw new SlaInvalidoError('O expediente precisa ter ao menos um dia útil');
   }
+
+  if (diasUteis.some((dia) => !Number.isInteger(dia) || dia < 0 || dia > 6)) {
+    throw new SlaInvalidoError('Dias úteis vão de 0 (domingo) a 6 (sábado)');
+  }
+}
+
+/**
+ * Deslocamento do fuso em relação ao UTC, em minutos, no instante dado.
+ * Ex.: America/Sao_Paulo → -180.
+ */
+export function offsetDoFuso(fusoHorario: string, instante: Date): number {
+  let formato: Intl.DateTimeFormat;
+
+  try {
+    formato = new Intl.DateTimeFormat('en-US', {
+      timeZone: fusoHorario,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    });
+  } catch {
+    throw new SlaInvalidoError(`Fuso horário desconhecido: ${fusoHorario}`);
+  }
+
+  const partes = Object.fromEntries(
+    formato.formatToParts(instante).map((parte) => [parte.type, parte.value]),
+  );
+
+  const horaDeParedeComoUtc = Date.UTC(
+    Number(partes.year),
+    Number(partes.month) - 1,
+    Number(partes.day),
+    Number(partes.hour),
+    Number(partes.minute),
+  );
+
+  const instanteSemSegundos =
+    Math.floor(instante.getTime() / MINUTO_EM_MS) * MINUTO_EM_MS;
+
+  return Math.round((horaDeParedeComoUtc - instanteSemSegundos) / MINUTO_EM_MS);
 }
 
 function paraLocal(data: Date, offsetMinutos: number): Date {
@@ -75,9 +156,9 @@ function ehDiaUtil(local: Date, expediente: Expediente): boolean {
   return expediente.diasUteis.includes(local.getUTCDay());
 }
 
-function emHora(local: Date, hora: number): Date {
+function emMinuto(local: Date, minutoDoDia: number): Date {
   const resultado = new Date(local.getTime());
-  resultado.setUTCHours(hora, 0, 0, 0);
+  resultado.setUTCHours(0, minutoDoDia, 0, 0);
   return resultado;
 }
 
@@ -88,7 +169,7 @@ function proximoDiaUtil(local: Date, expediente: Expediente): Date {
     resultado.setUTCDate(resultado.getUTCDate() + 1);
   } while (!ehDiaUtil(resultado, expediente));
 
-  return emHora(resultado, expediente.horaInicio);
+  return emMinuto(resultado, expediente.inicioMinuto);
 }
 
 /** Move um instante para dentro do expediente, avançando se necessário. */
@@ -97,8 +178,8 @@ function normalizar(local: Date, expediente: Expediente): Date {
     return proximoDiaUtil(local, expediente);
   }
 
-  const inicio = emHora(local, expediente.horaInicio);
-  const fim = emHora(local, expediente.horaFim);
+  const inicio = emMinuto(local, expediente.inicioMinuto);
+  const fim = emMinuto(local, expediente.fimMinuto);
 
   if (local < inicio) {
     return inicio;
@@ -130,11 +211,12 @@ export function adicionarMinutosUteis(
     );
   }
 
-  let atual = normalizar(paraLocal(inicio, expediente.offsetMinutos), expediente);
+  const offset = offsetDoFuso(expediente.fusoHorario, inicio);
+  let atual = normalizar(paraLocal(inicio, offset), expediente);
   let restante = minutos;
 
   while (restante > 0) {
-    const fimDoDia = emHora(atual, expediente.horaFim);
+    const fimDoDia = emMinuto(atual, expediente.fimMinuto);
     const disponivel = (fimDoDia.getTime() - atual.getTime()) / MINUTO_EM_MS;
 
     if (restante <= disponivel) {
@@ -146,7 +228,7 @@ export function adicionarMinutosUteis(
     }
   }
 
-  return deLocal(atual, expediente.offsetMinutos);
+  return deLocal(atual, offset);
 }
 
 /** Minutos úteis decorridos entre dois instantes. */
@@ -161,12 +243,13 @@ export function minutosUteisEntre(
     return 0;
   }
 
-  const alvo = paraLocal(fim, expediente.offsetMinutos);
-  let atual = normalizar(paraLocal(inicio, expediente.offsetMinutos), expediente);
+  const offset = offsetDoFuso(expediente.fusoHorario, inicio);
+  const alvo = paraLocal(fim, offset);
+  let atual = normalizar(paraLocal(inicio, offset), expediente);
   let total = 0;
 
   while (atual < alvo) {
-    const fimDoDia = emHora(atual, expediente.horaFim);
+    const fimDoDia = emMinuto(atual, expediente.fimMinuto);
     const limite = fimDoDia < alvo ? fimDoDia : alvo;
 
     total += (limite.getTime() - atual.getTime()) / MINUTO_EM_MS;
@@ -221,11 +304,7 @@ export function retomarSla(
     throw new SlaInvalidoError('O SLA não está pausado');
   }
 
-  const minutosDaPausa = minutosUteisEntre(
-    estado.pausadoEm,
-    agora,
-    expediente,
-  );
+  const minutosDaPausa = minutosUteisEntre(estado.pausadoEm, agora, expediente);
 
   return {
     venceEm: adicionarMinutosUteis(estado.venceEm, minutosDaPausa, expediente),

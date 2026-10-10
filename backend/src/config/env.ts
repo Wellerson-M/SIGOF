@@ -22,17 +22,8 @@ const esquemaEnv = z.object({
 
   DATABASE_URL: z.string().url(),
 
-  JWT_SECRET: z
-    .string()
-    .min(32, 'JWT_SECRET deve ter no mínimo 32 caracteres'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET deve ter no mínimo 32 caracteres'),
   JWT_EXPIRES_IN: z.string().default('8h'),
-
-  SLA_ATENDIMENTO_INICIAL_MINUTOS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(240),
-  JANELA_DUPLICIDADE_DIAS: z.coerce.number().int().positive().default(7),
 });
 
 export type Env = z.infer<typeof esquemaEnv>;
