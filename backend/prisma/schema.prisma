@@ -1,6 +1,7 @@
 // Modelo de dados do SIGOF (RFC seções 5.2 e 5.5).
 //
-// Toda tabela de negócio carrega `empresaId`, que é a chave de isolamento
+// Toda tabela de negócio — inclusive as filhas da solicitação, como
+// mensagens e anexos — carrega `empresaId`, que é a chave de isolamento
 // multi-tenant. O filtro por empresa é aplicado no backend a partir do
 // usuário autenticado — nunca a partir de parâmetro enviado pelo cliente.
 
@@ -59,12 +60,41 @@ model Empresa {
   id          String   @id @default(uuid())
   razaoSocial String   @map("razao_social")
   cnpj        String   @unique
+  /// Identificador curto usado no login (ex.: `transportadora-demo`). É o que
+  /// diz a qual empresa o usuário pertence, já que o mesmo e-mail pode existir
+  /// em duas transportadoras.
+  slug        String   @unique
   ativa       Boolean  @default(true)
   criadoEm    DateTime @default(now()) @map("criado_em")
+
+  // --- Parâmetros de atendimento (RFC seção 2.5) ---
+  // Ficam na empresa, e não fixos no código, porque cada transportadora tem
+  // seu expediente e seu prazo. O SLA gravado na solicitação é calculado com
+  // estes valores no momento da abertura.
+
+  /// Fuso IANA usado para saber quando começa e termina o expediente.
+  fusoHorario            String  @default("America/Sao_Paulo") @map("fuso_horario")
+  /// Início do expediente, em minutos desde a meia-noite (480 = 08:00).
+  expedienteInicioMinuto Int     @default(480) @map("expediente_inicio_minuto")
+  /// Fim do expediente, em minutos desde a meia-noite (1080 = 18:00).
+  expedienteFimMinuto    Int     @default(1080) @map("expediente_fim_minuto")
+  /// Dias úteis da semana (0 = domingo ... 6 = sábado).
+  diasUteis              Int[]   @default([1, 2, 3, 4, 5]) @map("dias_uteis")
+  /// Prazo para o atendimento inicial, em minutos úteis (240 = 4 horas).
+  slaAtendimentoMinutos  Int     @default(240) @map("sla_atendimento_minutos")
+  /// Janela de detecção de duplicidade de CTe/NF, em dias corridos.
+  janelaDuplicidadeDias  Int     @default(7) @map("janela_duplicidade_dias")
+  /// Caixa de e-mail do setor que recebe cópia de toda ocorrência e
+  /// movimentação, como registro e backup. Opcional.
+  emailCaixaCentral      String? @map("email_caixa_central")
 
   usuarios     Usuario[]
   solicitacoes Solicitacao[]
   sequencias   SequenciaProtocolo[]
+  mensagens    Mensagem[]
+  anexos       Anexo[]
+  historicos   StatusHistorico[]
+  notificacoes Notificacao[]
 
   @@map("empresas")
 }
@@ -82,8 +112,8 @@ model Usuario {
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
 
-  solicitacoesAbertas    Solicitacao[]      @relation("SolicitacoesAbertas")
-  solicitacoesAtribuidas Solicitacao[]      @relation("SolicitacoesAtribuidas")
+  solicitacoesAbertas    Solicitacao[]     @relation("SolicitacoesAbertas")
+  solicitacoesAtribuidas Solicitacao[]     @relation("SolicitacoesAtribuidas")
   mensagens              Mensagem[]
   historicos             StatusHistorico[]
   notificacoes           Notificacao[]
@@ -124,12 +154,12 @@ model Solicitacao {
   slaPausadoEm       DateTime? @map("sla_pausado_em")
   slaMinutosPausados Int       @default(0) @map("sla_minutos_pausados")
 
-  criadoEm    DateTime  @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-  resolvidoEm DateTime? @map("resolvido_em")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+  resolvidoEm  DateTime? @map("resolvido_em")
 
-  empresa     Empresa @relation(fields: [empresaId], references: [id])
-  solicitante Usuario @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+  solicitante Usuario  @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])
   responsavel Usuario? @relation("SolicitacoesAtribuidas", fields: [responsavelId], references: [id])
 
   mensagens    Mensagem[]
@@ -166,6 +196,7 @@ model SequenciaProtocolo {
 
 model Mensagem {
   id            String   @id @default(uuid())
+  empresaId     String   @map("empresa_id")
   solicitacaoId String   @map("solicitacao_id")
   autorId       String   @map("autor_id")
   conteudo      String
@@ -173,15 +204,17 @@ model Mensagem {
   interna       Boolean  @default(false)
   criadoEm      DateTime @default(now()) @map("criado_em")
 
+  empresa     Empresa     @relation(fields: [empresaId], references: [id])
   solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
   autor       Usuario     @relation(fields: [autorId], references: [id])
 
-  @@index([solicitacaoId])
+  @@index([empresaId, solicitacaoId])
   @@map("mensagens")
 }
 
 model Anexo {
   id            String   @id @default(uuid())
+  empresaId     String   @map("empresa_id")
   solicitacaoId String   @map("solicitacao_id")
   enviadoPorId  String   @map("enviado_por_id")
   nomeArquivo   String   @map("nome_arquivo")
@@ -191,10 +224,11 @@ model Anexo {
   tamanhoBytes  Int      @map("tamanho_bytes")
   criadoEm      DateTime @default(now()) @map("criado_em")
 
+  empresa     Empresa     @relation(fields: [empresaId], references: [id])
   solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
   enviadoPor  Usuario     @relation(fields: [enviadoPorId], references: [id])
 
-  @@index([solicitacaoId])
+  @@index([empresaId, solicitacaoId])
   @@map("anexos")
 }
 
@@ -202,6 +236,7 @@ model Anexo {
 /// Registros são apenas inseridos, nunca alterados ou removidos.
 model StatusHistorico {
   id             String             @id @default(uuid())
+  empresaId      String             @map("empresa_id")
   solicitacaoId  String             @map("solicitacao_id")
   autorId        String             @map("autor_id")
   statusAnterior StatusSolicitacao? @map("status_anterior")
@@ -209,24 +244,27 @@ model StatusHistorico {
   observacao     String?
   criadoEm       DateTime           @default(now()) @map("criado_em")
 
+  empresa     Empresa     @relation(fields: [empresaId], references: [id])
   solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
   autor       Usuario     @relation(fields: [autorId], references: [id])
 
-  @@index([solicitacaoId])
+  @@index([empresaId, solicitacaoId])
   @@map("status_historicos")
 }
 
 model Notificacao {
   id            String   @id @default(uuid())
+  empresaId     String   @map("empresa_id")
   usuarioId     String   @map("usuario_id")
   solicitacaoId String   @map("solicitacao_id")
   mensagem      String
   lida          Boolean  @default(false)
   criadoEm      DateTime @default(now()) @map("criado_em")
 
+  empresa     Empresa     @relation(fields: [empresaId], references: [id])
   usuario     Usuario     @relation(fields: [usuarioId], references: [id])
   solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
 
-  @@index([usuarioId, lida])
+  @@index([empresaId, usuarioId, lida])
   @@map("notificacoes")
 }
