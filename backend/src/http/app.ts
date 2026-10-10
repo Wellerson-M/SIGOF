@@ -1,8 +1,9 @@
 import cors from 'cors';
-import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { randomUUID } from 'node:crypto';
 import { pinoHttp } from 'pino-http';
+import { tratadorDeErros } from './tratador-de-erros.js';
 
 /**
  * Monta a aplicação Express sem iniciar o servidor.
@@ -23,7 +24,8 @@ export function criarApp(): Express {
   // (RFC seção 5.7 — pilar de Logs)
   app.use(
     pinoHttp({
-      genReqId: (req) => req.headers['x-request-id']?.toString() ?? randomUUID(),
+      genReqId: (req) =>
+        req.headers['x-request-id']?.toString() ?? randomUUID(),
       redact: ['req.headers.authorization', 'req.headers.cookie'],
       // Os testes não devem poluir a saída com log de requisição
       level: process.env.NODE_ENV === 'test' ? 'silent' : 'info',
@@ -47,16 +49,4 @@ export function criarApp(): Express {
   app.use(tratadorDeErros);
 
   return app;
-}
-
-function tratadorDeErros(
-  erro: Error,
-  req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
-  req.log?.error({ err: erro }, 'Erro não tratado');
-
-  // Detalhes internos nunca vazam para o cliente
-  res.status(500).json({ erro: 'Erro interno do servidor' });
 }
