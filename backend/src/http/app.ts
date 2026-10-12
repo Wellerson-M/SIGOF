@@ -18,7 +18,6 @@ export function criarApp(): Express {
   // Cabeçalhos de segurança (RFC seção 6.1 — "Configuração Incorreta")
   app.use(helmet());
   app.use(cors());
-  app.use(express.json({ limit: '1mb' }));
 
   // Logs estruturados em JSON com correlation id por requisição
   // (RFC seção 5.7 — pilar de Logs)
@@ -31,6 +30,10 @@ export function criarApp(): Express {
       level: process.env.NODE_ENV === 'test' ? 'silent' : 'info',
     }),
   );
+
+  // Depois do log: JSON malformado ou grande demais também fica registrado
+  // com o correlation id
+  app.use(express.json({ limit: '1mb' }));
 
   // Health check consumido pelo monitoramento e pelo deploy
   // (RFC seções 5.7 e 5.8; RNF04)

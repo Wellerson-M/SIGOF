@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
 import { z } from 'zod';
 
 /**
@@ -9,6 +9,10 @@ import { z } from 'zod';
  * um erro obscuro. Segredos vêm sempre do ambiente, nunca do código
  * (RFC seções 5.8 e 6.1 — "Configuração Incorreta").
  */
+// O .env fica na raiz do repositório, mas `npm run dev` roda dentro de
+// backend/. Procura nos dois lugares; o primeiro encontrado vence.
+config({ path: ['.env', '../.env'] });
+
 const esquemaEnv = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'staging', 'production'])
