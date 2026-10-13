@@ -15,9 +15,16 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx src/banco/seed.ts",
+    "db:reset": "prisma migrate reset --force && npm run db:seed",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

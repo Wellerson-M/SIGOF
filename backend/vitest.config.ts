@@ -8,7 +8,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/http/server.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/http/server.ts',
+        // Scripts e conexão com o banco são exercitados pelos testes de
+        // integração, não pelos unitários
+        'src/banco/**',
+      ],
       // Quality gate da RFC seção 5.6: mínimo de 75% no backend.
       // O pipeline reprova o merge se a cobertura cair abaixo disso.
       thresholds: {
