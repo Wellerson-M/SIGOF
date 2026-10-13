@@ -24,26 +24,27 @@ services:
       retries: 5
 
   # Storage de anexos S3-compatível. Substitui o AWS S3 em desenvolvimento
-  # sem alterar a aplicação (RFC seção 5.4).
-  minio:
-    image: minio/minio:latest
-    container_name: sigof-minio
-    command: server /data --console-address ":9001"
+  # sem alterar a aplicação (RFC seção 5.4). SeaweedFS no lugar do MinIO,
+  # cuja imagem deixou de ser publicada no Docker Hub.
+  storage:
+    image: chrislusf/seaweedfs:4.48
+    container_name: sigof-storage
+    command: server -dir=/data -s3 -s3.port=9000
     environment:
-      MINIO_ROOT_USER: sigof
-      MINIO_ROOT_PASSWORD: sigof-secret
-    # Só a própria máquina acessa; ninguém na rede local enxerga o banco
+      # Credencial de administrador do S3 (acesso anônimo é recusado)
+      AWS_ACCESS_KEY_ID: sigof
+      AWS_SECRET_ACCESS_KEY: sigof-secret
+    # Só a própria máquina acessa; ninguém na rede local enxerga o storage
     ports:
       - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
     volumes:
-      - minio-data:/data
+      - storage-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
   postgres-data:
-  minio-data:
+  storage-data:

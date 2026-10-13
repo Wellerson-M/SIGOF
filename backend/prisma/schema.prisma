@@ -54,7 +54,7 @@ enum Prioridade {
 
 // ------------------------------------------------------------- Entidades
 
-/// Transportadora. No MVP existe apenas a Aceville, mas é a chave que
+/// Transportadora. No MVP existe apenas a empresa piloto, mas é a chave que
 /// viabiliza a evolução para SaaS multi-transportadora (RFC seção 1.7).
 model Empresa {
   id          String   @id @default(uuid())
