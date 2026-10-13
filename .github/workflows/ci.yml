@@ -37,9 +37,13 @@ jobs:
     env:
       DATABASE_URL: postgresql://sigof:sigof@localhost:5432/sigof?schema=public
       JWT_SECRET: segredo-do-ci-com-mais-de-32-caracteres
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Histórico completo: o SonarCloud usa o blame para saber o que é código novo
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -66,6 +70,11 @@ jobs:
 
       - name: Seed roda sem erro
         run: npm run db:seed
+
+      - name: Análise estática (SonarCloud)
+        uses: SonarSource/sonarqube-scan-action@v8
+        # PRs do Dependabot não recebem os segredos do repositório
+        if: env.SONAR_TOKEN != ''
 
       - name: Auditoria de dependências
         run: npm audit --audit-level=high
