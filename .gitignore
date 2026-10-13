@@ -1,0 +1,29 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+build/
+.next/
+
+# Variáveis de ambiente (nunca versionar segredos — ver .env.example)
+.env
+.env.local
+.env.*.local
+
+# Testes e cobertura
+coverage/
+.vitest/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editores e sistema operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Ferramentas locais
+.claude/
