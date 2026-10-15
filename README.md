@@ -28,11 +28,15 @@ O MVP é validado com uma transportadora parceira (projeto de extensão). A arqu
 | **Supervisor** | Reprioriza e reatribui solicitações e acompanha os indicadores |
 | **Administrador** | Gerencia usuários, expediente, SLA e tipos de ocorrência da empresa |
 
-Regras de negócio já implementadas e testadas:
+## Situação atual
+
+Pronto e testado no backend:
 - **Protocolo** `SOL-AAAA-MM-NNNN`, sequencial por empresa e seguro sob concorrência.
 - **Máquina de estados** com as transições permitidas para cada perfil.
 - **Duplicidade:** o mesmo CTe ou NF dentro da janela configurada gera alerta. "CTE 12.345", "CT-e nº 012345" e a chave de 44 dígitos são reconhecidos como o mesmo documento.
 - **SLA em minutos úteis**, respeitando o expediente, o fuso e os dias úteis de cada empresa, com pausa enquanto aguarda documento.
+
+Em desenvolvimento: o login, as rotas de solicitações (abrir, listar, atender), as telas e a publicação em staging e produção. O andamento está no [quadro do projeto](https://github.com/users/Wellerson-M/projects/1).
 
 ## Stack
 
