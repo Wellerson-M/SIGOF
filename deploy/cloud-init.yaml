@@ -28,7 +28,7 @@ write_files:
       [Service]
       Type=oneshot
       # Primeiro a configuração mais recente da main; depois o script dela
-      ExecStartPre=/bin/sh -c 'cd /opt/sigof/repo && git fetch -q origin main && git reset -q --hard origin/main'
+      ExecStartPre=/bin/sh -c 'cd /opt/sigof/repo && git fetch -q origin main && git reset -q --hard FETCH_HEAD'
       ExecStart=/bin/sh /opt/sigof/repo/deploy/atualizar.sh
 
   - path: /etc/systemd/system/sigof-atualizar.timer
@@ -52,6 +52,7 @@ runcmd:
     DOMINIO_STAGING=__DOMINIO_STAGING__
     STAGING_DB_SENHA=$(openssl rand -hex 24)
     STAGING_JWT_SECRET=$(openssl rand -hex 32)
+    STAGING_SEED_SENHA=$(openssl rand -base64 18)
     EOF
   - systemctl daemon-reload
   - systemctl enable --now docker

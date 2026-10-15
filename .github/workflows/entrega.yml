@@ -28,6 +28,9 @@ permissions:
 jobs:
   imagem:
     name: Imagem Docker do backend
+    # Execução manual também só a partir da main: o staging nunca recebe
+    # código que não passou por PR
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read

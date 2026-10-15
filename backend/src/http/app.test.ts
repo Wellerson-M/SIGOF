@@ -1,5 +1,7 @@
+import type { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+import { carregarEnv } from '../config/env.js';
 import { criarApp } from './app.js';
 
 describe('GET /health', () => {
@@ -29,5 +31,48 @@ describe('rota inexistente', () => {
 
     expect(resposta.status).toBe(404);
     expect(resposta.body.erro).toBe('Rota não encontrada');
+  });
+});
+
+describe('IP do cliente atrás do proxy (Caddy)', () => {
+  // Banco simulado: nenhum usuário existe, então todo login responde 401
+  const prismaSemUsuarios = {
+    usuario: { findFirst: () => Promise.resolve(null) },
+  } as unknown as PrismaClient;
+
+  function appEm(NODE_ENV: 'development' | 'staging') {
+    return criarApp({
+      prisma: prismaSemUsuarios,
+      env: carregarEnv({
+        NODE_ENV,
+        DATABASE_URL: 'postgresql://x:y@localhost:5432/z',
+        JWT_SECRET: 'x'.repeat(32),
+        FRONTEND_URL: 'https://app.sigof.test',
+      }),
+      limiteDeLoginPorMinuto: 1,
+    });
+  }
+
+  function login(app: ReturnType<typeof appEm>, ipReal: string) {
+    return request(app)
+      .post('/auth/login')
+      .set('Origin', 'https://app.sigof.test')
+      .set('X-Forwarded-For', ipReal)
+      .send({ empresa: 'demo', email: 'a@b.test', senha: 'x' });
+  }
+
+  it('em staging, cada IP real tem o próprio limite de tentativas', async () => {
+    const app = appEm('staging');
+
+    expect((await login(app, '203.0.113.1')).status).toBe(401);
+    expect((await login(app, '203.0.113.1')).status).toBe(429);
+    expect((await login(app, '203.0.113.2')).status).toBe(401);
+  });
+
+  it('em desenvolvimento, ignora o X-Forwarded-For (que o cliente pode forjar)', async () => {
+    const app = appEm('development');
+
+    expect((await login(app, '203.0.113.1')).status).toBe(401);
+    expect((await login(app, '203.0.113.2')).status).toBe(429);
   });
 });
