@@ -1,2 +1,4 @@
 # Scripts de shell rodam dentro de contêineres Linux: sempre LF
 *.sh text eol=lf
+# Arquivos que rodam no servidor Linux (cloud-init, compose, Caddyfile): sempre LF
+deploy/** text eol=lf
