@@ -23,7 +23,13 @@ const esquemaEnv = z.object({
   DATABASE_URL: z.string().url(),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET deve ter no mínimo 32 caracteres'),
-  JWT_EXPIRES_IN: z.string().default('8h'),
+  /** Vida do token de acesso. Curta: se vazar, serve por pouco tempo. */
+  ACESSO_MINUTOS: z.coerce.number().int().positive().default(15),
+  /** Vida da sessão (refresh token) sem uso. */
+  SESSAO_DIAS: z.coerce.number().int().positive().default(7),
+
+  /** Origem do frontend, a única autorizada pelo CORS a enviar cookies. */
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
 });
 
 export type Env = z.infer<typeof esquemaEnv>;
