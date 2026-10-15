@@ -5,7 +5,7 @@ import {
   type Request,
   type Response,
 } from 'express';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import {
   COOKIE_ACESSO,
@@ -77,8 +77,12 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     // Por IP + e-mail: um atacante não esgota o limite de outra pessoa
+    // ipKeyGenerator agrupa endereços IPv6 pela sub-rede (/56): sem isso,
+    // quem tem um bloco IPv6 trocaria de IP a cada tentativa
     keyGenerator: (req) =>
-      `${req.ip}:${String((req.body as { email?: unknown })?.email ?? '')
+      `${ipKeyGenerator(req.ip ?? '')}:${String(
+        (req.body as { email?: unknown })?.email ?? '',
+      )
         .trim()
         .toLowerCase()}`,
     handler: (_req, res) => {

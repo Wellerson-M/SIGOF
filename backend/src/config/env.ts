@@ -21,6 +21,9 @@ const esquemaEnv = z
 
     PORT: z.coerce.number().int().positive().default(3333),
 
+    /** Commit da imagem em execução, gravado no build do Docker. */
+    VERSAO: z.string().default('local'),
+
     DATABASE_URL: z.string().url(),
 
     JWT_SECRET: z

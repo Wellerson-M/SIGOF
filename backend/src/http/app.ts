@@ -31,6 +31,16 @@ export interface ModulosDaApp {
 export function criarApp(modulos?: ModulosDaApp): Express {
   const app = express();
 
+  // Em staging e produção a API fica atrás do Caddy. Sem isto, o IP de toda
+  // requisição seria o do Caddy, e o limite de tentativas de login valeria
+  // para todos os usuários juntos.
+  const publicado =
+    modulos?.env.NODE_ENV === 'staging' ||
+    modulos?.env.NODE_ENV === 'production';
+  if (publicado) {
+    app.set('trust proxy', 1);
+  }
+
   // Cabeçalhos de segurança (RFC seção 6.1 — "Configuração Incorreta")
   app.use(helmet());
   // Só o frontend pode chamar a API levando cookies; qualquer outra origem
@@ -71,6 +81,9 @@ export function criarApp(modulos?: ModulosDaApp): Express {
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
+      // Commit em execução: o pipeline de entrega usa para confirmar que a
+      // versão nova está no ar
+      versao: modulos?.env.VERSAO ?? 'local',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });

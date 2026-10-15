@@ -9,6 +9,7 @@ describe('GET /health', () => {
     expect(resposta.status).toBe(200);
     expect(resposta.body.status).toBe('ok');
     expect(typeof resposta.body.uptime).toBe('number');
+    expect(resposta.body.versao).toBe('local');
   });
 });
 

@@ -1,0 +1,14 @@
+# Caddy: recebe o tráfego HTTPS e entrega ao contêiner certo.
+# O certificado é obtido e renovado sozinho (Let's Encrypt).
+
+{$DOMINIO_STAGING} {
+	encode zstd gzip
+
+	header {
+		# Navegador só fala HTTPS com este site pelos próximos 6 meses
+		Strict-Transport-Security "max-age=15552000"
+		-Server
+	}
+
+	reverse_proxy api-staging:3333
+}

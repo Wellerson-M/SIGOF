@@ -1,10 +1,10 @@
 /**
  * Dados de demonstração (seed) — apenas desenvolvimento e staging.
  *
- *   npm run db:seed
- *
- * Apaga tudo e recria do zero, então pode ser executado quantas vezes for
- * preciso. Cria duas empresas: a "Transportadora Demo", com um usuário de
+ *   npm run db:seed              apaga tudo e recria do zero
+ *   npm run db:seed -- --se-vazio  só semeia se o banco não tiver empresas
+ *                                  (usado ao subir o staging)
+ * Cria duas empresas: a "Transportadora Demo", com um usuário de
  * cada perfil e solicitações de exemplo, e a "Outra Transportadora", que
  * existe só para provar que uma empresa nunca enxerga os dados da outra.
  */
@@ -248,6 +248,15 @@ async function main(): Promise<void> {
 
   const prisma = criarPrismaClient(databaseUrl);
   try {
+    if (
+      process.argv.includes('--se-vazio') &&
+      (await prisma.empresa.count()) > 0
+    ) {
+      // eslint-disable-next-line no-console -- saída de script de linha de comando
+      console.log('Seed ignorado: o banco já tem dados.');
+      return;
+    }
+
     await limpar(prisma);
     await semear(prisma);
     // eslint-disable-next-line no-console -- saída de script de linha de comando

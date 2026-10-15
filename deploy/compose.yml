@@ -1,0 +1,65 @@
+# Servidor do SIGOF na nuvem (RFC seção 5.8).
+#
+# Roda na VM da Azure. O próprio servidor busca as atualizações a cada minuto
+# (deploy/atualizar.sh): baixa a configuração mais recente da main e a
+# imagem nova do GitHub Container Registry. Ninguém entra no servidor para
+# publicar nada.
+#
+# Os segredos ficam em /opt/sigof/.env, gerado na criação da VM, fora do
+# repositório, e nunca saem de lá (ver deploy/cloud-init.yaml).
+
+name: sigof
+
+services:
+  # Porta de entrada: HTTPS com certificado automático (Let's Encrypt)
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO_STAGING: ${DOMINIO_STAGING}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-dados:/data
+      - caddy-config:/config
+    depends_on:
+      - api-staging
+
+  # ---------------------------------------------------------------- Staging
+  # Ensaio geral: mesma imagem que vai para produção, com dados de mentira.
+
+  postgres-staging:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sigof
+      POSTGRES_PASSWORD: ${STAGING_DB_SENHA}
+      POSTGRES_DB: sigof
+    volumes:
+      - postgres-staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigof -d sigof"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sem "ports": o banco só é acessível pela rede interna do Docker
+
+  api-staging:
+    image: ghcr.io/wellerson-m/sigof-backend:staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://sigof:${STAGING_DB_SENHA}@postgres-staging:5432/sigof?schema=public
+      JWT_SECRET: ${STAGING_JWT_SECRET}
+      FRONTEND_URL: https://${DOMINIO_STAGING}
+      SEMEAR_SE_VAZIO: "true"
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+
+volumes:
+  caddy-dados:
+  caddy-config:
+  postgres-staging:
