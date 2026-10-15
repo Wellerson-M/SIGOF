@@ -78,7 +78,9 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
     legacyHeaders: false,
     // Por IP + e-mail: um atacante não esgota o limite de outra pessoa
     keyGenerator: (req) =>
-      `${req.ip}:${String((req.body as { email?: unknown })?.email ?? '').toLowerCase()}`,
+      `${req.ip}:${String((req.body as { email?: unknown })?.email ?? '')
+        .trim()
+        .toLowerCase()}`,
     handler: (_req, res) => {
       res.status(429).json({
         erro: 'Muitas tentativas. Aguarde um minuto e tente de novo.',
@@ -104,7 +106,11 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
     try {
       gravarCookies(res, await servico.renovar(token, contexto(req)));
     } catch (erro) {
-      limparCookies(res);
+      // Só apaga os cookies se a sessão morreu de fato; numa falha
+      // passageira (banco fora do ar) o usuário pode tentar de novo
+      if (erro instanceof ErroNaoAutenticado) {
+        limparCookies(res);
+      }
       throw erro;
     }
     res.status(204).end();
@@ -130,7 +136,7 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
   rotas.get('/eu', autenticar(jwtSecret), async (req, res) => {
     const { id, empresaId } = usuarioDa(req);
     const usuario = await prisma.usuario.findFirst({
-      where: { id, empresaId, ativo: true },
+      where: { id, empresaId, ativo: true, empresa: { ativa: true } },
       select: {
         id: true,
         nome: true,

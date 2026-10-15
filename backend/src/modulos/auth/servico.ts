@@ -94,20 +94,25 @@ export class ServicoDeAutenticacao {
     }
 
     if (!senhaCorreta) {
-      const falhas = usuario.falhasDeLogin + 1;
-      const bloquear = falhas >= FALHAS_PARA_BLOQUEIO;
-
-      await this.prisma.usuario.update({
+      // Incremento feito pelo próprio banco: tentativas simultâneas somam
+      // todas, em vez de uma sobrescrever a contagem da outra
+      const { falhasDeLogin } = await this.prisma.usuario.update({
         where: { id: usuario.id },
-        data: bloquear
-          ? {
-              falhasDeLogin: 0,
-              bloqueadoAte: new Date(
-                agora.getTime() + MINUTOS_DE_BLOQUEIO * MINUTO,
-              ),
-            }
-          : { falhasDeLogin: falhas },
+        data: { falhasDeLogin: { increment: 1 } },
+        select: { falhasDeLogin: true },
       });
+
+      if (falhasDeLogin >= FALHAS_PARA_BLOQUEIO) {
+        await this.prisma.usuario.update({
+          where: { id: usuario.id },
+          data: {
+            falhasDeLogin: 0,
+            bloqueadoAte: new Date(
+              agora.getTime() + MINUTOS_DE_BLOQUEIO * MINUTO,
+            ),
+          },
+        });
+      }
       throw new ErroNaoAutenticado(CREDENCIAIS_INVALIDAS);
     }
 
@@ -137,7 +142,7 @@ export class ServicoDeAutenticacao {
     const agora = this.agora();
     const sessao = await this.prisma.sessao.findUnique({
       where: { tokenHash: hashDoToken(tokenDeSessao) },
-      include: { usuario: true },
+      include: { usuario: { include: { empresa: true } } },
     });
 
     if (!sessao || sessao.revogadaEm !== null || sessao.expiraEm <= agora) {
@@ -156,12 +161,13 @@ export class ServicoDeAutenticacao {
       throw new ErroNaoAutenticado('Sessão expirada');
     }
 
-    if (!sessao.usuario.ativo) {
+    // Usuário desativado ou empresa desativada perdem o acesso na hora
+    if (!sessao.usuario.ativo || !sessao.usuario.empresa.ativa) {
       await this.revogarFamilia(sessao.familia);
       throw new ErroNaoAutenticado('Sessão expirada');
     }
 
-    return this.abrirSessao(
+    const tokens = await this.abrirSessao(
       {
         id: sessao.usuario.id,
         empresaId: sessao.usuario.empresaId,
@@ -170,6 +176,20 @@ export class ServicoDeAutenticacao {
       sessao.familia,
       contexto,
     );
+
+    // Uma saída (ou detecção de reuso) que aconteceu enquanto esta
+    // renovação rodava revogou a família antes de a sessão nova existir.
+    // Conferir depois de criar fecha essa janela: se algo da família foi
+    // revogado, a sessão nova também é.
+    const revogadas = await this.prisma.sessao.count({
+      where: { familia: sessao.familia, revogadaEm: { not: null } },
+    });
+    if (revogadas > 0) {
+      await this.revogarFamilia(sessao.familia);
+      throw new ErroNaoAutenticado('Sessão expirada');
+    }
+
+    return tokens;
   }
 
   /** Encerra a sessão deste dispositivo. Token desconhecido não é erro. */

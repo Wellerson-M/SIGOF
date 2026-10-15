@@ -42,6 +42,25 @@ describe('carregarEnv', () => {
     ).toThrow(/NODE_ENV/);
   });
 
+  it('em desenvolvimento, FRONTEND_URL tem padrão localhost', () => {
+    expect(carregarEnv(envValido).FRONTEND_URL).toBe('http://localhost:3000');
+  });
+
+  it('em staging e produção, exige FRONTEND_URL explícita', () => {
+    for (const NODE_ENV of ['staging', 'production']) {
+      expect(() => carregarEnv({ ...envValido, NODE_ENV })).toThrow(
+        /FRONTEND_URL: obrigatória/,
+      );
+      expect(
+        carregarEnv({
+          ...envValido,
+          NODE_ENV,
+          FRONTEND_URL: 'https://app.sigof.test',
+        }).FRONTEND_URL,
+      ).toBe('https://app.sigof.test');
+    }
+  });
+
   it('usa process.env quando nenhuma fonte é informada', () => {
     vi.stubEnv('DATABASE_URL', envValido.DATABASE_URL);
     vi.stubEnv('JWT_SECRET', envValido.JWT_SECRET);

@@ -271,6 +271,48 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
   });
 
+  it('tentativas erradas simultâneas somam todas e bloqueiam a conta', async () => {
+    const { email, id } = outra.usuarios.SUPERVISOR;
+
+    await Promise.all(
+      Array.from({ length: FALHAS_PARA_BLOQUEIO }, () =>
+        login(outra.slug, email, 'senha-errada'),
+      ),
+    );
+    const usuario = await prisma.usuario.findUniqueOrThrow({ where: { id } });
+
+    expect(usuario.bloqueadoAte).not.toBeNull();
+    await prisma.usuario.update({
+      where: { id },
+      data: { bloqueadoAte: null, falhasDeLogin: 0 },
+    });
+  });
+
+  it('empresa desativada perde o acesso: renovar e /auth/eu recusam', async () => {
+    const cookies = cookiesDa(
+      await login(empresa.slug, empresa.usuarios.ANALISTA.email),
+    );
+    await prisma.empresa.update({
+      where: { id: empresa.id },
+      data: { ativa: false },
+    });
+
+    const eu = await request(app)
+      .get('/auth/eu')
+      .set('Cookie', comCookies(cookies));
+    const renovar = await request(app)
+      .post('/auth/renovar')
+      .set('Origin', FRONTEND)
+      .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`);
+
+    await prisma.empresa.update({
+      where: { id: empresa.id },
+      data: { ativa: true },
+    });
+    expect(eu.status).toBe(404);
+    expect(renovar.status).toBe(401);
+  });
+
   it('recusa login vindo de outro site (CSRF)', async () => {
     const resposta = await request(app)
       .post('/auth/login')
@@ -291,17 +333,21 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       env: envDeTeste(),
       limiteDeLoginPorMinuto: 2,
     });
-    const tentar = () =>
+    const tentar = (email = 'limite@x.test') =>
       request(appLimitada)
         .post('/auth/login')
         .set('Origin', FRONTEND)
-        .send({ empresa: empresa.slug, email: 'limite@x.test', senha: 'x' });
+        .send({ empresa: empresa.slug, email, senha: 'x' });
 
     await tentar();
-    await tentar();
+    // Espaços e maiúsculas não criam uma "conta nova" no limite
+    await tentar(' LIMITE@X.TEST ');
     const terceira = await tentar();
+    const outroEmail = await tentar('outro-email@x.test');
 
     expect(terceira.status).toBe(429);
     expect(terceira.body.codigo).toBe('MUITAS_TENTATIVAS');
+    // Outro e-mail no mesmo IP tem o próprio limite
+    expect(outroEmail.status).toBe(401);
   });
 });

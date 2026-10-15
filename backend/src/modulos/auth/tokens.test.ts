@@ -62,11 +62,18 @@ describe('token de sessão', () => {
     expect(a.length).toBeGreaterThanOrEqual(43);
   });
 
-  it('o hash é determinístico e não revela o token', () => {
-    const token = gerarTokenDeSessao();
+  it('o hash é o SHA-256 do token, em hexadecimal', () => {
+    // Vetor de teste oficial do SHA-256 (FIPS 180-2) para "abc"
+    expect(hashDoToken('abc')).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
+  });
 
-    expect(hashDoToken(token)).toBe(hashDoToken(token));
-    expect(hashDoToken(token)).not.toContain(token);
-    expect(hashDoToken(token)).toMatch(/^[0-9a-f]{64}$/);
+  it('tokens diferentes geram hashes diferentes, e o hash não revela o token', () => {
+    const a = gerarTokenDeSessao();
+    const b = gerarTokenDeSessao();
+
+    expect(hashDoToken(a)).not.toBe(hashDoToken(b));
+    expect(hashDoToken(a)).not.toContain(a);
   });
 });
