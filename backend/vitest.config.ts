@@ -14,6 +14,7 @@ export default defineConfig({
         // Scripts e conexão com o banco são exercitados pelos testes de
         // integração, não pelos unitários
         'src/banco/**',
+        'src/testes/**',
       ],
       // Quality gate da RFC seção 5.6: mínimo de 75% no backend.
       // O pipeline reprova o merge se a cobertura cair abaixo disso.

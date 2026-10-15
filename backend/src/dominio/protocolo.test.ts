@@ -37,21 +37,21 @@ describe('formatarProtocolo', () => {
   });
 
   it('rejeita sequencial zero ou negativo', () => {
-    expect(() => formatarProtocolo({ ano: 2026, mes: 1, sequencial: 0 })).toThrow(
-      ProtocoloInvalidoError,
-    );
+    expect(() =>
+      formatarProtocolo({ ano: 2026, mes: 1, sequencial: 0 }),
+    ).toThrow(ProtocoloInvalidoError);
     expect(() =>
       formatarProtocolo({ ano: 2026, mes: 1, sequencial: -5 }),
     ).toThrow(ProtocoloInvalidoError);
   });
 
   it('rejeita mês fora de 1..12', () => {
-    expect(() => formatarProtocolo({ ano: 2026, mes: 13, sequencial: 1 })).toThrow(
-      /Mês fora do intervalo/,
-    );
-    expect(() => formatarProtocolo({ ano: 2026, mes: 0, sequencial: 1 })).toThrow(
-      /Mês fora do intervalo/,
-    );
+    expect(() =>
+      formatarProtocolo({ ano: 2026, mes: 13, sequencial: 1 }),
+    ).toThrow(/Mês fora do intervalo/);
+    expect(() =>
+      formatarProtocolo({ ano: 2026, mes: 0, sequencial: 1 }),
+    ).toThrow(/Mês fora do intervalo/);
   });
 
   it('rejeita sequencial fracionário', () => {

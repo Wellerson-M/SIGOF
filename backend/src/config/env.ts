@@ -13,18 +13,46 @@ import { z } from 'zod';
 // backend/. Procura nos dois lugares; o primeiro encontrado vence.
 config({ path: ['.env', '../.env'] });
 
-const esquemaEnv = z.object({
-  NODE_ENV: z
-    .enum(['development', 'test', 'staging', 'production'])
-    .default('development'),
+const esquemaEnv = z
+  .object({
+    NODE_ENV: z
+      .enum(['development', 'test', 'staging', 'production'])
+      .default('development'),
 
-  PORT: z.coerce.number().int().positive().default(3333),
+    PORT: z.coerce.number().int().positive().default(3333),
 
-  DATABASE_URL: z.string().url(),
+    DATABASE_URL: z.string().url(),
 
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET deve ter no mínimo 32 caracteres'),
-  JWT_EXPIRES_IN: z.string().default('8h'),
-});
+    JWT_SECRET: z
+      .string()
+      .min(32, 'JWT_SECRET deve ter no mínimo 32 caracteres'),
+    /** Vida do token de acesso. Curta: se vazar, serve por pouco tempo. */
+    ACESSO_MINUTOS: z.coerce.number().int().positive().default(15),
+    /** Vida da sessão (refresh token) sem uso. */
+    SESSAO_DIAS: z.coerce.number().int().positive().default(7),
+
+    /**
+     * Origem do frontend, a única autorizada a chamar a API com cookies.
+     * Obrigatória em staging e produção: um padrão errado ali bloquearia o
+     * site inteiro sem nenhum aviso.
+     */
+    FRONTEND_URL: z.string().url().optional(),
+  })
+  .superRefine((env, ctx) => {
+    const publicado =
+      env.NODE_ENV === 'staging' || env.NODE_ENV === 'production';
+    if (publicado && env.FRONTEND_URL === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['FRONTEND_URL'],
+        message: `obrigatória em ${env.NODE_ENV}`,
+      });
+    }
+  })
+  .transform((env) => ({
+    ...env,
+    FRONTEND_URL: env.FRONTEND_URL ?? 'http://localhost:3000',
+  }));
 
 export type Env = z.infer<typeof esquemaEnv>;
 

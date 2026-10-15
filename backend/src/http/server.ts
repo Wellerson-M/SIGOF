@@ -1,10 +1,12 @@
 import pino from 'pino';
 import { carregarEnv } from '../config/env.js';
+import { criarPrismaClient } from '../banco/cliente.js';
 import { criarApp } from './app.js';
 
 const logger = pino();
 const env = carregarEnv();
-const app = criarApp();
+const prisma = criarPrismaClient(env.DATABASE_URL);
+const app = criarApp({ prisma, env });
 
 const servidor = app.listen(env.PORT, () => {
   logger.info(
@@ -27,7 +29,9 @@ for (const sinal of ['SIGINT', 'SIGTERM'] as const) {
     encerrando = true;
 
     logger.info({ sinal }, 'Encerrando SIGOF API');
-    servidor.close(() => process.exit(0));
+    servidor.close(() => {
+      void prisma.$disconnect().finally(() => process.exit(0));
+    });
     servidor.closeIdleConnections();
 
     setTimeout(() => {

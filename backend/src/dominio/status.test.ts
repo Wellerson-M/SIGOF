@@ -13,7 +13,9 @@ import {
 describe('fluxo feliz (RFC seção 3.3, fluxo 1)', () => {
   it('permite NOVO -> EM_ANDAMENTO -> RESOLVIDO pelo analista', () => {
     expect(podeTransicionar('NOVO', 'EM_ANDAMENTO', 'ANALISTA')).toBe(true);
-    expect(podeTransicionar('EM_ANDAMENTO', 'RESOLVIDO', 'ANALISTA')).toBe(true);
+    expect(podeTransicionar('EM_ANDAMENTO', 'RESOLVIDO', 'ANALISTA')).toBe(
+      true,
+    );
   });
 });
 
@@ -37,7 +39,9 @@ describe('escalonamento (RFC seção 3.3, fluxo 3)', () => {
     expect(podeTransicionar('ESCALADO', 'EM_ANDAMENTO', 'SUPERVISOR')).toBe(
       true,
     );
-    expect(podeTransicionar('ESCALADO', 'EM_ANDAMENTO', 'ANALISTA')).toBe(false);
+    expect(podeTransicionar('ESCALADO', 'EM_ANDAMENTO', 'ANALISTA')).toBe(
+      false,
+    );
   });
 });
 

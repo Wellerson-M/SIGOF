@@ -95,6 +95,7 @@ model Empresa {
   anexos       Anexo[]
   historicos   StatusHistorico[]
   notificacoes Notificacao[]
+  sessoes      Sessao[]
 
   @@map("empresas")
 }
@@ -110,6 +111,12 @@ model Usuario {
   ativo     Boolean  @default(true)
   criadoEm  DateTime @default(now()) @map("criado_em")
 
+  // --- Proteção contra força bruta (RNF03) ---
+  /// Falhas de senha seguidas desde o último login bem-sucedido.
+  falhasDeLogin Int       @default(0) @map("falhas_de_login")
+  /// Enquanto estiver no futuro, o login é recusado mesmo com a senha certa.
+  bloqueadoAte  DateTime? @map("bloqueado_ate")
+
   empresa Empresa @relation(fields: [empresaId], references: [id])
 
   solicitacoesAbertas    Solicitacao[]     @relation("SolicitacoesAbertas")
@@ -118,12 +125,40 @@ model Usuario {
   historicos             StatusHistorico[]
   notificacoes           Notificacao[]
   anexos                 Anexo[]
+  sessoes                Sessao[]
 
   // O e-mail é único dentro da empresa, não globalmente: em um cenário
   // multi-tenant, a mesma pessoa pode existir em duas transportadoras.
   @@unique([empresaId, email])
   @@index([empresaId])
   @@map("usuarios")
+}
+
+/// Sessão de login, representada pelo refresh token.
+///
+/// O token em si nunca é gravado, só o hash SHA-256 dele: quem ler o banco
+/// não consegue se passar pelo usuário. A cada renovação a sessão é
+/// substituída por uma nova da mesma `familia`; se um token já substituído
+/// for apresentado de novo, alguém o copiou, e a família inteira é revogada.
+model Sessao {
+  id            String    @id @default(uuid())
+  empresaId     String    @map("empresa_id")
+  usuarioId     String    @map("usuario_id")
+  familia       String
+  tokenHash     String    @unique @map("token_hash")
+  expiraEm      DateTime  @map("expira_em")
+  substituidaEm DateTime? @map("substituida_em")
+  revogadaEm    DateTime? @map("revogada_em")
+  ip            String?
+  userAgent     String?   @map("user_agent")
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([familia])
+  @@map("sessoes")
 }
 
 model Solicitacao {
