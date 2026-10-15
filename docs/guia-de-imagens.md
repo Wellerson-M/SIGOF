@@ -29,7 +29,7 @@ Este guia diz **exatamente qual imagem vai em cada seção** do arquivo `docs/rf
 | **3.1 Fluxo Principal** | ✅ Já tem fluxograma Mermaid | — | ✅ Pronto |
 | **3.2 Fluxos Alternativos** | (Opcional) Pode adicionar mini-fluxogramas Mermaid | — | 🟢 Baixa |
 | **4.1 Fluxo de Navegação** | ✅ Já tem diagrama Mermaid | — | ✅ Pronto |
-| **4.2 Wireframes (Telas 1–6)** | ✅ Os 6 mockups do Google Stitch já inseridos (em `docs/stitch_interface_sigof_corporativa/`) | Ver `mockup.md` | ✅ Pronto |
+| **4.2 Wireframes (Telas 1–6)** | ✅ Os 6 mockups do Google Stitch já inseridos (em `docs/stitch_interface_sigof_corporativa/`) | Ver [`mockups/mockup.md`](mockups/mockup.md) | ✅ Pronto |
 | **4.3 Fluxo de Interação** | (Opcional) Sequência das telas do Stitch lado a lado | Stitch | 🟢 Baixa |
 | **4.4 Feedback de Usuários** | Print do feedback real da equipe da Aceville | Conversa/formulário | 🔴 Alta — exigido NP3 |
 | **5.1 Diagrama C4** | ✅ Já tem 3 níveis em Mermaid | — | ✅ Pronto |
@@ -50,7 +50,7 @@ As 6 telas geradas no Stitch **já foram inseridas** na seção **4.2** da RFC, 
 - **Tela 5: Detalhes da Solicitação** → `detalhes_da_solicita_o_sigof/screen.png` ✅
 - **Tela 6: Dashboard Gerencial** → `dashboard_gerencial_sigof/screen.png` ✅
 
-> **Pendência:** os mockups atuais mostram tipos de ocorrência genéricos (avaria, extravio) nas linhas de exemplo. Como o escopo foi definido como **foco em CTe**, o ideal é **regerar essas telas** usando o prompt base atualizado em `mockup.md` (que já força os tipos "Reversão de frete", "Troca de pagador", "Ajuste fiscal de CTe"). Enquanto isso, há uma nota na RFC explicando que os dados são ilustrativos.
+> **Pendência:** os mockups atuais mostram tipos de ocorrência genéricos (avaria, extravio) nas linhas de exemplo. Como o escopo foi definido como **foco em CTe**, o ideal é **regerar essas telas** usando o prompt base atualizado em [`mockups/mockup.md`](mockups/mockup.md) (que já força os tipos "Reversão de frete", "Troca de pagador", "Ajuste fiscal de CTe"). Enquanto isso, há uma nota na RFC explicando que os dados são ilustrativos.
 
 ---
 

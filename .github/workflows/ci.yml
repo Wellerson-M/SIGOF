@@ -37,9 +37,15 @@ jobs:
     env:
       DATABASE_URL: postgresql://sigof:sigof@localhost:5432/sigof?schema=public
       JWT_SECRET: segredo-do-ci-com-mais-de-32-caracteres
+      # Só um sim/não: o token em si fica restrito ao passo do SonarCloud,
+      # longe do npm ci e dos testes, que executam código de terceiros
+      TEM_SONAR: ${{ secrets.SONAR_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Histórico completo: o SonarCloud usa o blame para saber o que é código novo
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -67,6 +73,20 @@ jobs:
 
       - name: Seed roda sem erro
         run: npm run db:seed
+
+      - name: Análise estática (SonarCloud)
+        if: env.TEM_SONAR == 'true'
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # PRs do Dependabot não recebem os segredos do repositório e podem
+      # pular a análise; em qualquer outro caso, pular é erro visível
+      - name: Exige que a análise tenha rodado
+        if: env.TEM_SONAR != 'true' && github.actor != 'dependabot[bot]'
+        run: |
+          echo "::error::SONAR_TOKEN ausente: a análise do SonarCloud não rodou."
+          exit 1
 
       - name: Auditoria de dependências
         run: npm audit --audit-level=high
