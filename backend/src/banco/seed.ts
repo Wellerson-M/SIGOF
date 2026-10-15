@@ -86,6 +86,7 @@ const EXEMPLOS: SolicitacaoExemplo[] = [
 
 async function limpar(prisma: PrismaClient): Promise<void> {
   // Ordem inversa das dependências (filhas antes das mães)
+  await prisma.sessao.deleteMany();
   await prisma.notificacao.deleteMany();
   await prisma.statusHistorico.deleteMany();
   await prisma.anexo.deleteMany();
