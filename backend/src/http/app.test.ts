@@ -55,7 +55,7 @@ describe('IP do cliente atrás do proxy (Caddy)', () => {
 
   function login(app: ReturnType<typeof appEm>, ipReal: string) {
     return request(app)
-      .post('/auth/login')
+      .post('/api/auth/login')
       .set('Origin', 'https://app.sigof.test')
       .set('X-Forwarded-For', ipReal)
       .send({ empresa: 'demo', email: 'a@b.test', senha: 'x' });

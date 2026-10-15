@@ -98,7 +98,7 @@ export function criarApp(modulos?: ModulosDaApp): Express {
     });
 
     app.use(
-      '/auth',
+      '/api/auth',
       rotasDeAutenticacao({
         servico,
         prisma,
