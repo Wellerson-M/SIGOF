@@ -1,4 +1,6 @@
 # Caddy: recebe o tráfego HTTPS e entrega ao contêiner certo.
+# Telas e API no mesmo endereço: /api e /health vão para a API, o resto para
+# as telas. Assim o cookie de sessão funciona sem liberar acesso entre sites.
 # O certificado é obtido e renovado sozinho (Let's Encrypt).
 
 {$DOMINIO_STAGING} {
@@ -10,5 +12,15 @@
 		-Server
 	}
 
-	reverse_proxy api-staging:3333
+	handle /api/* {
+		reverse_proxy api-staging:3333
+	}
+
+	handle /health {
+		reverse_proxy api-staging:3333
+	}
+
+	handle {
+		reverse_proxy web-staging:3000
+	}
 }

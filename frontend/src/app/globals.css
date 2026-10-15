@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/*
+ * Identidade visual do SIGOF: paleta "Azul Documento", estilo operacional
+ * denso, fonte IBM Plex. As cores são tokens (variáveis CSS) para o tema
+ * escuro trocar tudo de uma vez, sem mexer nos componentes.
+ */
+:root {
+  --primaria: #0b3a6e;
+  --sobre-primaria: #ffffff;
+  --destaque: #0e9f8e;
+  --sobre-destaque: #ffffff;
+  --fundo: #f4f6fa;
+  --superficie: #ffffff;
+  --texto: #142033;
+  --texto-suave: #56637a;
+  --borda: #d9e0ea;
+  --foco: #2f6feb;
+
+  /* Marca: painel de login e menu lateral. Fica azul-escura nos dois temas */
+  --marca: #0b3a6e;
+  --sobre-marca: #ffffff;
+
+  /* Estados (SLA e status) */
+  --ok: #1e7d4f;
+  --atencao: #9a6400;
+  --critico: #c0352b;
+  --pausado: #5b6b85;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primaria: #8db8ee;
+    --sobre-primaria: #0e131b;
+    --destaque: #3ccbb8;
+    --sobre-destaque: #0e131b;
+    --fundo: #0e131b;
+    --superficie: #151c27;
+    --texto: #e3e9f2;
+    --texto-suave: #94a1b5;
+    --borda: #253042;
+    --foco: #7fa6ff;
+
+    --marca: #0c2a4f;
+    --sobre-marca: #e3e9f2;
+
+    --ok: #4cc38a;
+    --atencao: #e8b547;
+    --critico: #f07068;
+    --pausado: #9aa8bf;
+  }
+}
+
+@theme inline {
+  --color-primaria: var(--primaria);
+  --color-sobre-primaria: var(--sobre-primaria);
+  --color-destaque: var(--destaque);
+  --color-sobre-destaque: var(--sobre-destaque);
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-borda: var(--borda);
+  --color-foco: var(--foco);
+  --color-marca: var(--marca);
+  --color-sobre-marca: var(--sobre-marca);
+  --color-ok: var(--ok);
+  --color-atencao: var(--atencao);
+  --color-critico: var(--critico);
+  --color-pausado: var(--pausado);
+
+  --font-sans: var(--fonte-plex-sans);
+  --font-mono: var(--fonte-plex-mono);
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+/* Foco sempre visível para quem navega pelo teclado (acessibilidade) */
+:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}

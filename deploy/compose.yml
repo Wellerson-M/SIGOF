@@ -36,6 +36,7 @@ services:
       - caddy-config:/config
     depends_on:
       - api-staging
+      - web-staging
 
   # ---------------------------------------------------------------- Staging
   # Ensaio geral: mesma imagem que vai para produção, com dados de mentira.
@@ -73,6 +74,12 @@ services:
     depends_on:
       postgres-staging:
         condition: service_healthy
+
+  # Telas (Next.js). Recebe tudo que não é /api
+  web-staging:
+    <<: *logs
+    image: ghcr.io/wellerson-m/sigof-frontend:staging
+    restart: unless-stopped
 
 volumes:
   caddy-dados:
