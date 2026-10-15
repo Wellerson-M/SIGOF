@@ -27,12 +27,20 @@ export class ErroDaApi extends Error {
     super(mensagem);
     this.name = 'ErroDaApi';
   }
+
+  /** Sessão inválida de verdade (e não servidor fora do ar, por exemplo). */
+  get semSessao(): boolean {
+    return this.status === 401;
+  }
 }
 
 const MENSAGEM_SEM_CONEXAO =
   'Não foi possível falar com o servidor. Confira sua conexão e tente de novo.';
 
-async function chamar(caminho: string, opcoes: RequestInit = {}): Promise<Response> {
+async function chamar(
+  caminho: string,
+  opcoes: RequestInit = {},
+): Promise<Response> {
   try {
     return await fetch(`/api${caminho}`, {
       ...opcoes,
@@ -60,16 +68,44 @@ async function erroDa(resposta: Response): Promise<ErroDaApi> {
 }
 
 /**
- * Faz o pedido; se a sessão de 15 minutos venceu (401), renova uma vez com
- * o cookie de sessão e repete. Se a renovação também falhar, o usuário
- * precisa entrar de novo.
+ * Renovação em andamento, compartilhada: se vários pedidos da tela
+ * descobrem juntos que o token venceu, só um "renovar" vai à API e todos
+ * esperam por ele. Devolve o erro da renovação, ou null se deu certo.
  */
-export async function pedir<T>(caminho: string, opcoes: RequestInit = {}): Promise<T> {
+let renovacaoEmAndamento: Promise<ErroDaApi | null> | null = null;
+
+function renovarSessao(): Promise<ErroDaApi | null> {
+  renovacaoEmAndamento ??= chamar('/auth/renovar', { method: 'POST' })
+    .then(async (resposta) => (resposta.ok ? null : await erroDa(resposta)))
+    .catch((erro: unknown) =>
+      erro instanceof ErroDaApi
+        ? erro
+        : new ErroDaApi(0, 'SEM_CONEXAO', MENSAGEM_SEM_CONEXAO),
+    )
+    .finally(() => {
+      renovacaoEmAndamento = null;
+    });
+  return renovacaoEmAndamento;
+}
+
+/**
+ * Faz o pedido; se a sessão de 15 minutos venceu (401), renova com o cookie
+ * de sessão e repete. Se a renovação for recusada (401), o usuário precisa
+ * entrar de novo; se falhar por outro motivo (servidor fora do ar), o erro
+ * é esse, e não "sessão expirada".
+ */
+export async function pedir<T>(
+  caminho: string,
+  opcoes: RequestInit = {},
+): Promise<T> {
   let resposta = await chamar(caminho, opcoes);
 
   if (resposta.status === 401) {
-    const renovacao = await chamar('/auth/renovar', { method: 'POST' });
-    if (renovacao.ok) {
+    const erroNaRenovacao = await renovarSessao();
+    if (erroNaRenovacao && erroNaRenovacao.status !== 401) {
+      throw erroNaRenovacao;
+    }
+    if (!erroNaRenovacao) {
       resposta = await chamar(caminho, opcoes);
     }
   }
@@ -81,7 +117,11 @@ export async function pedir<T>(caminho: string, opcoes: RequestInit = {}): Promi
   return (resposta.status === 204 ? undefined : await resposta.json()) as T;
 }
 
-export async function entrar(empresa: string, email: string, senha: string): Promise<void> {
+export async function entrar(
+  empresa: string,
+  email: string,
+  senha: string,
+): Promise<void> {
   const resposta = await chamar('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ empresa, email, senha }),

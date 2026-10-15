@@ -15,7 +15,9 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   async rewrites() {
-    return [{ source: '/api/:caminho*', destination: `${API_INTERNA}/api/:caminho*` }];
+    return [
+      { source: '/api/:caminho*', destination: `${API_INTERNA}/api/:caminho*` },
+    ];
   },
 };
 

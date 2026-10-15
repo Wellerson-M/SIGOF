@@ -14,7 +14,10 @@ describe('pedir', () => {
     vi.stubGlobal('fetch', fetch);
 
     await expect(pedir('/auth/eu')).resolves.toEqual({ ok: true });
-    expect(fetch).toHaveBeenCalledWith('/api/auth/eu', expect.objectContaining({ credentials: 'same-origin' }));
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/eu',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    );
   });
 
   it('com sessão vencida (401), renova uma vez e repete o pedido', async () => {
@@ -36,16 +39,65 @@ describe('pedir', () => {
   it('se a renovação falha, devolve o erro da API', async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce(resposta(401, { erro: 'Autenticação necessária', codigo: 'NAO_AUTENTICADO' }))
+      .mockResolvedValueOnce(
+        resposta(401, {
+          erro: 'Autenticação necessária',
+          codigo: 'NAO_AUTENTICADO',
+        }),
+      )
       .mockResolvedValueOnce(resposta(401, { erro: 'Sessão expirada' }));
     vi.stubGlobal('fetch', fetch);
 
-    await expect(pedir('/auth/eu')).rejects.toMatchObject({ status: 401, codigo: 'NAO_AUTENTICADO' });
+    await expect(pedir('/auth/eu')).rejects.toMatchObject({
+      status: 401,
+      codigo: 'NAO_AUTENTICADO',
+    });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('vários pedidos com o token vencido fazem uma renovação só', async () => {
+    const fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        url === '/api/auth/renovar'
+          ? resposta(204)
+          : fetch.mock.calls.filter(([u]) => u === url).length === 1
+            ? resposta(401, { erro: 'x' })
+            : resposta(200, { url }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await Promise.all([pedir('/a'), pedir('/b'), pedir('/c')]);
+
+    expect(
+      fetch.mock.calls.filter(([u]) => u === '/api/auth/renovar'),
+    ).toHaveLength(1);
+  });
+
+  it('se a renovação falha por outro motivo (500), o erro é esse, e não "sem sessão"', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(401, { erro: 'x' }))
+      .mockResolvedValueOnce(
+        resposta(500, {
+          erro: 'Erro interno do servidor',
+          codigo: 'ERRO_INTERNO',
+        }),
+      );
+    vi.stubGlobal('fetch', fetch);
+
+    const erro = (await pedir('/auth/eu').catch(
+      (e: unknown) => e,
+    )) as ErroDaApi;
+    expect(erro.status).toBe(500);
+    expect(erro.semSessao).toBe(false);
+  });
+
   it('sem conexão, dá uma mensagem que o usuário entende', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    );
 
     const erro = await pedir('/auth/eu').catch((e: unknown) => e);
     expect(erro).toBeInstanceOf(ErroDaApi);
@@ -55,7 +107,9 @@ describe('pedir', () => {
   it('resposta 204 devolve undefined', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(resposta(204)));
 
-    await expect(pedir('/auth/sair', { method: 'POST' })).resolves.toBeUndefined();
+    await expect(
+      pedir('/auth/sair', { method: 'POST' }),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -67,16 +121,25 @@ describe('entrar', () => {
     await entrar('demo', 'a@b.test', 'segredo');
 
     const [, opcoes] = fetch.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(opcoes.body))).toEqual({ empresa: 'demo', email: 'a@b.test', senha: 'segredo' });
+    expect(JSON.parse(String(opcoes.body))).toEqual({
+      empresa: 'demo',
+      email: 'a@b.test',
+      senha: 'segredo',
+    });
   });
 
   it('não tenta renovar quando a senha está errada', async () => {
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(resposta(401, { erro: 'Empresa, e-mail ou senha inválidos', codigo: 'NAO_AUTENTICADO' }));
+    const fetch = vi.fn().mockResolvedValue(
+      resposta(401, {
+        erro: 'Empresa, e-mail ou senha inválidos',
+        codigo: 'NAO_AUTENTICADO',
+      }),
+    );
     vi.stubGlobal('fetch', fetch);
 
-    await expect(entrar('demo', 'a@b.test', 'errada')).rejects.toThrow('Empresa, e-mail ou senha inválidos');
+    await expect(entrar('demo', 'a@b.test', 'errada')).rejects.toThrow(
+      'Empresa, e-mail ou senha inválidos',
+    );
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

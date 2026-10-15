@@ -36,6 +36,15 @@ export interface Tokens {
 export const FALHAS_PARA_BLOQUEIO = 10;
 export const MINUTOS_DE_BLOQUEIO = 15;
 
+/**
+ * Tolerância para renovações simultâneas do mesmo token de sessão. Duas
+ * abas abertas (ou dois pedidos da mesma tela) podem perceber juntas que o
+ * token de acesso venceu e renovar ao mesmo tempo. Nos primeiros segundos
+ * após a troca, o reuso é tratado como isso; depois, só quem copiou o
+ * token o usaria de novo. É a mesma ideia do "reuse interval" do Auth0.
+ */
+export const SEGUNDOS_DE_RENOVACAO_CONCORRENTE = 30;
+
 const MINUTO = 60_000;
 const DIA = 24 * 60 * MINUTO;
 
@@ -132,8 +141,9 @@ export class ServicoDeAutenticacao {
 
   /**
    * Troca um token de sessão por um par novo (rotação). Cada token de sessão
-   * vale uma única vez: se um já usado aparecer de novo, ele foi copiado por
-   * alguém, e todas as sessões daquela família são revogadas.
+   * vale uma única vez: se um já usado aparecer de novo depois da janela de
+   * renovação concorrente, ele foi copiado por alguém, e todas as sessões
+   * daquela família são revogadas.
    */
   async renovar(
     tokenDeSessao: string,
@@ -149,14 +159,13 @@ export class ServicoDeAutenticacao {
       throw new ErroNaoAutenticado('Sessão expirada');
     }
 
-    // Marca como usada só se ainda não estiver: duas renovações simultâneas
-    // com o mesmo token não podem ambas vencer
+    // Marca como usada só se ainda não estiver (operação atômica no banco)
     const { count } = await this.prisma.sessao.updateMany({
       where: { id: sessao.id, substituidaEm: null },
       data: { substituidaEm: agora },
     });
 
-    if (count === 0) {
+    if (count === 0 && !(await this.foiTrocadaAgoraHaPouco(sessao.id, agora))) {
       await this.revogarFamilia(sessao.familia);
       throw new ErroNaoAutenticado('Sessão expirada');
     }
@@ -209,6 +218,21 @@ export class ServicoDeAutenticacao {
       where: { usuarioId, revogadaEm: null },
       data: { revogadaEm: this.agora() },
     });
+  }
+
+  private async foiTrocadaAgoraHaPouco(
+    id: string,
+    agora: Date,
+  ): Promise<boolean> {
+    const { substituidaEm } = await this.prisma.sessao.findUniqueOrThrow({
+      where: { id },
+      select: { substituidaEm: true },
+    });
+    return (
+      substituidaEm !== null &&
+      agora.getTime() - substituidaEm.getTime() <=
+        SEGUNDOS_DE_RENOVACAO_CONCORRENTE * 1000
+    );
   }
 
   private async revogarFamilia(familia: string): Promise<void> {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
 import { NOME_DO_PERFIL, type Perfil } from '@/lib/api';
 import { useSessao } from '@/lib/sessao';
@@ -24,15 +24,38 @@ const MENU: ItemDoMenu[] = [
     emBreve: true,
     perfis: ['SOLICITANTE', 'ANALISTA', 'SUPERVISOR'],
   },
-  { rotulo: 'Indicadores', href: '/indicadores', emBreve: true, perfis: ['SUPERVISOR', 'ADMIN'] },
-  { rotulo: 'Administração', href: '/administracao', emBreve: true, perfis: ['ADMIN'] },
+  {
+    rotulo: 'Indicadores',
+    href: '/indicadores',
+    emBreve: true,
+    perfis: ['SUPERVISOR', 'ADMIN'],
+  },
+  {
+    rotulo: 'Administração',
+    href: '/administracao',
+    emBreve: true,
+    perfis: ['ADMIN'],
+  },
 ];
 
 /** Estrutura das páginas internas: menu lateral, barra superior e conteúdo. */
 export function Moldura({ children }: { children: ReactNode }) {
   const { usuario, sair } = useSessao();
+  const [erroAoSair, setErroAoSair] = useState<string | null>(null);
+
+  async function aoSair() {
+    setErroAoSair(null);
+    try {
+      await sair();
+    } catch {
+      // A sessão continua ativa no servidor: avisar em vez de fingir que saiu
+      setErroAoSair('Não foi possível sair. Tente de novo.');
+    }
+  }
   const caminho = usePathname();
-  const itens = MENU.filter((item) => !item.perfis || item.perfis.includes(usuario.perfil));
+  const itens = MENU.filter(
+    (item) => !item.perfis || item.perfis.includes(usuario.perfil),
+  );
 
   return (
     <div className="flex min-h-screen">
@@ -49,7 +72,9 @@ export function Moldura({ children }: { children: ReactNode }) {
                 title="Em desenvolvimento"
               >
                 {item.rotulo}
-                <span className="text-[10px] uppercase tracking-wide">em breve</span>
+                <span className="text-[10px] uppercase tracking-wide">
+                  em breve
+                </span>
               </span>
             ) : (
               <Link
@@ -76,17 +101,27 @@ export function Moldura({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <div className="text-right leading-tight">
               <p className="text-sm font-medium text-texto">{usuario.nome}</p>
-              <p className="text-xs text-texto-suave">{NOME_DO_PERFIL[usuario.perfil]}</p>
+              <p className="text-xs text-texto-suave">
+                {NOME_DO_PERFIL[usuario.perfil]}
+              </p>
             </div>
             <button
               type="button"
-              onClick={() => void sair()}
+              onClick={() => void aoSair()}
               className="h-8 rounded-md border border-borda px-3 text-sm text-texto hover:bg-fundo"
             >
               Sair
             </button>
           </div>
         </header>
+        {erroAoSair && (
+          <p
+            role="alert"
+            className="border-b border-critico/40 bg-critico/10 px-4 py-2 text-sm text-critico md:px-6"
+          >
+            {erroAoSair}
+          </p>
+        )}
         {/* No celular o menu lateral some; os atalhos ficam numa faixa rolável */}
         <nav
           aria-label="Menu principal (celular)"

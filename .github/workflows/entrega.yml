@@ -55,7 +55,11 @@ jobs:
           tags: |
             ghcr.io/wellerson-m/sigof-backend:staging
             ghcr.io/wellerson-m/sigof-backend:${{ github.sha }}
-          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          # A revisão (commit) gravada nas duas imagens: o servidor só atualiza
+          # quando API e telas forem do mesmo commit
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -67,7 +71,11 @@ jobs:
           tags: |
             ghcr.io/wellerson-m/sigof-frontend:staging
             ghcr.io/wellerson-m/sigof-frontend:${{ github.sha }}
-          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          # A revisão (commit) gravada nas duas imagens: o servidor só atualiza
+          # quando API e telas forem do mesmo commit
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 

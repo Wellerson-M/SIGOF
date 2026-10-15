@@ -33,7 +33,9 @@ describe('FormularioDeLogin', () => {
 
     await preencher('', 'a@b.test', '');
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Preencha empresa, e-mail e senha.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Preencha empresa, e-mail e senha.',
+    );
     expect(entrar).not.toHaveBeenCalled();
   });
 
@@ -43,18 +45,30 @@ describe('FormularioDeLogin', () => {
 
     await preencher('Transportadora-Demo', 'a@b.test', 'Demo@2026');
 
-    expect(entrar).toHaveBeenCalledWith('Transportadora-Demo', 'a@b.test', 'Demo@2026');
+    expect(entrar).toHaveBeenCalledWith(
+      'Transportadora-Demo',
+      'a@b.test',
+      'Demo@2026',
+    );
     expect(localStorage.getItem(CHAVE_EMPRESA)).toBe('transportadora-demo');
     expect(replace).toHaveBeenCalledWith('/inicio');
   });
 
   it('com login recusado, mostra a mensagem da API e limpa a senha', async () => {
-    entrar.mockRejectedValue(new ErroDaApi(401, 'NAO_AUTENTICADO', 'Empresa, e-mail ou senha inválidos'));
+    entrar.mockRejectedValue(
+      new ErroDaApi(
+        401,
+        'NAO_AUTENTICADO',
+        'Empresa, e-mail ou senha inválidos',
+      ),
+    );
     render(<FormularioDeLogin />);
 
     await preencher('demo', 'a@b.test', 'errada');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Empresa, e-mail ou senha inválidos');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Empresa, e-mail ou senha inválidos',
+    );
     expect(screen.getByLabelText('Senha')).toHaveValue('');
     expect(replace).not.toHaveBeenCalled();
   });

@@ -16,7 +16,10 @@ vi.mock('@/lib/sessao', () => ({
       email: 'sofia@demo.test',
       perfil,
       area: 'COMERCIAL',
-      empresa: { razaoSocial: 'Transportadora Demo Ltda.', slug: 'transportadora-demo' },
+      empresa: {
+        razaoSocial: 'Transportadora Demo Ltda.',
+        slug: 'transportadora-demo',
+      },
     },
     sair,
   }),
@@ -43,6 +46,17 @@ describe('Moldura', () => {
     perfil = 'ADMIN';
     render(<Moldura>x</Moldura>);
     expect(screen.getAllByText('Administração').length).toBeGreaterThan(0);
+  });
+
+  it('se sair falhar, avisa na tela', async () => {
+    sair.mockRejectedValueOnce(new Error('sem conexão'));
+    render(<Moldura>x</Moldura>);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível sair',
+    );
   });
 
   it('o botão Sair encerra a sessão', async () => {

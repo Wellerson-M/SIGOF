@@ -19,6 +19,20 @@ cd /opt/sigof/repo/deploy
 # baixa as que faltarem; consultá-las a cada minuto estouraria o limite de
 # downloads anônimos do Docker Hub.
 docker compose --env-file /opt/sigof/.env pull -q api-staging web-staging
+
+# A entrega publica as duas imagens uma depois da outra. Se o servidor
+# olhar bem no meio, veria API nova com tela velha: só atualiza quando as
+# duas forem do mesmo commit (etiqueta gravada pela entrega).
+revisao() {
+  docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$1"
+}
+api=$(revisao ghcr.io/wellerson-m/sigof-backend:staging)
+web=$(revisao ghcr.io/wellerson-m/sigof-frontend:staging)
+if [ "$api" != "$web" ]; then
+  echo "API ($api) e telas ($web) de commits diferentes: aguardando a publicação terminar."
+  exit 0
+fi
+
 docker compose --env-file /opt/sigof/.env up -d --remove-orphans
 
 # Imagens antigas ocupam disco à toa

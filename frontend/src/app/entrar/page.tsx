@@ -15,11 +15,13 @@ export default function PaginaDeLogin() {
             Ocorrências de frete organizadas, do pedido à correção do CTe.
           </h1>
           <p className="mt-4 text-sm opacity-80">
-            Protocolo, prazo de atendimento, alerta de duplicidade e histórico completo, num só
-            lugar.
+            Protocolo, prazo de atendimento, alerta de duplicidade e histórico
+            completo, num só lugar.
           </p>
         </div>
-        <p className="text-xs opacity-60">SIGOF · Sistema Inteligente de Gestão de Ocorrências de Frete</p>
+        <p className="text-xs opacity-60">
+          SIGOF · Sistema Inteligente de Gestão de Ocorrências de Frete
+        </p>
       </section>
 
       {/* Formulário */}

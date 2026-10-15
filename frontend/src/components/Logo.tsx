@@ -12,14 +12,29 @@ interface PropriedadesDoLogo {
   invertido?: boolean;
 }
 
-export function Logo({ tamanho = 32, comNome = true, invertido = false }: PropriedadesDoLogo) {
+export function Logo({
+  tamanho = 32,
+  comNome = true,
+  invertido = false,
+}: PropriedadesDoLogo) {
   const corPista = invertido ? 'var(--sobre-marca)' : 'var(--primaria)';
   const corFaixa = invertido ? 'var(--marca)' : 'var(--superficie)';
 
   return (
     <span className="inline-flex items-center gap-2">
-      <svg width={tamanho} height={tamanho} viewBox="0 0 48 48" aria-hidden="true">
-        <path d={CAMINHO_S} fill="none" stroke={corPista} strokeWidth="9" strokeLinecap="round" />
+      <svg
+        width={tamanho}
+        height={tamanho}
+        viewBox="0 0 48 48"
+        aria-hidden="true"
+      >
+        <path
+          d={CAMINHO_S}
+          fill="none"
+          stroke={corPista}
+          strokeWidth="9"
+          strokeLinecap="round"
+        />
         <path
           d={CAMINHO_S}
           fill="none"

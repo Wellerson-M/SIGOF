@@ -13,7 +13,10 @@ vi.mock('@/lib/sessao', () => ({
       email: 'sergio@demo.test',
       perfil: 'SUPERVISOR',
       area: 'FINANCEIRO',
-      empresa: { razaoSocial: 'Transportadora Demo Ltda.', slug: 'transportadora-demo' },
+      empresa: {
+        razaoSocial: 'Transportadora Demo Ltda.',
+        slug: 'transportadora-demo',
+      },
     },
     sair: vi.fn(),
   }),
@@ -33,7 +36,9 @@ describe('página inicial', () => {
   it('cumprimenta pelo primeiro nome e mostra perfil, área e empresa', () => {
     render(<PaginaInicial />);
 
-    expect(screen.getByRole('heading', { name: 'Olá, Sérgio' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Olá, Sérgio' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Supervisor')).toBeInTheDocument();
     expect(screen.getByText('Área: Financeiro')).toBeInTheDocument();
     expect(screen.getByText('transportadora-demo')).toBeInTheDocument();
@@ -42,6 +47,8 @@ describe('página inicial', () => {
   it('não repete o ponto final da razão social', () => {
     render(<PaginaInicial />);
 
-    expect(screen.getByText('Você está no SIGOF da Transportadora Demo Ltda.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Você está no SIGOF da Transportadora Demo Ltda.'),
+    ).toBeInTheDocument();
   });
 });

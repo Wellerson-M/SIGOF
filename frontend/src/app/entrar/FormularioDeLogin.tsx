@@ -117,7 +117,15 @@ interface PropriedadesDoCampo {
   autoComplete?: string;
 }
 
-function Campo({ id, rotulo, valor, aoMudar, tipo = 'text', dica, autoComplete }: PropriedadesDoCampo) {
+function Campo({
+  id,
+  rotulo,
+  valor,
+  aoMudar,
+  tipo = 'text',
+  dica,
+  autoComplete,
+}: PropriedadesDoCampo) {
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium text-texto">

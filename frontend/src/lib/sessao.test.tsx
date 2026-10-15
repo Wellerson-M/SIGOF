@@ -1,14 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ErroDaApi } from './api';
 import { ProvedorDeSessao, useSessao } from './sessao';
 
 const replace = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
+// Objeto estável, como o roteador de verdade do Next
+const roteador = { replace };
+vi.mock('next/navigation', () => ({ useRouter: () => roteador }));
 
 const usuarioLogado = vi.fn();
 const sair = vi.fn();
-vi.mock('./api', () => ({
+vi.mock('./api', async (original) => ({
+  ...(await original<typeof import('./api')>()),
   usuarioLogado: () => usuarioLogado(),
   sair: () => sair(),
 }));
@@ -62,13 +66,71 @@ describe('ProvedorDeSessao', () => {
   });
 
   it('sem sessão, manda para o login', async () => {
-    usuarioLogado.mockRejectedValue(new Error('401'));
+    usuarioLogado.mockRejectedValue(
+      new ErroDaApi(401, 'NAO_AUTENTICADO', 'Autenticação necessária'),
+    );
     render(
       <ProvedorDeSessao>
         <MostraUsuario />
       </ProvedorDeSessao>,
     );
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/entrar'));
+  });
+
+  it('servidor fora do ar não desloga: mostra o erro e deixa tentar de novo', async () => {
+    usuarioLogado
+      .mockRejectedValueOnce(
+        new ErroDaApi(
+          0,
+          'SEM_CONEXAO',
+          'Não foi possível falar com o servidor.',
+        ),
+      )
+      .mockResolvedValueOnce(USUARIO);
+    render(
+      <ProvedorDeSessao>
+        <MostraUsuario />
+      </ProvedorDeSessao>,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível falar com o servidor.',
+    );
+    expect(replace).not.toHaveBeenCalled();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('André Analista')).toBeInTheDocument();
+  });
+
+  it('se sair falhar na API, continua logado (não vai para o login)', async () => {
+    usuarioLogado.mockResolvedValue(USUARIO);
+    sair.mockRejectedValue(new ErroDaApi(0, 'SEM_CONEXAO', 'sem conexão'));
+    let falhou = false;
+    function SairComErro() {
+      const sessao = useSessao();
+      return (
+        <button
+          type="button"
+          onClick={() => sessao.sair().catch(() => (falhou = true))}
+        >
+          Sair
+        </button>
+      );
+    }
+    render(
+      <ProvedorDeSessao>
+        <SairComErro />
+      </ProvedorDeSessao>,
+    );
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: 'Sair' }));
+
+    await vi.waitFor(() => expect(falhou).toBe(true));
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it('sair encerra a sessão na API e volta para o login', async () => {
@@ -80,7 +142,9 @@ describe('ProvedorDeSessao', () => {
       </ProvedorDeSessao>,
     );
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Sair' }));
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: 'Sair' }));
 
     expect(sair).toHaveBeenCalled();
     expect(replace).toHaveBeenCalledWith('/entrar');

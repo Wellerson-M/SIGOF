@@ -13,7 +13,11 @@ import {
   temBanco,
   type EmpresaDeTeste,
 } from '../../testes/banco-de-teste.js';
-import { FALHAS_PARA_BLOQUEIO } from './servico.js';
+import {
+  FALHAS_PARA_BLOQUEIO,
+  SEGUNDOS_DE_RENOVACAO_CONCORRENTE,
+} from './servico.js';
+import { hashDoToken } from './tokens.js';
 
 const FRONTEND = envDeTeste().FRONTEND_URL;
 
@@ -201,19 +205,45 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       expect(novos.sigof_acesso).toBeDefined();
     });
 
-    it('reuso de um token já trocado derruba a sessão inteira (roubo detectado)', async () => {
+    function renovarCom(token: string) {
+      return request(app)
+        .post('/api/auth/renovar')
+        .set('Origin', FRONTEND)
+        .set('Cookie', `sigof_sessao=${token}`);
+    }
+
+    it('duas renovações simultâneas do mesmo token (duas abas) são aceitas', async () => {
       const original = cookiesDa(
         await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
       );
-      const renovar = (token: string) =>
-        request(app)
-          .post('/api/auth/renovar')
-          .set('Origin', FRONTEND)
-          .set('Cookie', `sigof_sessao=${token}`);
 
-      const legitimo = cookiesDa(await renovar(original.sigof_sessao!));
-      const atacante = await renovar(original.sigof_sessao!);
-      const depoisDoAtaque = await renovar(legitimo.sigof_sessao!);
+      const [aba1, aba2] = await Promise.all([
+        renovarCom(original.sigof_sessao!),
+        renovarCom(original.sigof_sessao!),
+      ]);
+
+      expect(aba1.status).toBe(204);
+      expect(aba2.status).toBe(204);
+    });
+
+    it(`reuso depois de ${SEGUNDOS_DE_RENOVACAO_CONCORRENTE} s derruba a sessão inteira (roubo detectado)`, async () => {
+      const original = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
+      );
+      const legitimo = cookiesDa(await renovarCom(original.sigof_sessao!));
+
+      // Simula o tempo passando: a troca do token original foi há 31 s
+      await prisma.sessao.update({
+        where: { tokenHash: hashDoToken(original.sigof_sessao!) },
+        data: {
+          substituidaEm: new Date(
+            Date.now() - (SEGUNDOS_DE_RENOVACAO_CONCORRENTE + 1) * 1000,
+          ),
+        },
+      });
+
+      const atacante = await renovarCom(original.sigof_sessao!);
+      const depoisDoAtaque = await renovarCom(legitimo.sigof_sessao!);
 
       expect(atacante.status).toBe(401);
       // O token mais novo também morreu: a família toda foi revogada
