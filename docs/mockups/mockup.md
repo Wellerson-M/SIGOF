@@ -10,7 +10,7 @@ Este arquivo contém os prompts prontos para gerar os mockups do **SIGOF** no [G
 4. Depois, gere **uma tela por vez** colando cada prompt da seção "Telas".
 5. Ajuste o que quiser direto no Stitch e **exporte cada tela como PNG**.
 6. Salve os PNGs na pasta `docs/assets/` do repositório (crie a pasta) com os nomes sugeridos em cada tela.
-7. Veja o arquivo [`guia-de-imagens.md`](guia-de-imagens.md) para saber onde colar cada print na RFC.
+7. Veja o arquivo [`guia-de-imagens.md`](../guia-de-imagens.md) para saber onde colar cada print na RFC.
 
 > **Dica:** o Stitch tende a gerar resultados melhores em inglês. Cada prompt abaixo tem a versão em português (principal) e você pode traduzir se quiser refinar. Mantenha o mesmo vocabulário visual entre as telas para consistência.
 
