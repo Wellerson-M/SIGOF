@@ -20,7 +20,10 @@ ROTULO_DNS=sigof-staging
 DOMINIO_STAGING="$ROTULO_DNS.$REGIAO.cloudapp.azure.com"
 
 DIR=$(dirname "$0")
-CLOUD_INIT=$(mktemp)
+# Arquivo relativo à pasta do projeto (não /tmp): o Azure CLI no Windows
+# não entende caminhos no formato do Git Bash e usaria o texto do caminho
+# como se fosse o conteúdo
+CLOUD_INIT="$DIR/.cloud-init.gerado.yaml"
 sed "s/__DOMINIO_STAGING__/$DOMINIO_STAGING/" "$DIR/cloud-init.yaml" > "$CLOUD_INIT"
 
 az group create --name "$GRUPO" --location "$REGIAO" --output none

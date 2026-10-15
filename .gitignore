@@ -27,3 +27,6 @@ Thumbs.db
 
 # Ferramentas locais
 .claude/
+
+# Gerado por deploy/provisionar-azure.sh
+deploy/.cloud-init.gerado.yaml
