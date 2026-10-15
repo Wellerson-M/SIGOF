@@ -1,16 +1,16 @@
 /**
  * Dados de demonstração (seed) — apenas desenvolvimento e staging.
  *
- *   npm run db:seed
- *
- * Apaga tudo e recria do zero, então pode ser executado quantas vezes for
- * preciso. Cria duas empresas: a "Transportadora Demo", com um usuário de
+ *   npm run db:seed              apaga tudo e recria do zero
+ *   npm run db:seed -- --se-vazio  só semeia se o banco não tiver empresas
+ *                                  (usado ao subir o staging)
+ * Cria duas empresas: a "Transportadora Demo", com um usuário de
  * cada perfil e solicitações de exemplo, e a "Outra Transportadora", que
  * existe só para provar que uma empresa nunca enxerga os dados da outra.
  */
 import { config } from 'dotenv';
 import type {
-  PrismaClient,
+  Prisma,
   StatusSolicitacao,
   TipoOcorrencia,
   Prioridade,
@@ -22,7 +22,10 @@ import { criarPrismaClient } from './cliente.js';
 
 config({ path: ['.env', '../.env'] });
 
-/** Senha de todos os usuários de demonstração. Nunca usar em produção. */
+/**
+ * Senha de todos os usuários de demonstração. Nunca usar em produção.
+ * No staging, que é público, vem de SEED_SENHA (aleatória, gerada na VM).
+ */
 export const SENHA_DEMO = 'Demo@2026';
 
 const MINUTO = 60_000;
@@ -84,7 +87,7 @@ const EXEMPLOS: SolicitacaoExemplo[] = [
   },
 ];
 
-async function limpar(prisma: PrismaClient): Promise<void> {
+async function limpar(prisma: Prisma.TransactionClient): Promise<void> {
   // Ordem inversa das dependências (filhas antes das mães)
   await prisma.sessao.deleteMany();
   await prisma.notificacao.deleteMany();
@@ -97,9 +100,10 @@ async function limpar(prisma: PrismaClient): Promise<void> {
   await prisma.empresa.deleteMany();
 }
 
-async function semear(prisma: PrismaClient): Promise<void> {
-  const senhaHash = await gerarHashDeSenha(SENHA_DEMO);
-
+async function semear(
+  prisma: Prisma.TransactionClient,
+  senhaHash: string,
+): Promise<void> {
   const demo = await prisma.empresa.create({
     data: {
       razaoSocial: 'Transportadora Demo Ltda.',
@@ -248,11 +252,33 @@ async function main(): Promise<void> {
 
   const prisma = criarPrismaClient(databaseUrl);
   try {
-    await limpar(prisma);
-    await semear(prisma);
+    if (
+      process.argv.includes('--se-vazio') &&
+      (await prisma.empresa.count()) > 0
+    ) {
+      // eslint-disable-next-line no-console -- saída de script de linha de comando
+      console.log('Seed ignorado: o banco já tem dados.');
+      return;
+    }
+
+    const senha = process.env.SEED_SENHA || SENHA_DEMO;
+    const senhaHash = await gerarHashDeSenha(senha);
+
+    // Tudo numa transação: se o seed for interrompido no meio, nada fica
+    // gravado e a próxima subida tenta de novo do zero
+    await prisma.$transaction(
+      async (tx) => {
+        await limpar(tx);
+        await semear(tx, senhaHash);
+      },
+      { timeout: 60_000 },
+    );
+
     // eslint-disable-next-line no-console -- saída de script de linha de comando
     console.log(
-      `Seed concluído. Empresa "transportadora-demo", senha de todos: ${SENHA_DEMO}`,
+      process.env.SEED_SENHA
+        ? 'Seed concluído. Empresa "transportadora-demo", senha definida em SEED_SENHA.'
+        : `Seed concluído. Empresa "transportadora-demo", senha de todos: ${SENHA_DEMO}`,
     );
   } finally {
     await prisma.$disconnect();

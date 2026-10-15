@@ -1,0 +1,59 @@
+#cloud-config
+# Configuração inicial da VM, executada uma única vez na criação
+# (infraestrutura como código; ver deploy/provisionar-azure.sh).
+#
+# __DOMINIO_STAGING__ é substituído pelo script de provisionamento.
+
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - unattended-upgrades   # correções de segurança do Ubuntu aplicadas sozinhas
+
+# 2 GB de swap: margem para picos de memória (build do Prisma, Postgres)
+swap:
+  filename: /swapfile
+  size: 2G
+
+write_files:
+  - path: /etc/systemd/system/sigof-atualizar.service
+    content: |
+      [Unit]
+      Description=SIGOF: busca configuração e imagens novas e atualiza os contêineres
+      After=docker.service network-online.target
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      # Primeiro a configuração mais recente da main; depois o script dela
+      ExecStartPre=/bin/sh -c 'cd /opt/sigof/repo && git fetch -q origin main && git reset -q --hard FETCH_HEAD'
+      ExecStart=/bin/sh /opt/sigof/repo/deploy/atualizar.sh
+
+  - path: /etc/systemd/system/sigof-atualizar.timer
+    content: |
+      [Unit]
+      Description=SIGOF: verifica atualizações a cada minuto
+
+      [Timer]
+      OnBootSec=30s
+      OnUnitActiveSec=60s
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - git clone --depth 1 https://github.com/Wellerson-M/SIGOF.git /opt/sigof/repo
+  # Segredos gerados aqui mesmo, aleatórios: nunca passam pelo GitHub nem pelo notebook
+  - |
+    umask 077
+    cat > /opt/sigof/.env <<EOF
+    DOMINIO_STAGING=__DOMINIO_STAGING__
+    STAGING_DB_SENHA=$(openssl rand -hex 24)
+    STAGING_JWT_SECRET=$(openssl rand -hex 32)
+    STAGING_SEED_SENHA=$(openssl rand -base64 18)
+    EOF
+  - systemctl daemon-reload
+  - systemctl enable --now docker
+  - systemctl enable --now sigof-atualizar.timer

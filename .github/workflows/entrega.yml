@@ -1,0 +1,84 @@
+# Entrega contínua do SIGOF (RFC seção 5.9).
+#
+# A cada merge na main:
+#   1. monta a imagem Docker do backend e publica no GitHub Container
+#      Registry com a etiqueta "staging" (e com o commit, para rastrear);
+#   2. espera o servidor buscar a imagem nova (deploy/atualizar.sh roda a
+#      cada minuto na VM) e confere, pelo /health, que o commit certo está
+#      no ar.
+#
+# Nenhuma credencial do servidor fica no GitHub: quem empurra a imagem é o
+# GitHub, quem puxa é o servidor.
+
+name: Entrega
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Duas entregas seguidas: a mais nova cancela a anterior
+concurrency:
+  group: entrega-staging
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  imagem:
+    name: Imagem Docker do backend
+    # Execução manual também só a partir da main: o staging nunca recebe
+    # código que não passou por PR
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: backend
+          push: true
+          build-args: VERSAO=${{ github.sha }}
+          tags: |
+            ghcr.io/wellerson-m/sigof-backend:staging
+            ghcr.io/wellerson-m/sigof-backend:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  staging:
+    name: Publicação em staging
+    needs: imagem
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://${{ vars.DOMINIO_STAGING }}/health
+    steps:
+      - name: Espera o servidor rodar o commit novo
+        env:
+          URL: https://${{ vars.DOMINIO_STAGING }}/health
+          ESPERADO: ${{ github.sha }}
+        run: |
+          for tentativa in $(seq 1 40); do
+            versao=$(curl -fsS --max-time 10 "$URL" | jq -r .versao || true)
+            if [ "$versao" = "$ESPERADO" ]; then
+              echo "Staging rodando $versao"
+              exit 0
+            fi
+            echo "Tentativa $tentativa: no ar está '${versao:-nada}'; aguardando..."
+            sleep 15
+          done
+          echo "::error::O staging não atualizou para $ESPERADO em 10 minutos."
+          exit 1

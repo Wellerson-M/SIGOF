@@ -1,0 +1,80 @@
+# Servidor do SIGOF na nuvem (RFC seção 5.8).
+#
+# Roda na VM da Azure. O próprio servidor busca as atualizações a cada minuto
+# (deploy/atualizar.sh): baixa a configuração mais recente da main e a
+# imagem nova do GitHub Container Registry. Ninguém entra no servidor para
+# publicar nada.
+#
+# Os segredos ficam em /opt/sigof/.env, gerado na criação da VM, fora do
+# repositório, e nunca saem de lá (ver deploy/cloud-init.yaml).
+
+name: sigof
+
+# Logs de cada contêiner limitados a 3 arquivos de 10 MB: sem isso, com o
+# tempo eles enchem o disco da VM
+x-logs: &logs
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # Porta de entrada: HTTPS com certificado automático (Let's Encrypt)
+  caddy:
+    <<: *logs
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO_STAGING: ${DOMINIO_STAGING}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-dados:/data
+      - caddy-config:/config
+    depends_on:
+      - api-staging
+
+  # ---------------------------------------------------------------- Staging
+  # Ensaio geral: mesma imagem que vai para produção, com dados de mentira.
+
+  postgres-staging:
+    <<: *logs
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sigof
+      POSTGRES_PASSWORD: ${STAGING_DB_SENHA}
+      POSTGRES_DB: sigof
+    volumes:
+      - postgres-staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigof -d sigof"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sem "ports": o banco só é acessível pela rede interna do Docker
+
+  api-staging:
+    <<: *logs
+    image: ghcr.io/wellerson-m/sigof-backend:staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://sigof:${STAGING_DB_SENHA}@postgres-staging:5432/sigof?schema=public
+      JWT_SECRET: ${STAGING_JWT_SECRET}
+      FRONTEND_URL: https://${DOMINIO_STAGING}
+      SEMEAR_SE_VAZIO: "true"
+      # O staging é público: a senha dos usuários de demonstração é aleatória,
+      # gerada na VM, e não a do README
+      SEED_SENHA: ${STAGING_SEED_SENHA}
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+
+volumes:
+  caddy-dados:
+  caddy-config:
+  postgres-staging:
