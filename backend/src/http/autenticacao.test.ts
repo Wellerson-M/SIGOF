@@ -4,6 +4,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { emitirTokenDeAcesso } from '../modulos/auth/tokens.js';
 import { autenticar, exigirPerfil, usuarioDa } from './autenticacao.js';
+import { protecaoCsrf } from './csrf.js';
 import { tratadorDeErros } from './tratador-de-erros.js';
 
 const SEGREDO = 'z'.repeat(32);
@@ -11,6 +12,7 @@ const SEGREDO = 'z'.repeat(32);
 function appDeTeste() {
   const app = express();
   app.use(cookieParser());
+  app.use(protecaoCsrf(['http://localhost:3000']));
   app.get('/qualquer', autenticar(SEGREDO), (req, res) => {
     res.json(usuarioDa(req));
   });

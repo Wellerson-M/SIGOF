@@ -8,6 +8,7 @@ import { pinoHttp } from 'pino-http';
 import type { Env } from '../config/env.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
+import { protecaoCsrf } from './csrf.js';
 import { tratadorDeErros } from './tratador-de-erros.js';
 
 export interface ModulosDaApp {
@@ -61,6 +62,9 @@ export function criarApp(modulos?: ModulosDaApp): Express {
   // Depois do log: JSON malformado ou grande demais também fica registrado
   // com o correlation id
   app.use(express.json({ limit: '1mb' }));
+
+  // Requisições que alteram dados só são aceitas vindas do frontend
+  app.use(protecaoCsrf(modulos ? [modulos.env.FRONTEND_URL] : []));
 
   // Health check consumido pelo monitoramento e pelo deploy
   // (RFC seções 5.7 e 5.8; RNF04)

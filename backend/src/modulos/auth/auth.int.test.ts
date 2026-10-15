@@ -15,6 +15,8 @@ import {
 } from '../../testes/banco-de-teste.js';
 import { FALHAS_PARA_BLOQUEIO } from './servico.js';
 
+const FRONTEND = envDeTeste().FRONTEND_URL;
+
 describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
   let prisma: PrismaClient;
   let app: Express;
@@ -38,6 +40,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
   function login(slug: string, email: string, senha = SENHA) {
     return request(app)
       .post('/auth/login')
+      .set('Origin', FRONTEND)
       .send({ empresa: slug, email, senha });
   }
 
@@ -91,6 +94,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     it('recusa dados malformados com 400 e o campo errado', async () => {
       const resposta = await request(app)
         .post('/auth/login')
+        .set('Origin', FRONTEND)
         .send({ empresa: '', email: 'nao-e-email', senha: '' });
 
       expect(resposta.status).toBe(400);
@@ -185,6 +189,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
       const resposta = await request(app)
         .post('/auth/renovar')
+        .set('Origin', FRONTEND)
         .set('Cookie', comCookies({ sigof_sessao: primeiro.sigof_sessao! }));
       const novos = cookiesDa(resposta);
 
@@ -201,6 +206,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       const renovar = (token: string) =>
         request(app)
           .post('/auth/renovar')
+          .set('Origin', FRONTEND)
           .set('Cookie', `sigof_sessao=${token}`);
 
       const legitimo = cookiesDa(await renovar(original.sigof_sessao!));
@@ -213,7 +219,10 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
 
     it('sem cookie, responde 401', async () => {
-      expect((await request(app).post('/auth/renovar')).status).toBe(401);
+      expect(
+        (await request(app).post('/auth/renovar').set('Origin', FRONTEND))
+          .status,
+      ).toBe(401);
     });
   });
 
@@ -225,9 +234,11 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
       const saida = await request(app)
         .post('/auth/sair')
+        .set('Origin', FRONTEND)
         .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`);
       const renovarDepois = await request(app)
         .post('/auth/renovar')
+        .set('Origin', FRONTEND)
         .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`);
 
       expect(saida.status).toBe(204);
@@ -236,7 +247,9 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
 
     it('POST /auth/sair sem cookie também responde 204', async () => {
-      expect((await request(app).post('/auth/sair')).status).toBe(204);
+      expect(
+        (await request(app).post('/auth/sair').set('Origin', FRONTEND)).status,
+      ).toBe(204);
     });
 
     it('POST /auth/sair-de-todos derruba as sessões de todos os dispositivos', async () => {
@@ -246,14 +259,30 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
       const resposta = await request(app)
         .post('/auth/sair-de-todos')
+        .set('Origin', FRONTEND)
         .set('Cookie', comCookies(notebook));
       const celularDepois = await request(app)
         .post('/auth/renovar')
+        .set('Origin', FRONTEND)
         .set('Cookie', `sigof_sessao=${celular.sigof_sessao}`);
 
       expect(resposta.status).toBe(204);
       expect(celularDepois.status).toBe(401);
     });
+  });
+
+  it('recusa login vindo de outro site (CSRF)', async () => {
+    const resposta = await request(app)
+      .post('/auth/login')
+      .set('Origin', 'https://site-malicioso.test')
+      .send({
+        empresa: empresa.slug,
+        email: empresa.usuarios.ANALISTA.email,
+        senha: SENHA,
+      });
+
+    expect(resposta.status).toBe(403);
+    expect(resposta.headers['set-cookie']).toBeUndefined();
   });
 
   it('limita tentativas de login por IP + e-mail (429)', async () => {
@@ -265,6 +294,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     const tentar = () =>
       request(appLimitada)
         .post('/auth/login')
+        .set('Origin', FRONTEND)
         .send({ empresa: empresa.slug, email: 'limite@x.test', senha: 'x' });
 
     await tentar();
