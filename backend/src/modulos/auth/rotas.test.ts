@@ -3,14 +3,18 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+import { protecaoCsrf } from '../../http/csrf.js';
 import { ErroNaoAutenticado } from '../../http/erros.js';
 import { tratadorDeErros } from '../../http/tratador-de-erros.js';
 import { rotasDeAutenticacao } from './rotas.js';
 import type { ServicoDeAutenticacao } from './servico.js';
 
+const FRONTEND = 'http://localhost:3000';
+
 function appCom(renovar: () => Promise<never>) {
   const app = express();
   app.use(cookieParser());
+  app.use(protecaoCsrf([FRONTEND]));
   app.use(
     '/auth',
     rotasDeAutenticacao({
@@ -33,6 +37,7 @@ describe('POST /auth/renovar quando a renovação falha', () => {
 
     const resposta = await request(app)
       .post('/auth/renovar')
+      .set('Origin', FRONTEND)
       .set('Cookie', 'sigof_sessao=qualquer');
 
     expect(resposta.status).toBe(401);
@@ -44,6 +49,7 @@ describe('POST /auth/renovar quando a renovação falha', () => {
 
     const resposta = await request(app)
       .post('/auth/renovar')
+      .set('Origin', FRONTEND)
       .set('Cookie', 'sigof_sessao=qualquer');
 
     expect(resposta.status).toBe(500);
