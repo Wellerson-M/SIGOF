@@ -79,19 +79,26 @@ if ($migrou -ne 0) { Falha 'As migrações do banco falharam.' }
 if ($semeou -ne 0) { Falha 'O seed falhou.' }
 
 Passo 'Ligando a API e as telas (cada uma abre numa janela própria)'
-if (PortaEmUso 3333) {
-  Write-Host 'A API já está ligada (porta 3333).'
+# A porta da API pode ter sido trocada no .env (PORT); o padrão é 3333
+$portaApi = 3333
+$linhaPorta = Select-String -Path .env -Pattern '^\s*PORT\s*=\s*(\d+)' | Select-Object -First 1
+if ($linhaPorta) { $portaApi = [int]$linhaPorta.Matches[0].Groups[1].Value }
+
+# A pasta vai como diretório de trabalho, e não dentro do comando: assim um
+# nome de pasta com aspas ou símbolos não quebra (nem injeta) nada
+if (PortaEmUso $portaApi) {
+  Write-Host "A API já está ligada (porta $portaApi)."
 } else {
-  Start-Process powershell -ArgumentList '-NoExit', '-Command', "`$Host.UI.RawUI.WindowTitle = 'SIGOF - API'; Set-Location '$raiz\backend'; npm run dev"
+  Start-Process powershell -WorkingDirectory (Join-Path $raiz 'backend') -ArgumentList '-NoExit', '-Command', "`$Host.UI.RawUI.WindowTitle = 'SIGOF - API'; npm run dev"
 }
 if (PortaEmUso 3000) {
   Write-Host 'As telas já estão ligadas (porta 3000).'
 } else {
-  Start-Process powershell -ArgumentList '-NoExit', '-Command', "`$Host.UI.RawUI.WindowTitle = 'SIGOF - Telas'; Set-Location '$raiz\frontend'; npm run dev"
+  Start-Process powershell -WorkingDirectory (Join-Path $raiz 'frontend') -ArgumentList '-NoExit', '-Command', "`$Host.UI.RawUI.WindowTitle = 'SIGOF - Telas'; npm run dev"
 }
 
 Write-Host 'Esperando tudo responder...'
-if (-not (Esperar 'http://localhost:3333/health' 60)) { Falha 'A API não respondeu. Veja a janela "SIGOF - API".' }
+if (-not (Esperar "http://localhost:$portaApi/health" 60)) { Falha 'A API não respondeu. Veja a janela "SIGOF - API".' }
 if (-not (Esperar 'http://localhost:3000/entrar' 120)) { Falha 'As telas não responderam. Veja a janela "SIGOF - Telas".' }
 
 Start-Process 'http://localhost:3000'

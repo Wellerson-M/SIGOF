@@ -19,12 +19,25 @@ Para desligar: `scripts\parar.cmd`.
 
 **Qualquer sistema (passo a passo):**
 
+Num terminal, na pasta do projeto (o último comando fica rodando: é a API):
+
 ```bash
 cp .env.example .env
 docker compose up -d
-cd backend  && npm install && npm run db:migrate && npm run db:seed && npm run dev   # terminal 1
-cd frontend && npm install && npm run dev                                          # terminal 2
+cd backend
+npm install && npm run db:migrate && npm run db:seed
+npm run dev
 ```
+
+Em **outro terminal**, também na pasta do projeto (as telas):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Depois, abra http://localhost:3000.
 
 Usuários de demonstração: empresa `transportadora-demo`, senha `Demo@2026`. Os e-mails estão no [README](README.md#usuários-de-demonstração).
 
