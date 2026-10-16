@@ -51,6 +51,16 @@ const esquemaEnv = z
       .min(32, 'CHAVE_CIFRA deve ter no mínimo 32 caracteres')
       .optional(),
 
+    /**
+     * Armazenamento S3 dos anexos (SeaweedFS no servidor e no
+     * docker-compose). Sem endpoint, os anexos ficam indisponíveis.
+     */
+    STORAGE_ENDPOINT: z.string().url().optional(),
+    STORAGE_BUCKET: z.string().min(3).default('sigof-anexos'),
+    STORAGE_ACCESS_KEY: z.string().optional(),
+    STORAGE_SECRET_KEY: z.string().optional(),
+    STORAGE_REGIAO: z.string().default('us-east-1'),
+
     /** Intervalo entre as rodadas de envio da fila de e-mails. */
     EMAIL_INTERVALO_SEGUNDOS: z.coerce.number().int().positive().default(15),
   })

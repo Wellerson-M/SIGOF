@@ -68,6 +68,11 @@ services:
       JWT_SECRET: ${STAGING_JWT_SECRET}
       # Cifra a senha do e-mail de envio guardada no banco
       CHAVE_CIFRA: ${STAGING_CHAVE_CIFRA}
+      # Anexos: armazenamento S3 da rede interna
+      STORAGE_ENDPOINT: http://storage-staging:9000
+      STORAGE_BUCKET: sigof-anexos
+      STORAGE_ACCESS_KEY: sigof
+      STORAGE_SECRET_KEY: ${STAGING_STORAGE_SEGREDO}
       FRONTEND_URL: https://${DOMINIO_STAGING}
       SEMEAR_SE_VAZIO: "true"
       # O staging é público: a senha dos usuários de demonstração é aleatória,
@@ -76,6 +81,27 @@ services:
     depends_on:
       postgres-staging:
         condition: service_healthy
+      storage-staging:
+        condition: service_healthy
+
+  # Anexos (S3-compatível). Só a API fala com ele, pela rede interna: os
+  # arquivos nunca ficam expostos na internet, e cada download passa pela
+  # conferência de acesso da API
+  storage-staging:
+    <<: *logs
+    image: chrislusf/seaweedfs:4.48
+    restart: unless-stopped
+    command: server -dir=/data -s3 -s3.port=9000
+    environment:
+      AWS_ACCESS_KEY_ID: sigof
+      AWS_SECRET_ACCESS_KEY: ${STAGING_STORAGE_SEGREDO}
+    volumes:
+      - storage-staging:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Telas (Next.js). Recebe tudo que não é /api
   web-staging:
@@ -87,3 +113,4 @@ volumes:
   caddy-dados:
   caddy-config:
   postgres-staging:
+  storage-staging:

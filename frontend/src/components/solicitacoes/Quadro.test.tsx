@@ -36,6 +36,7 @@ function solicitacao(extra: Partial<Resumo> = {}): Resumo {
     slaVenceEm: '2026-10-15T16:00:00Z',
     sla: { situacao: 'NO_PRAZO', minutosRestantes: 135 },
     acoes: ['EM_ANDAMENTO'],
+    totais: { anexos: 0, mensagens: 0 },
     ...extra,
   };
 }

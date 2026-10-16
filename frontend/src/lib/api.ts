@@ -50,7 +50,10 @@ async function chamar(
       ...opcoes,
       credentials: 'same-origin',
       headers: {
-        ...(opcoes.body ? { 'Content-Type': 'application/json' } : {}),
+        // Texto é JSON; um FormData (envio de arquivo) leva o próprio tipo
+        ...(typeof opcoes.body === 'string'
+          ? { 'Content-Type': 'application/json' }
+          : {}),
         ...opcoes.headers,
       },
     });
@@ -104,6 +107,19 @@ export async function pedir<T>(
   caminho: string,
   opcoes: RequestInit = {},
 ): Promise<T> {
+  const resposta = await responder(caminho, opcoes);
+  return (resposta.status === 204 ? undefined : await resposta.json()) as T;
+}
+
+/** Como `pedir`, mas devolve o conteúdo bruto (download de anexo). */
+export async function pedirArquivo(caminho: string): Promise<Blob> {
+  return (await responder(caminho)).blob();
+}
+
+async function responder(
+  caminho: string,
+  opcoes: RequestInit = {},
+): Promise<Response> {
   let resposta = await chamar(caminho, opcoes);
 
   if (resposta.status === 401) {
@@ -119,8 +135,7 @@ export async function pedir<T>(
   if (!resposta.ok) {
     throw await erroDa(resposta);
   }
-
-  return (resposta.status === 204 ? undefined : await resposta.json()) as T;
+  return resposta;
 }
 
 export async function entrar(

@@ -348,8 +348,16 @@ function Cartao({
       <p className="line-clamp-2 text-sm text-texto">{item.descricao}</p>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
         <IndicadorDeSla sla={item.sla} />
-        <span className="truncate text-xs text-texto-suave">
-          {item.responsavel?.nome ?? 'Sem responsável'}
+        <span className="flex items-center gap-2 truncate text-xs text-texto-suave">
+          {item.totais.anexos > 0 && (
+            <span title="Anexos">📎 {item.totais.anexos}</span>
+          )}
+          {item.totais.mensagens > 0 && (
+            <span title="Mensagens">💬 {item.totais.mensagens}</span>
+          )}
+          <span className="truncate">
+            {item.responsavel?.nome ?? 'Sem responsável'}
+          </span>
         </span>
       </div>
     </Link>

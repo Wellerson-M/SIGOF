@@ -61,6 +61,8 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
       },
     ],
     emails: [],
+    anexos: [],
+    totais: { anexos: 0, mensagens: 1 },
     pode: { mudarPrioridade: true, atribuir: true, comentarInterno: true },
     ...extra,
   };

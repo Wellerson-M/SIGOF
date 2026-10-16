@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ErroDaApi, entrar, pedir } from './api';
+import { ErroDaApi, entrar, pedir, pedirArquivo } from './api';
 
 function resposta(status: number, corpo?: unknown): Response {
   return new Response(corpo === undefined ? null : JSON.stringify(corpo), {
@@ -110,6 +110,31 @@ describe('pedir', () => {
     await expect(
       pedir('/auth/sair', { method: 'POST' }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('pedirArquivo e envio de arquivo', () => {
+  it('devolve o conteúdo bruto, renovando a sessão se precisar', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(401, { erro: 'x' }))
+      .mockResolvedValueOnce(resposta(204))
+      .mockResolvedValueOnce(new Response('%PDF-1.7', { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const arquivo = await pedirArquivo('/solicitacoes/s1/anexos/a1');
+    expect(await arquivo.text()).toBe('%PDF-1.7');
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('FormData vai sem o Content-Type de JSON', async () => {
+    const fetch = vi.fn().mockResolvedValue(resposta(201, { id: 'a1' }));
+    vi.stubGlobal('fetch', fetch);
+    await pedir('/solicitacoes/s1/anexos', {
+      method: 'POST',
+      body: new FormData(),
+    });
+    const opcoes = fetch.mock.calls[0]?.[1] as RequestInit;
+    expect(opcoes.headers).toEqual({});
   });
 });
 

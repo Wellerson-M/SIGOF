@@ -44,6 +44,37 @@ describe('FormularioDeAbertura', () => {
     ).toHaveAttribute('href', '/solicitacoes/nova');
   });
 
+  it('anexa os arquivos depois de abrir e avisa os recusados', async () => {
+    vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+    const anexar = vi.spyOn(api, 'anexar').mockResolvedValue({
+      id: 'a1',
+      nomeArquivo: 'nota.pdf',
+      tipoMime: 'application/pdf',
+      tamanhoBytes: 10,
+      enviadoPor: { id: 'u', nome: 'U' },
+      criadoEm: '2026-10-16T10:00:00Z',
+    });
+    render(<FormularioDeAbertura />);
+    const usuario = await preencher();
+    // Sem filtrar pelo "accept": o navegador deixa escolher "todos os arquivos"
+    await userEvent
+      .setup({ applyAccept: false })
+      .upload(screen.getByLabelText(/^Anexos/), [
+        new File(['%PDF'], 'nota.pdf', { type: 'application/pdf' }),
+        new File(['MZ'], 'programa.exe'),
+      ]);
+    await usuario.click(
+      screen.getByRole('button', { name: 'Abrir solicitação' }),
+    );
+
+    expect(await screen.findByText(/SOL-2026-10-0042/)).toBeInTheDocument();
+    expect(anexar).toHaveBeenCalledWith('nova', expect.any(File));
+    expect(anexar).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText('programa.exe: envie PDF, PNG, JPG, WEBP ou XML'),
+    ).toBeInTheDocument();
+  });
+
   it('duplicidade: mostra a existente e deixa abrir mesmo assim', async () => {
     const abrir = vi
       .spyOn(api, 'abrir')

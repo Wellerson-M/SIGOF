@@ -16,6 +16,13 @@ import {
   rotasDeConfiguracaoDeEmail,
   rotasDeNotificacoes,
 } from '../modulos/avisos/rotas.js';
+import {
+  ArmazenamentoIndisponivel,
+  ArmazenamentoS3,
+  type Armazenamento,
+} from '../modulos/anexos/armazenamento.js';
+import { rotasDeAnexos } from '../modulos/anexos/rotas.js';
+import { ServicoDeAnexos } from '../modulos/anexos/servico.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
 import { rotasDeSolicitacoes } from '../modulos/solicitacoes/rotas.js';
@@ -31,6 +38,21 @@ export interface ModulosDaApp {
   limiteDeLoginPorMinuto?: number;
   /** Troca o envio SMTP real por um dublê (testes). */
   remetenteDeEmail?: Remetente;
+  /** Troca o armazenamento S3 por outro (testes). */
+  armazenamento?: Armazenamento;
+}
+
+function armazenamentoDo(env: Env): Armazenamento {
+  if (!env.STORAGE_ENDPOINT) {
+    return new ArmazenamentoIndisponivel();
+  }
+  return new ArmazenamentoS3({
+    endpoint: env.STORAGE_ENDPOINT,
+    bucket: env.STORAGE_BUCKET,
+    chaveDeAcesso: env.STORAGE_ACCESS_KEY ?? '',
+    segredo: env.STORAGE_SECRET_KEY ?? '',
+    regiao: env.STORAGE_REGIAO,
+  });
 }
 
 /**
@@ -128,6 +150,17 @@ export function criarApp(modulos?: ModulosDaApp): Express {
     );
 
     const avisos = new ServicoDeAvisos({ urlDoSistema: env.FRONTEND_URL });
+    app.use(
+      '/api/solicitacoes/:id/anexos',
+      rotasDeAnexos({
+        servico: new ServicoDeAnexos(
+          prisma,
+          modulos.armazenamento ?? armazenamentoDo(env),
+          avisos,
+        ),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
     app.use(
       '/api/solicitacoes',
       rotasDeSolicitacoes({
