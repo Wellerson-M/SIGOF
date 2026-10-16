@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { api } from '@/lib/solicitacoes';
 import PaginaInicial from './(sistema)/inicio/page';
 import PaginaDeLogin from './entrar/page';
 
@@ -33,6 +34,13 @@ describe('página de login', () => {
 });
 
 describe('página inicial', () => {
+  it('mostra o resumo do dia tirado do quadro', async () => {
+    vi.spyOn(api, 'listar').mockResolvedValue([]);
+    render(<PaginaInicial />);
+    expect(await screen.findByText('Na fila, sem ninguém')).toBeInTheDocument();
+    expect(screen.getByText('Com SLA vencido')).toBeInTheDocument();
+  });
+
   it('cumprimenta pelo primeiro nome e mostra perfil, área e empresa', () => {
     render(<PaginaInicial />);
 

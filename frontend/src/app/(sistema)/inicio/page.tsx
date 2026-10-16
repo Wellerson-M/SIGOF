@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { NOME_DO_PERFIL } from '@/lib/api';
+import { resumoDoDia, type Contagem } from '@/lib/inicio';
 import { useSessao } from '@/lib/sessao';
+import { api } from '@/lib/solicitacoes';
 
 const AREA: Record<string, string> = {
   FINANCEIRO: 'Financeiro',
@@ -10,15 +13,25 @@ const AREA: Record<string, string> = {
   OPERACIONAL: 'Operacional',
 };
 
-const PROXIMAS_ENTREGAS = [
-  'Anexos (PDF e imagens) em cada solicitação',
-  'Avisos no sistema e por e-mail a cada movimentação',
-  'Indicadores para o supervisor',
-  'Administração de usuários e dos parâmetros da empresa',
-];
-
 export default function PaginaInicial() {
   const { usuario } = useSessao();
+  const [resumo, setResumo] = useState<Contagem[] | null>(null);
+  const mostraResumo = usuario.perfil !== 'ADMIN';
+
+  useEffect(() => {
+    if (!mostraResumo) return;
+    let cancelado = false;
+    api.listar().then(
+      (itens) => {
+        if (!cancelado) setResumo(resumoDoDia(usuario, itens));
+      },
+      () => {},
+    );
+    return () => {
+      cancelado = true;
+    };
+  }, [usuario, mostraResumo]);
+
   const primeiroNome = usuario.nome.split(' ')[0];
   // "Ltda." já termina em ponto: sem isto a frase sairia com dois pontos
   const empresa = usuario.empresa.razaoSocial.replace(/\.$/, '');
@@ -33,6 +46,28 @@ export default function PaginaInicial() {
           Você está no SIGOF da {empresa}.
         </p>
       </div>
+
+      {resumo && (
+        <section
+          aria-label="Resumo do dia"
+          className="grid gap-4 sm:grid-cols-3"
+        >
+          {resumo.map((c) => (
+            <Link
+              key={c.rotulo}
+              href="/solicitacoes"
+              className="rounded-lg border border-borda bg-superficie p-4 hover:border-primaria/50"
+            >
+              <p className="text-sm text-texto-suave">{c.rotulo}</p>
+              <p
+                className={`mt-1 text-3xl font-semibold tabular-nums ${c.critico ? 'text-critico' : 'text-texto'}`}
+              >
+                {c.valor}
+              </p>
+            </Link>
+          ))}
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Cartao titulo="Seu perfil">
@@ -82,23 +117,28 @@ export default function PaginaInicial() {
         )}
       </div>
 
-      <Cartao titulo="Em desenvolvimento">
-        <p className="mb-3 text-sm text-texto-suave">
-          As próximas funcionalidades aparecem aqui e no menu conforme ficarem
-          prontas:
-        </p>
-        <ul className="flex flex-col gap-2">
-          {PROXIMAS_ENTREGAS.map((item) => (
-            <li key={item} className="flex gap-2 text-sm text-texto">
-              <span
-                className="mt-1.5 inline-block size-1.5 shrink-0 rounded-full bg-destaque"
-                aria-hidden="true"
-              />
-              {item}
-            </li>
-          ))}
-        </ul>
-      </Cartao>
+      {usuario.perfil === 'ADMIN' && (
+        <Cartao titulo="Administração">
+          <p className="mb-3 text-sm text-texto-suave">
+            Cadastre os funcionários, ajuste o expediente e o prazo de
+            atendimento e configure o e-mail de avisos.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/administracao"
+              className="inline-flex h-9 items-center rounded-md border border-borda px-4 text-sm text-texto"
+            >
+              Abrir a administração
+            </Link>
+            <Link
+              href="/indicadores"
+              className="inline-flex h-9 items-center rounded-md border border-borda px-4 text-sm text-texto"
+            >
+              Ver os indicadores
+            </Link>
+          </div>
+        </Cartao>
+      )}
     </div>
   );
 }

@@ -27,7 +27,6 @@ const MENU: ItemDoMenu[] = [
   {
     rotulo: 'Indicadores',
     href: '/indicadores',
-    emBreve: true,
     perfis: ['SUPERVISOR', 'ADMIN'],
   },
   {
