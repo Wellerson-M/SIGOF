@@ -20,7 +20,7 @@ function appCom(renovar: () => Promise<never>) {
     next();
   });
   app.use(
-    '/auth',
+    '/api/auth',
     rotasDeAutenticacao({
       servico: { renovar } as unknown as ServicoDeAutenticacao,
       prisma: {} as PrismaClient,
@@ -33,13 +33,13 @@ function appCom(renovar: () => Promise<never>) {
   return app;
 }
 
-describe('POST /auth/renovar quando a renovação falha', () => {
+describe('POST /api/auth/renovar quando a renovação falha', () => {
   it('sessão inválida: apaga os cookies', async () => {
     const app = appCom(() =>
       Promise.reject(new ErroNaoAutenticado('Sessão expirada')),
     );
 
-    const resposta = await request(app).post('/auth/renovar');
+    const resposta = await request(app).post('/api/auth/renovar');
 
     expect(resposta.status).toBe(401);
     expect(String(resposta.headers['set-cookie'])).toContain('sigof_sessao=;');
@@ -48,7 +48,7 @@ describe('POST /auth/renovar quando a renovação falha', () => {
   it('falha passageira (ex.: banco fora do ar): mantém os cookies', async () => {
     const app = appCom(() => Promise.reject(new Error('conexão recusada')));
 
-    const resposta = await request(app).post('/auth/renovar');
+    const resposta = await request(app).post('/api/auth/renovar');
 
     expect(resposta.status).toBe(500);
     expect(resposta.headers['set-cookie']).toBeUndefined();

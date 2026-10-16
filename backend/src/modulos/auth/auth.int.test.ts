@@ -13,7 +13,11 @@ import {
   temBanco,
   type EmpresaDeTeste,
 } from '../../testes/banco-de-teste.js';
-import { FALHAS_PARA_BLOQUEIO } from './servico.js';
+import {
+  FALHAS_PARA_BLOQUEIO,
+  SEGUNDOS_DE_RENOVACAO_CONCORRENTE,
+} from './servico.js';
+import { hashDoToken } from './tokens.js';
 
 const FRONTEND = envDeTeste().FRONTEND_URL;
 
@@ -39,7 +43,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
   function login(slug: string, email: string, senha = SENHA) {
     return request(app)
-      .post('/auth/login')
+      .post('/api/auth/login')
       .set('Origin', FRONTEND)
       .send({ empresa: slug, email, senha });
   }
@@ -50,7 +54,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       .join('; ');
   }
 
-  describe('POST /auth/login', () => {
+  describe('POST /api/auth/login', () => {
     it('com credenciais certas, devolve 204 e os dois cookies protegidos', async () => {
       const resposta = await login(
         empresa.slug,
@@ -62,7 +66,9 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
         resposta.headers['set-cookie'] as unknown as string[]
       ).join('\n');
       expect(setCookie).toMatch(/sigof_acesso=.+; .*HttpOnly/);
-      expect(setCookie).toMatch(/sigof_sessao=.+; Path=\/auth; .*HttpOnly/);
+      expect(setCookie).toMatch(
+        /sigof_sessao=.+; Path=\/api\/auth; .*HttpOnly/,
+      );
       expect(setCookie).toMatch(/SameSite=Lax/);
     });
 
@@ -93,7 +99,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
     it('recusa dados malformados com 400 e o campo errado', async () => {
       const resposta = await request(app)
-        .post('/auth/login')
+        .post('/api/auth/login')
         .set('Origin', FRONTEND)
         .send({ empresa: '', email: 'nao-e-email', senha: '' });
 
@@ -148,14 +154,14 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
   });
 
-  describe('GET /auth/eu', () => {
+  describe('GET /api/auth/eu', () => {
     it('devolve o usuário logado com a empresa dele', async () => {
       const cookies = cookiesDa(
         await login(empresa.slug, empresa.usuarios.ANALISTA.email),
       );
 
       const resposta = await request(app)
-        .get('/auth/eu')
+        .get('/api/auth/eu')
         .set('Cookie', comCookies(cookies));
 
       expect(resposta.status).toBe(200);
@@ -168,9 +174,9 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
 
     it('sem cookie ou com token adulterado, responde 401', async () => {
-      const semCookie = await request(app).get('/auth/eu');
+      const semCookie = await request(app).get('/api/auth/eu');
       const adulterado = await request(app)
-        .get('/auth/eu')
+        .get('/api/auth/eu')
         .set(
           'Cookie',
           'sigof_acesso=eyJhbGciOiJIUzI1NiJ9.e30.assinatura-falsa',
@@ -181,14 +187,14 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
   });
 
-  describe('POST /auth/renovar', () => {
+  describe('POST /api/auth/renovar', () => {
     it('troca o token de sessão por um novo par', async () => {
       const primeiro = cookiesDa(
         await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
       );
 
       const resposta = await request(app)
-        .post('/auth/renovar')
+        .post('/api/auth/renovar')
         .set('Origin', FRONTEND)
         .set('Cookie', comCookies({ sigof_sessao: primeiro.sigof_sessao! }));
       const novos = cookiesDa(resposta);
@@ -199,19 +205,45 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       expect(novos.sigof_acesso).toBeDefined();
     });
 
-    it('reuso de um token já trocado derruba a sessão inteira (roubo detectado)', async () => {
+    function renovarCom(token: string) {
+      return request(app)
+        .post('/api/auth/renovar')
+        .set('Origin', FRONTEND)
+        .set('Cookie', `sigof_sessao=${token}`);
+    }
+
+    it('duas renovações simultâneas do mesmo token (duas abas) são aceitas', async () => {
       const original = cookiesDa(
         await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
       );
-      const renovar = (token: string) =>
-        request(app)
-          .post('/auth/renovar')
-          .set('Origin', FRONTEND)
-          .set('Cookie', `sigof_sessao=${token}`);
 
-      const legitimo = cookiesDa(await renovar(original.sigof_sessao!));
-      const atacante = await renovar(original.sigof_sessao!);
-      const depoisDoAtaque = await renovar(legitimo.sigof_sessao!);
+      const [aba1, aba2] = await Promise.all([
+        renovarCom(original.sigof_sessao!),
+        renovarCom(original.sigof_sessao!),
+      ]);
+
+      expect(aba1.status).toBe(204);
+      expect(aba2.status).toBe(204);
+    });
+
+    it(`reuso depois de ${SEGUNDOS_DE_RENOVACAO_CONCORRENTE} s derruba a sessão inteira (roubo detectado)`, async () => {
+      const original = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
+      );
+      const legitimo = cookiesDa(await renovarCom(original.sigof_sessao!));
+
+      // Simula o tempo passando: a troca do token original foi há 31 s
+      await prisma.sessao.update({
+        where: { tokenHash: hashDoToken(original.sigof_sessao!) },
+        data: {
+          substituidaEm: new Date(
+            Date.now() - (SEGUNDOS_DE_RENOVACAO_CONCORRENTE + 1) * 1000,
+          ),
+        },
+      });
+
+      const atacante = await renovarCom(original.sigof_sessao!);
+      const depoisDoAtaque = await renovarCom(legitimo.sigof_sessao!);
 
       expect(atacante.status).toBe(401);
       // O token mais novo também morreu: a família toda foi revogada
@@ -220,7 +252,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
     it('sem cookie, responde 401', async () => {
       expect(
-        (await request(app).post('/auth/renovar').set('Origin', FRONTEND))
+        (await request(app).post('/api/auth/renovar').set('Origin', FRONTEND))
           .status,
       ).toBe(401);
     });
@@ -233,11 +265,11 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       );
 
       const saida = await request(app)
-        .post('/auth/sair')
+        .post('/api/auth/sair')
         .set('Origin', FRONTEND)
         .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`);
       const renovarDepois = await request(app)
-        .post('/auth/renovar')
+        .post('/api/auth/renovar')
         .set('Origin', FRONTEND)
         .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`);
 
@@ -248,7 +280,8 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
     it('POST /auth/sair sem cookie também responde 204', async () => {
       expect(
-        (await request(app).post('/auth/sair').set('Origin', FRONTEND)).status,
+        (await request(app).post('/api/auth/sair').set('Origin', FRONTEND))
+          .status,
       ).toBe(204);
     });
 
@@ -258,11 +291,11 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       const notebook = cookiesDa(await login(empresa.slug, email));
 
       const resposta = await request(app)
-        .post('/auth/sair-de-todos')
+        .post('/api/auth/sair-de-todos')
         .set('Origin', FRONTEND)
         .set('Cookie', comCookies(notebook));
       const celularDepois = await request(app)
-        .post('/auth/renovar')
+        .post('/api/auth/renovar')
         .set('Origin', FRONTEND)
         .set('Cookie', `sigof_sessao=${celular.sigof_sessao}`);
 
@@ -298,10 +331,10 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
 
     const eu = await request(app)
-      .get('/auth/eu')
+      .get('/api/auth/eu')
       .set('Cookie', comCookies(cookies));
     const renovar = await request(app)
-      .post('/auth/renovar')
+      .post('/api/auth/renovar')
       .set('Origin', FRONTEND)
       .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`);
 
@@ -315,7 +348,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
 
   it('recusa login vindo de outro site (CSRF)', async () => {
     const resposta = await request(app)
-      .post('/auth/login')
+      .post('/api/auth/login')
       .set('Origin', 'https://site-malicioso.test')
       .send({
         empresa: empresa.slug,
@@ -335,7 +368,7 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
     const tentar = (email = 'limite@x.test') =>
       request(appLimitada)
-        .post('/auth/login')
+        .post('/api/auth/login')
         .set('Origin', FRONTEND)
         .send({ empresa: empresa.slug, email, senha: 'x' });
 

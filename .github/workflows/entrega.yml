@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   imagem:
-    name: Imagem Docker do backend
+    name: Imagens Docker (API e telas)
     # Execução manual também só a partir da main: o staging nunca recebe
     # código que não passou por PR
     if: github.ref == 'refs/heads/main'
@@ -46,7 +46,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
+      - name: API
+        uses: docker/build-push-action@v7
         with:
           context: backend
           push: true
@@ -54,9 +55,29 @@ jobs:
           tags: |
             ghcr.io/wellerson-m/sigof-backend:staging
             ghcr.io/wellerson-m/sigof-backend:${{ github.sha }}
-          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # A revisão (commit) gravada nas duas imagens: o servidor só atualiza
+          # quando API e telas forem do mesmo commit
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Telas
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ghcr.io/wellerson-m/sigof-frontend:staging
+            ghcr.io/wellerson-m/sigof-frontend:${{ github.sha }}
+          # A revisão (commit) gravada nas duas imagens: o servidor só atualiza
+          # quando API e telas forem do mesmo commit
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
 
   staging:
     name: Publicação em staging
@@ -64,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: https://${{ vars.DOMINIO_STAGING }}/health
+      url: https://${{ vars.DOMINIO_STAGING }}
     steps:
       - name: Espera o servidor rodar o commit novo
         env:
@@ -74,7 +95,10 @@ jobs:
           for tentativa in $(seq 1 40); do
             versao=$(curl -fsS --max-time 10 "$URL" | jq -r .versao || true)
             if [ "$versao" = "$ESPERADO" ]; then
-              echo "Staging rodando $versao"
+              echo "API de staging rodando $versao"
+              # A tela de login também precisa responder
+              curl -fsS --max-time 10 -o /dev/null "${URL%/health}/entrar"
+              echo "Telas no ar"
               exit 0
             fi
             echo "Tentativa $tentativa: no ar está '${versao:-nada}'; aguardando..."

@@ -30,13 +30,15 @@ O MVP é validado com uma transportadora parceira (projeto de extensão). A arqu
 
 ## Situação atual
 
-Pronto e testado no backend:
+Pronto e testado:
+- **Telas de login e painel inicial**, com a identidade visual do produto, tema claro e escuro e versão para celular.
+- **Login** por empresa, e-mail e senha, com sessão em cookie protegido, bloqueio por tentativas, proteção contra CSRF e controle de acesso por perfil.
 - **Protocolo** `SOL-AAAA-MM-NNNN`, sequencial por empresa e seguro sob concorrência.
 - **Máquina de estados** com as transições permitidas para cada perfil.
 - **Duplicidade:** o mesmo CTe ou NF dentro da janela configurada gera alerta. "CTE 12.345", "CT-e nº 012345" e a chave de 44 dígitos são reconhecidos como o mesmo documento.
 - **SLA em minutos úteis**, respeitando o expediente, o fuso e os dias úteis de cada empresa, com pausa enquanto aguarda documento.
 
-Em desenvolvimento: o login, as rotas de solicitações (abrir, listar, atender), as telas e a publicação em staging e produção. O andamento está no [quadro do projeto](https://github.com/users/Wellerson-M/projects/1).
+Em desenvolvimento: as solicitações (abrir, listar, atender) e as telas delas, e o ambiente de produção. O staging já está no ar e é atualizado a cada merge na `main`. O andamento está no [quadro do projeto](https://github.com/users/Wellerson-M/projects/1).
 
 ## Stack
 
@@ -46,8 +48,8 @@ Em desenvolvimento: o login, as rotas de solicitações (abrir, listar, atender)
 | Banco de dados | PostgreSQL 16 com Prisma 7 (migrações versionadas) |
 | Anexos | Armazenamento S3-compatível (SeaweedFS no ambiente local) |
 | Segurança | Argon2id, sessão em cookie `HttpOnly`, Helmet, isolamento por empresa |
-| Testes | Vitest + Supertest; cobertura mínima de 75% no backend |
-| Frontend | Next.js *(em desenvolvimento)* |
+| Frontend | Next.js 16, React 19, Tailwind CSS 4, IBM Plex |
+| Testes | Vitest + Supertest no backend (mínimo 75%); Vitest + Testing Library no frontend (mínimo 25%) |
 | Infraestrutura | Docker Compose, GitHub Actions (CI/CD), ambientes de staging e produção |
 
 ## Como rodar localmente
@@ -70,6 +72,17 @@ npm run db:seed
 # 4. API em http://localhost:3333 (teste: http://localhost:3333/health)
 npm run dev
 ```
+
+Em outro terminal, as telas:
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Abra http://localhost:3000 e entre com um usuário de demonstração
+```
+
+As telas e a API ficam no mesmo endereço: o frontend repassa `/api` para o backend. Em staging e produção, quem faz essa divisão é o Caddy.
 
 ### Usuários de demonstração
 

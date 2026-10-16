@@ -46,9 +46,9 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
     secure: cookieSeguro,
     sameSite: 'lax',
   };
-  // O cookie de sessão só é enviado para /auth: nas demais rotas ele não
+  // O cookie de sessão só é enviado para /api/auth: nas demais rotas ele não
   // trafega, o que reduz a superfície de vazamento.
-  const opcoesSessao: CookieOptions = { ...base, path: '/auth' };
+  const opcoesSessao: CookieOptions = { ...base, path: '/api/auth' };
 
   function gravarCookies(res: Response, tokens: Tokens): void {
     res.cookie(COOKIE_ACESSO, tokens.acesso, {

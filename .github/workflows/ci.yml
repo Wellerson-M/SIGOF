@@ -37,15 +37,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://sigof:sigof@localhost:5432/sigof?schema=public
       JWT_SECRET: segredo-do-ci-com-mais-de-32-caracteres
-      # Só um sim/não: o token em si fica restrito ao passo do SonarCloud,
-      # longe do npm ci e dos testes, que executam código de terceiros
-      TEM_SONAR: ${{ secrets.SONAR_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Histórico completo: o SonarCloud usa o blame para saber o que é código novo
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -74,7 +68,78 @@ jobs:
       - name: Seed roda sem erro
         run: npm run db:seed
 
-      - name: Análise estática (SonarCloud)
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Guarda a cobertura para o SonarCloud
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: backend/coverage/lcov.info
+
+  frontend:
+    name: Frontend — lint, typecheck, testes e build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Verificação de tipos (tsc)
+        run: npm run typecheck
+
+      - name: Testes de componentes + cobertura (mínimo 25% — Playbook)
+        run: npm run test:coverage
+
+      - name: Build de produção
+        run: npm run build
+
+      - name: Guarda a cobertura para o SonarCloud
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-frontend
+          path: frontend/coverage/lcov.info
+
+  sonarcloud:
+    name: Análise estática (SonarCloud)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    env:
+      # Só um sim/não: o token em si fica restrito ao passo do SonarCloud
+      TEM_SONAR: ${{ secrets.SONAR_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Histórico completo: o SonarCloud usa o blame para saber o que é código novo
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cobertura-backend
+          path: backend/coverage
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cobertura-frontend
+          path: frontend/coverage
+
+      - name: Análise do backend e do frontend
         if: env.TEM_SONAR == 'true'
         uses: SonarSource/sonarqube-scan-action@v8
         env:
@@ -87,7 +152,3 @@ jobs:
         run: |
           echo "::error::SONAR_TOKEN ausente: a análise do SonarCloud não rodou."
           exit 1
-
-      - name: Auditoria de dependências
-        run: npm audit --audit-level=high
-        continue-on-error: true
