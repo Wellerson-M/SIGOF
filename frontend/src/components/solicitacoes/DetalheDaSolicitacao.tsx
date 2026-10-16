@@ -14,6 +14,7 @@ import {
   dataCurta,
   mensagemDoErro,
   type Detalhe,
+  type Evento,
   type Pessoa,
   type Prioridade,
   type Status,
@@ -284,11 +285,7 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
                   className="border-l-2 border-borda pl-3 text-sm"
                 >
                   <p className="font-medium text-texto">
-                    {evento.statusAnterior === null
-                      ? 'Aberta'
-                      : evento.statusAnterior === evento.statusNovo
-                        ? 'Alteração'
-                        : NOME_DO_STATUS[evento.statusNovo]}
+                    {tituloDoEvento(evento)}
                   </p>
                   {evento.observacao && (
                     <p className="whitespace-pre-wrap text-texto">
@@ -319,6 +316,13 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
       )}
     </div>
   );
+}
+
+/** Abertura, mudança de status ou alteração (prioridade, responsável). */
+function tituloDoEvento(evento: Evento): string {
+  if (evento.statusAnterior === null) return 'Aberta';
+  if (evento.statusAnterior === evento.statusNovo) return 'Alteração';
+  return NOME_DO_STATUS[evento.statusNovo];
 }
 
 function Dado({ nome, children }: { nome: string; children: React.ReactNode }) {
