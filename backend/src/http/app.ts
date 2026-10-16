@@ -8,6 +8,8 @@ import { pinoHttp } from 'pino-http';
 import type { Env } from '../config/env.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
+import { rotasDeSolicitacoes } from '../modulos/solicitacoes/rotas.js';
+import { ServicoDeSolicitacoes } from '../modulos/solicitacoes/servico.js';
 import { protecaoCsrf } from './csrf.js';
 import { tratadorDeErros } from './tratador-de-erros.js';
 
@@ -109,6 +111,14 @@ export function criarApp(modulos?: ModulosDaApp): Express {
         ...(modulos.limiteDeLoginPorMinuto === undefined
           ? {}
           : { limiteDeLoginPorMinuto: modulos.limiteDeLoginPorMinuto }),
+      }),
+    );
+
+    app.use(
+      '/api/solicitacoes',
+      rotasDeSolicitacoes({
+        servico: new ServicoDeSolicitacoes(prisma),
+        jwtSecret: env.JWT_SECRET,
       }),
     );
   }

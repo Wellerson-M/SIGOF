@@ -83,7 +83,24 @@ export function analisarProtocolo(protocolo: string): ComponentesProtocolo {
 /**
  * Competência (ano/mês) de uma data, que identifica a linha de
  * `SequenciaProtocolo` a ser incrementada.
+ *
+ * É calculada no fuso da empresa. O servidor roda em UTC: sem isto, uma
+ * solicitação aberta às 22h do dia 31 em São Paulo (01h do dia 1º em UTC)
+ * ganharia o protocolo do mês seguinte.
  */
-export function competenciaDe(data: Date): { ano: number; mes: number } {
-  return { ano: data.getFullYear(), mes: data.getMonth() + 1 };
+export function competenciaDe(
+  data: Date,
+  fusoHorario: string,
+): { ano: number; mes: number } {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: fusoHorario,
+      year: 'numeric',
+      month: 'numeric',
+    })
+      .formatToParts(data)
+      .map((parte) => [parte.type, parte.value]),
+  );
+
+  return { ano: Number(partes.year), mes: Number(partes.month) };
 }
