@@ -32,7 +32,6 @@ const MENU: ItemDoMenu[] = [
   {
     rotulo: 'Administração',
     href: '/administracao',
-    emBreve: true,
     perfis: ['ADMIN'],
   },
 ];
@@ -104,12 +103,16 @@ export function Moldura({ children }: { children: ReactNode }) {
             {usuario.empresa.razaoSocial}
           </p>
           <div className="flex items-center gap-3">
-            <div className="text-right leading-tight">
+            <Link
+              href="/conta"
+              title="Minha conta"
+              className="rounded-md px-2 py-1 text-right leading-tight hover:bg-fundo"
+            >
               <p className="text-sm font-medium text-texto">{usuario.nome}</p>
               <p className="text-xs text-texto-suave">
                 {NOME_DO_PERFIL[usuario.perfil]}
               </p>
-            </div>
+            </Link>
             <button
               type="button"
               onClick={() => void aoSair()}

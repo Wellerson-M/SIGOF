@@ -14,6 +14,8 @@ export interface UsuarioLogado {
   email: string;
   perfil: Perfil;
   area: 'FINANCEIRO' | 'COMERCIAL' | 'OPERACIONAL' | null;
+  /** Ainda com a senha provisória: precisa trocar antes de usar o sistema. */
+  trocarSenha: boolean;
   empresa: { razaoSocial: string; slug: string };
 }
 

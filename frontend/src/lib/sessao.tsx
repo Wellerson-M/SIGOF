@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   createContext,
   useCallback,
@@ -20,6 +20,8 @@ interface Sessao {
   usuario: UsuarioLogado;
   /** Encerra a sessão. Se a API falhar, rejeita e o usuário continua logado. */
   sair: () => Promise<void>;
+  /** Busca de novo os dados de quem está logado (ex.: depois de trocar a senha). */
+  atualizar: () => Promise<void>;
 }
 
 type Estado =
@@ -37,6 +39,7 @@ const ContextoDaSessao = createContext<Sessao | null>(null);
  */
 export function ProvedorDeSessao({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const caminho = usePathname();
   const [estado, setEstado] = useState<Estado>({ tipo: 'carregando' });
 
   const verificar = useCallback(() => {
@@ -65,6 +68,15 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
   }, [router]);
 
   useEffect(() => verificar(), [verificar]);
+
+  // Senha provisória: nada do sistema abre antes de a pessoa criar a dela
+  const precisaTrocarSenha =
+    estado.tipo === 'logado' && estado.usuario.trocarSenha;
+  useEffect(() => {
+    if (precisaTrocarSenha && caminho !== '/conta') {
+      router.replace('/conta');
+    }
+  }, [precisaTrocarSenha, caminho, router]);
 
   if (estado.tipo === 'carregando') {
     return (
@@ -99,8 +111,14 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
     router.replace('/entrar');
   }
 
+  async function atualizar() {
+    setEstado({ tipo: 'logado', usuario: await usuarioLogado() });
+  }
+
   return (
-    <ContextoDaSessao.Provider value={{ usuario: estado.usuario, sair }}>
+    <ContextoDaSessao.Provider
+      value={{ usuario: estado.usuario, sair, atualizar }}
+    >
       {children}
     </ContextoDaSessao.Provider>
   );

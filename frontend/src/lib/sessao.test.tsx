@@ -7,7 +7,11 @@ import { ProvedorDeSessao, useSessao } from './sessao';
 const replace = vi.fn();
 // Objeto estável, como o roteador de verdade do Next
 const roteador = { replace };
-vi.mock('next/navigation', () => ({ useRouter: () => roteador }));
+let caminho = '/inicio';
+vi.mock('next/navigation', () => ({
+  useRouter: () => roteador,
+  usePathname: () => caminho,
+}));
 
 const usuarioLogado = vi.fn();
 const sair = vi.fn();
@@ -23,6 +27,7 @@ const USUARIO = {
   email: 'andre@demo.test',
   perfil: 'ANALISTA',
   area: null,
+  trocarSenha: false,
   empresa: { razaoSocial: 'Demo', slug: 'demo' },
 };
 
@@ -40,6 +45,7 @@ function MostraUsuario() {
 
 describe('ProvedorDeSessao', () => {
   beforeEach(() => {
+    caminho = '/inicio';
     replace.mockReset();
     usuarioLogado.mockReset();
     sair.mockReset();
@@ -153,5 +159,38 @@ describe('ProvedorDeSessao', () => {
   it('useSessao fora do provedor é erro de programação', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<MostraUsuario />)).toThrow(/ProvedorDeSessao/);
+  });
+
+  it('com senha provisória, leva para Minha conta antes de tudo', async () => {
+    usuarioLogado.mockResolvedValue({ ...USUARIO, trocarSenha: true });
+    render(
+      <ProvedorDeSessao>
+        <MostraUsuario />
+      </ProvedorDeSessao>,
+    );
+    await screen.findByText('André Analista');
+    expect(replace).toHaveBeenCalledWith('/conta');
+  });
+
+  it('na própria Minha conta não redireciona, e atualizar busca de novo', async () => {
+    caminho = '/conta';
+    usuarioLogado.mockResolvedValueOnce({ ...USUARIO, trocarSenha: true });
+    usuarioLogado.mockResolvedValueOnce({ ...USUARIO, nome: 'André Novo' });
+    function Atualiza() {
+      const { usuario, atualizar } = useSessao();
+      return (
+        <button type="button" onClick={() => void atualizar()}>
+          {usuario.nome}
+        </button>
+      );
+    }
+    render(
+      <ProvedorDeSessao>
+        <Atualiza />
+      </ProvedorDeSessao>,
+    );
+    await userEvent.click(await screen.findByText('André Analista'));
+    expect(await screen.findByText('André Novo')).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
   });
 });
