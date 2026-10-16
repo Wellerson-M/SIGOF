@@ -23,6 +23,8 @@ export class ErroDaApi extends Error {
     readonly status: number,
     readonly codigo: string,
     mensagem: string,
+    /** Dados extras do erro (ex.: as solicitações duplicadas no 409). */
+    readonly detalhes?: unknown,
   ) {
     super(mensagem);
     this.name = 'ErroDaApi';
@@ -59,11 +61,13 @@ async function erroDa(resposta: Response): Promise<ErroDaApi> {
   const corpo = (await resposta.json().catch(() => ({}))) as {
     erro?: string;
     codigo?: string;
+    detalhes?: unknown;
   };
   return new ErroDaApi(
     resposta.status,
     corpo.codigo ?? 'ERRO',
     corpo.erro ?? 'Algo deu errado. Tente de novo em instantes.',
+    corpo.detalhes,
   );
 }
 

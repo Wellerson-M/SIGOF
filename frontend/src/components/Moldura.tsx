@@ -17,11 +17,10 @@ interface ItemDoMenu {
 
 const MENU: ItemDoMenu[] = [
   { rotulo: 'Início', href: '/inicio' },
-  { rotulo: 'Solicitações', href: '/solicitacoes', emBreve: true },
+  { rotulo: 'Solicitações', href: '/solicitacoes' },
   {
     rotulo: 'Nova solicitação',
     href: '/solicitacoes/nova',
-    emBreve: true,
     perfis: ['SOLICITANTE', 'ANALISTA', 'SUPERVISOR'],
   },
   {
@@ -53,6 +52,12 @@ export function Moldura({ children }: { children: ReactNode }) {
     }
   }
   const caminho = usePathname();
+  // O detalhe de uma solicitação acende "Solicitações" no menu
+  const atual = (href: string) =>
+    caminho === href ||
+    (href === '/solicitacoes' &&
+      caminho.startsWith('/solicitacoes/') &&
+      caminho !== '/solicitacoes/nova');
   const itens = MENU.filter(
     (item) => !item.perfis || item.perfis.includes(usuario.perfil),
   );
@@ -80,7 +85,7 @@ export function Moldura({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                aria-current={caminho === item.href ? 'page' : undefined}
+                aria-current={atual(item.href) ? 'page' : undefined}
                 className="rounded-md px-3 py-2 text-sm hover:bg-white/10 aria-[current=page]:bg-white/15 aria-[current=page]:font-semibold"
               >
                 {item.rotulo}
@@ -140,7 +145,7 @@ export function Moldura({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                aria-current={caminho === item.href ? 'page' : undefined}
+                aria-current={atual(item.href) ? 'page' : undefined}
                 className="shrink-0 rounded-md px-3 py-1.5 text-sm text-texto aria-[current=page]:bg-fundo aria-[current=page]:font-semibold"
               >
                 {item.rotulo}

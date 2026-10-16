@@ -182,7 +182,7 @@ async function semear(
 
   for (const exemplo of porAbertura) {
     const criadoEm = new Date(agora - exemplo.idadeMinutos * MINUTO);
-    const { ano, mes } = competenciaDe(criadoEm);
+    const { ano, mes } = competenciaDe(criadoEm, demo.fusoHorario);
     const chave = `${ano}-${mes}`;
     const sequencial = (sequencias.get(chave)?.ultimo ?? 0) + 1;
     sequencias.set(chave, { ano, mes, ultimo: sequencial });

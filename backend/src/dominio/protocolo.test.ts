@@ -100,10 +100,28 @@ describe('analisarProtocolo', () => {
 
 describe('competenciaDe', () => {
   it('retorna ano e mês com o mês começando em 1', () => {
-    expect(competenciaDe(new Date(2026, 0, 15))).toEqual({ ano: 2026, mes: 1 });
-    expect(competenciaDe(new Date(2026, 11, 31))).toEqual({
+    expect(
+      competenciaDe(new Date('2026-01-15T12:00:00Z'), 'America/Sao_Paulo'),
+    ).toEqual({ ano: 2026, mes: 1 });
+    expect(
+      competenciaDe(new Date('2026-12-15T12:00:00Z'), 'America/Sao_Paulo'),
+    ).toEqual({ ano: 2026, mes: 12 });
+  });
+
+  it('usa o fuso da empresa, e não o UTC do servidor', () => {
+    // 22h de 31/10 em São Paulo já é 1º/11 em UTC
+    const noiteDoDia31 = new Date('2026-11-01T01:00:00Z');
+
+    expect(competenciaDe(noiteDoDia31, 'America/Sao_Paulo')).toEqual({
       ano: 2026,
-      mes: 12,
+      mes: 10,
     });
+    expect(competenciaDe(noiteDoDia31, 'UTC')).toEqual({ ano: 2026, mes: 11 });
+  });
+
+  it('vira o ano no fuso da empresa', () => {
+    expect(
+      competenciaDe(new Date('2027-01-01T02:00:00Z'), 'America/Sao_Paulo'),
+    ).toEqual({ ano: 2026, mes: 12 });
   });
 });

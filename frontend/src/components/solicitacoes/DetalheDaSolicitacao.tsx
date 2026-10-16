@@ -1,0 +1,426 @@
+'use client';
+
+import Link from 'next/link';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ErroDaApi } from '@/lib/api';
+import {
+  ACAO_PARA,
+  NOME_DA_PRIORIDADE,
+  NOME_DO_STATUS,
+  NOME_DO_TIPO,
+  PEDE_OBSERVACAO,
+  PRIORIDADES,
+  api,
+  dataCurta,
+  mensagemDoErro,
+  type Detalhe,
+  type Evento,
+  type Pessoa,
+  type Prioridade,
+  type Status,
+} from '@/lib/solicitacoes';
+import { DialogoDeObservacao } from './DialogoDeObservacao';
+import {
+  EtiquetaDePrioridade,
+  EtiquetaDeStatus,
+  IndicadorDeSla,
+} from './Etiquetas';
+
+const SELECAO =
+  'h-9 rounded-md border border-borda bg-superficie px-2 text-sm text-texto';
+
+/** Tudo de uma solicitação: dados, ações, conversa e histórico. */
+export function DetalheDaSolicitacao({ id }: { id: string }) {
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
+  const [naoExiste, setNaoExiste] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [pendente, setPendente] = useState<Status | null>(null);
+  const [responsaveis, setResponsaveis] = useState<Pessoa[]>([]);
+
+  const falhaAoCarregar = useCallback((falha: unknown) => {
+    if (falha instanceof ErroDaApi && falha.status === 404) {
+      setNaoExiste(true);
+    } else {
+      setErro(mensagemDoErro(falha));
+    }
+  }, []);
+
+  const carregar = useCallback(async () => {
+    try {
+      setDetalhe(await api.detalhar(id));
+    } catch (falha) {
+      falhaAoCarregar(falha);
+    }
+  }, [id, falhaAoCarregar]);
+
+  useEffect(() => {
+    let cancelado = false;
+    api.detalhar(id).then(
+      (dados) => {
+        if (!cancelado) setDetalhe(dados);
+      },
+      (falha: unknown) => {
+        if (!cancelado) falhaAoCarregar(falha);
+      },
+    );
+    return () => {
+      cancelado = true;
+    };
+  }, [id, falhaAoCarregar]);
+
+  const podeAtribuir = detalhe?.pode.atribuir ?? false;
+  useEffect(() => {
+    if (podeAtribuir) {
+      api.responsaveis().then(setResponsaveis, () => setResponsaveis([]));
+    }
+  }, [podeAtribuir]);
+
+  /** Executa a ação e recarrega tudo (histórico inclusive). */
+  async function executar(acao: () => Promise<unknown>): Promise<boolean> {
+    setOcupado(true);
+    setErro(null);
+    try {
+      await acao();
+      await carregar();
+      return true;
+    } catch (falha) {
+      setErro(mensagemDoErro(falha));
+      if (falha instanceof ErroDaApi && falha.status === 409) {
+        await carregar();
+      }
+      return false;
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  function mover(para: Status) {
+    if (PEDE_OBSERVACAO[para]) {
+      setPendente(para);
+    } else {
+      void executar(() => api.mover(id, para));
+    }
+  }
+
+  if (naoExiste) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-3">
+        <h1 className="text-xl font-semibold text-texto">
+          Solicitação não encontrada
+        </h1>
+        <p className="text-sm text-texto-suave">
+          Ela não existe ou você não tem acesso a ela.
+        </p>
+        <Link href="/solicitacoes" className="text-sm text-primaria underline">
+          Voltar ao quadro
+        </Link>
+      </div>
+    );
+  }
+
+  if (!detalhe) {
+    return erro ? (
+      <p role="alert" className="text-sm text-critico">
+        {erro}
+      </p>
+    ) : (
+      <p className="text-sm text-texto-suave">Carregando…</p>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex max-w-5xl flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <Link href="/solicitacoes" className="text-sm text-primaria underline">
+          ← Quadro
+        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="font-mono text-2xl font-semibold text-texto">
+            {detalhe.protocolo}
+          </h1>
+          <EtiquetaDeStatus status={detalhe.status} />
+          <EtiquetaDePrioridade prioridade={detalhe.prioridade} />
+          <IndicadorDeSla sla={detalhe.sla} />
+        </div>
+      </div>
+
+      {erro && (
+        <p
+          role="alert"
+          className="rounded-md border border-critico/40 bg-critico/10 px-3 py-2 text-sm text-critico"
+        >
+          {erro}
+        </p>
+      )}
+
+      {(detalhe.acoes.length > 0 ||
+        detalhe.pode.mudarPrioridade ||
+        detalhe.pode.atribuir) && (
+        <section className="flex flex-wrap items-end gap-4 rounded-lg border border-borda bg-superficie p-4">
+          {detalhe.acoes.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
+                Mover
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {detalhe.acoes.map((para) => (
+                  <button
+                    key={para}
+                    type="button"
+                    disabled={ocupado}
+                    onClick={() => mover(para)}
+                    className={`h-9 rounded-md px-3 text-sm font-semibold disabled:opacity-50 ${
+                      para === 'CANCELADO'
+                        ? 'border border-critico/50 text-critico'
+                        : 'bg-primaria text-sobre-primaria'
+                    }`}
+                  >
+                    {ACAO_PARA[para]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {detalhe.pode.mudarPrioridade && (
+            <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+              Prioridade
+              <select
+                value={detalhe.prioridade}
+                disabled={ocupado}
+                onChange={(evento) => {
+                  const prioridade = evento.target.value as Prioridade;
+                  void executar(() => api.priorizar(id, prioridade));
+                }}
+                className={SELECAO}
+              >
+                {PRIORIDADES.map((p) => (
+                  <option key={p} value={p}>
+                    {NOME_DA_PRIORIDADE[p]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {detalhe.pode.atribuir && (
+            <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+              Responsável
+              <select
+                value={detalhe.responsavel?.id ?? ''}
+                disabled={ocupado}
+                onChange={(evento) => {
+                  const responsavelId = evento.target.value;
+                  if (responsavelId) {
+                    void executar(() => api.atribuir(id, responsavelId));
+                  }
+                }}
+                className={SELECAO}
+              >
+                <option value="">Ninguém</option>
+                {responsaveis.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </section>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <section className="rounded-lg border border-borda bg-superficie p-4">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+              Ocorrência
+            </h2>
+            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              <Dado nome="Tipo">{NOME_DO_TIPO[detalhe.tipo]}</Dado>
+              <Dado nome="CTe">{detalhe.cte ?? '—'}</Dado>
+              <Dado nome="NF">{detalhe.nf ?? '—'}</Dado>
+              {detalhe.pagadorCorreto && (
+                <Dado nome="Pagador correto">{detalhe.pagadorCorreto}</Dado>
+              )}
+            </dl>
+            <p className="mt-4 whitespace-pre-wrap text-sm text-texto">
+              {detalhe.descricao}
+            </p>
+          </section>
+
+          <Conversa
+            detalhe={detalhe}
+            aoEnviar={(conteudo, interna) =>
+              executar(() => api.comentar(id, conteudo, interna))
+            }
+          />
+        </div>
+
+        <aside className="flex flex-col gap-5">
+          <section className="rounded-lg border border-borda bg-superficie p-4">
+            <dl className="flex flex-col gap-3 text-sm">
+              <Dado nome="Solicitante">{detalhe.solicitante.nome}</Dado>
+              <Dado nome="Responsável">
+                {detalhe.responsavel?.nome ?? 'Ninguém ainda'}
+              </Dado>
+              <Dado nome="Aberta em">{dataCurta(detalhe.criadoEm)}</Dado>
+              {detalhe.slaVenceEm && detalhe.sla.situacao !== 'ENCERRADO' && (
+                <Dado nome="Prazo (SLA)">{dataCurta(detalhe.slaVenceEm)}</Dado>
+              )}
+              {detalhe.resolvidoEm && (
+                <Dado nome="Resolvida em">
+                  {dataCurta(detalhe.resolvidoEm)}
+                </Dado>
+              )}
+            </dl>
+          </section>
+
+          <section className="rounded-lg border border-borda bg-superficie p-4">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+              Histórico
+            </h2>
+            <ol className="flex flex-col gap-3">
+              {detalhe.historico.map((evento) => (
+                <li
+                  key={evento.id}
+                  className="border-l-2 border-borda pl-3 text-sm"
+                >
+                  <p className="font-medium text-texto">
+                    {tituloDoEvento(evento)}
+                  </p>
+                  {evento.observacao && (
+                    <p className="whitespace-pre-wrap text-texto">
+                      {evento.observacao}
+                    </p>
+                  )}
+                  <p className="text-xs text-texto-suave">
+                    {evento.autor.nome} · {dataCurta(evento.criadoEm)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </aside>
+      </div>
+
+      {pendente && (
+        <DialogoDeObservacao
+          titulo={`${ACAO_PARA[pendente]} — ${detalhe.protocolo}`}
+          pergunta={PEDE_OBSERVACAO[pendente] ?? ''}
+          aoFechar={() => setPendente(null)}
+          aoConfirmar={(observacao) => {
+            const para = pendente;
+            setPendente(null);
+            void executar(() => api.mover(id, para, observacao));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Abertura, mudança de status ou alteração (prioridade, responsável). */
+function tituloDoEvento(evento: Evento): string {
+  if (evento.statusAnterior === null) return 'Aberta';
+  if (evento.statusAnterior === evento.statusNovo) return 'Alteração';
+  return NOME_DO_STATUS[evento.statusNovo];
+}
+
+function Dado({ nome, children }: { nome: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-texto-suave">{nome}</dt>
+      <dd className="text-texto">{children}</dd>
+    </div>
+  );
+}
+
+function Conversa({
+  detalhe,
+  aoEnviar,
+}: {
+  detalhe: Detalhe;
+  aoEnviar: (conteudo: string, interna: boolean) => Promise<boolean>;
+}) {
+  const [texto, setTexto] = useState('');
+  const [interna, setInterna] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+
+  async function enviar(evento: FormEvent) {
+    evento.preventDefault();
+    if (!texto.trim()) return;
+    setEnviando(true);
+    const enviada = await aoEnviar(texto, interna);
+    setEnviando(false);
+    // Se falhou, o texto fica para a pessoa tentar de novo
+    if (enviada) setTexto('');
+  }
+
+  return (
+    <section className="rounded-lg border border-borda bg-superficie p-4">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+        Conversa
+      </h2>
+      {detalhe.mensagens.length === 0 ? (
+        <p className="mb-3 text-sm text-texto-suave">Nenhuma mensagem ainda.</p>
+      ) : (
+        <ol className="mb-4 flex flex-col gap-3">
+          {detalhe.mensagens.map((m) => (
+            <li
+              key={m.id}
+              className={`rounded-md border p-3 text-sm ${
+                m.interna
+                  ? 'border-atencao/40 bg-atencao/10'
+                  : 'border-borda bg-fundo'
+              }`}
+            >
+              <p className="mb-1 text-xs text-texto-suave">
+                <span className="font-semibold text-texto">{m.autor.nome}</span>{' '}
+                · {dataCurta(m.criadoEm)}
+                {m.interna && ' · interna (só a equipe vê)'}
+              </p>
+              <p className="whitespace-pre-wrap text-texto">{m.conteudo}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+      <form
+        onSubmit={(evento) => void enviar(evento)}
+        className="flex flex-col gap-2"
+      >
+        <label className="sr-only" htmlFor="nova-mensagem">
+          Nova mensagem
+        </label>
+        <textarea
+          id="nova-mensagem"
+          value={texto}
+          onChange={(evento) => setTexto(evento.target.value)}
+          rows={3}
+          maxLength={5000}
+          placeholder="Escreva uma mensagem"
+          className="rounded-md border border-borda bg-fundo px-3 py-2 text-sm text-texto"
+        />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {detalhe.pode.comentarInterno ? (
+            <label className="flex items-center gap-2 text-sm text-texto">
+              <input
+                type="checkbox"
+                checked={interna}
+                onChange={(evento) => setInterna(evento.target.checked)}
+              />
+              Comentário interno (o solicitante não vê)
+            </label>
+          ) : (
+            <span />
+          )}
+          <button
+            type="submit"
+            disabled={enviando || !texto.trim()}
+            className="h-9 rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria disabled:opacity-50"
+          >
+            {enviando ? 'Enviando…' : 'Enviar'}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}

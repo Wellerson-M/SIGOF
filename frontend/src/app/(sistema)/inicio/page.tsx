@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { NOME_DO_PERFIL } from '@/lib/api';
 import { useSessao } from '@/lib/sessao';
 
@@ -10,11 +11,10 @@ const AREA: Record<string, string> = {
 };
 
 const PROXIMAS_ENTREGAS = [
-  'Abrir solicitação de correção de CTe, com protocolo e prazo (SLA)',
-  'Alerta de duplicidade quando o mesmo CTe ou NF já tem pedido aberto',
-  'Fila do analista ordenada por prioridade e prazo',
-  'Conversa, anexos e histórico em cada solicitação',
+  'Anexos (PDF e imagens) em cada solicitação',
+  'Avisos no sistema e por e-mail a cada movimentação',
   'Indicadores para o supervisor',
+  'Administração de usuários e dos parâmetros da empresa',
 ];
 
 export default function PaginaInicial() {
@@ -63,6 +63,23 @@ export default function PaginaInicial() {
             Sessão protegida
           </p>
         </Cartao>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/solicitacoes"
+          className="inline-flex h-10 items-center rounded-md bg-primaria px-5 text-sm font-semibold text-sobre-primaria"
+        >
+          Abrir o quadro de solicitações
+        </Link>
+        {usuario.perfil !== 'ADMIN' && (
+          <Link
+            href="/solicitacoes/nova"
+            className="inline-flex h-10 items-center rounded-md border border-borda bg-superficie px-5 text-sm font-semibold text-texto"
+          >
+            Nova solicitação
+          </Link>
+        )}
       </div>
 
       <Cartao titulo="Em desenvolvimento">
