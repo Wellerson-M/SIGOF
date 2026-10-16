@@ -4,7 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Perfil } from '@/lib/api';
 import { Moldura } from './Moldura';
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/inicio' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/inicio',
+  useRouter: () => ({ push: vi.fn() }),
+}));
+// O sino busca as notificações na API; aqui ele só precisa aparecer
+vi.mock('@/lib/avisos', async (original) => ({
+  ...(await original<typeof import('@/lib/avisos')>()),
+  notificacoes: {
+    listar: () => Promise.resolve({ naoLidas: 0, itens: [] }),
+    marcarLidas: () => Promise.resolve({ naoLidas: 0 }),
+  },
+}));
 
 const sair = vi.fn().mockResolvedValue(undefined);
 let perfil: Perfil = 'SOLICITANTE';

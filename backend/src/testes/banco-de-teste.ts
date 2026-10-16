@@ -69,6 +69,7 @@ export async function apagarEmpresaDeTeste(
   await prisma.eventoAuditoria.deleteMany(onde);
   await prisma.sessao.deleteMany(onde);
   await prisma.notificacao.deleteMany(onde);
+  await prisma.emailSaida.deleteMany(onde);
   await prisma.statusHistorico.deleteMany(onde);
   await prisma.anexo.deleteMany(onde);
   await prisma.mensagem.deleteMany(onde);

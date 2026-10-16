@@ -56,9 +56,24 @@ describe('carregarEnv', () => {
           ...envValido,
           NODE_ENV,
           FRONTEND_URL: 'https://app.sigof.test',
+          CHAVE_CIFRA: 'x'.repeat(32),
         }).FRONTEND_URL,
       ).toBe('https://app.sigof.test');
     }
+  });
+
+  it('em staging e produção, exige CHAVE_CIFRA; em desenvolvimento tem padrão', () => {
+    expect(() =>
+      carregarEnv({
+        ...envValido,
+        NODE_ENV: 'production',
+        FRONTEND_URL: 'https://app.sigof.test',
+      }),
+    ).toThrow(/CHAVE_CIFRA: obrigatória/);
+    expect(() => carregarEnv({ ...envValido, CHAVE_CIFRA: 'curta' })).toThrow(
+      /CHAVE_CIFRA/,
+    );
+    expect(carregarEnv(envValido).CHAVE_CIFRA).toMatch(/desenvolvimento/);
   });
 
   it('usa process.env quando nenhuma fonte é informada', () => {

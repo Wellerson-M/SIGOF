@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { EVENTO_NOTIFICACOES_LIDAS } from '@/components/Sino';
 import { ErroDaApi } from '@/lib/api';
+import { COR_DA_SITUACAO, NOME_DA_SITUACAO, notificacoes } from '@/lib/avisos';
 import {
   ACAO_PARA,
   NOME_DA_PRIORIDADE,
@@ -53,6 +55,14 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
       falhaAoCarregar(falha);
     }
   }, [id, falhaAoCarregar]);
+
+  // Abriu a solicitação: as notificações dela deixam de ser novidade
+  useEffect(() => {
+    notificacoes.marcarLidas({ solicitacaoId: id }).then(
+      () => window.dispatchEvent(new Event(EVENTO_NOTIFICACOES_LIDAS)),
+      () => {},
+    );
+  }, [id]);
 
   useEffect(() => {
     let cancelado = false;
@@ -299,6 +309,36 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
               ))}
             </ol>
           </section>
+
+          {detalhe.emails.length > 0 && (
+            <section className="rounded-lg border border-borda bg-superficie p-4">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+                E-mails enviados
+              </h2>
+              <ol className="flex flex-col gap-2">
+                {detalhe.emails.map((e) => (
+                  <li key={e.id} className="text-sm">
+                    <p>
+                      <span
+                        className={`font-medium ${COR_DA_SITUACAO[e.situacao]}`}
+                      >
+                        {NOME_DA_SITUACAO[e.situacao]}
+                      </span>{' '}
+                      <span className="text-xs text-texto-suave">
+                        · {dataCurta(e.enviadoEm ?? e.criadoEm)}
+                      </span>
+                    </p>
+                    <p className="break-all text-xs text-texto-suave">
+                      {e.para.join(', ')}
+                    </p>
+                    {e.ultimoErro && e.situacao !== 'ENVIADO' && (
+                      <p className="text-xs text-critico">{e.ultimoErro}</p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
         </aside>
       </div>
 

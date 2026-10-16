@@ -62,6 +62,14 @@ enum AcaoDeAuditoria {
   USUARIO_ALTERADO
   SENHA_REDEFINIDA
   EMPRESA_ALTERADA
+  EMAIL_CONFIGURADO
+}
+
+enum SituacaoDoEmail {
+  PENDENTE
+  ENVIADO
+  /// Esgotou as tentativas; fica registrado com o último erro.
+  FALHOU
 }
 
 // ------------------------------------------------------------- Entidades
@@ -100,6 +108,22 @@ model Empresa {
   /// movimentação, como registro e backup. Opcional.
   emailCaixaCentral      String? @map("email_caixa_central")
 
+  // --- E-mail de saída (RF13) ---
+  // Cada empresa envia pela própria conta (ex.: Gmail com senha de app),
+  // configurada pelo administrador na tela. A senha fica cifrada com
+  // AES-256-GCM; a chave só existe no servidor (CHAVE_CIFRA).
+
+  /// Enquanto estiver desligado, nada é posto na fila de envio.
+  emailAtivo          Boolean @default(false) @map("email_ativo")
+  smtpServidor        String? @map("smtp_servidor")
+  smtpPorta           Int?    @map("smtp_porta")
+  /// true = TLS desde o início (porta 465); false = STARTTLS (porta 587).
+  smtpTlsDireto       Boolean @default(true) @map("smtp_tls_direto")
+  smtpUsuario         String? @map("smtp_usuario")
+  smtpSenhaCifrada    String? @map("smtp_senha_cifrada")
+  /// Nome que aparece como remetente ("SIGOF — Transportadora Demo").
+  emailRemetenteNome  String? @map("email_remetente_nome")
+
   usuarios     Usuario[]
   solicitacoes Solicitacao[]
   sequencias   SequenciaProtocolo[]
@@ -109,6 +133,7 @@ model Empresa {
   notificacoes Notificacao[]
   sessoes      Sessao[]
   auditoria    EventoAuditoria[]
+  emails       EmailSaida[]
 
   @@map("empresas")
 }
@@ -221,6 +246,7 @@ model Solicitacao {
   anexos       Anexo[]
   historicos   StatusHistorico[]
   notificacoes Notificacao[]
+  emails       EmailSaida[]
 
   @@unique([empresaId, protocolo])
   // Índices que sustentam a detecção de duplicidade (RF09): a busca é
@@ -347,4 +373,40 @@ model EventoAuditoria {
 
   @@index([empresaId, criadoEm])
   @@map("eventos_auditoria")
+}
+
+/// Fila de e-mails de saída (padrão "outbox").
+///
+/// O e-mail é gravado na mesma transação da movimentação que o gerou e
+/// enviado depois, por um processo em segundo plano. Se o provedor de
+/// e-mail estiver fora do ar, a movimentação acontece do mesmo jeito e o
+/// envio é tentado de novo, com espera crescente.
+model EmailSaida {
+  id            String          @id @default(uuid())
+  empresaId     String          @map("empresa_id")
+  /// Nulo no e-mail de teste da configuração.
+  solicitacaoId String?         @map("solicitacao_id")
+  para          String[]
+  assunto       String
+  texto         String
+  html          String
+  /// Cabeçalhos que fazem o Gmail e o Outlook mostrarem todos os e-mails
+  /// de um protocolo como uma única conversa.
+  messageId     String          @unique @map("message_id")
+  respondendoA  String?         @map("respondendo_a")
+  situacao      SituacaoDoEmail @default(PENDENTE)
+  tentativas    Int             @default(0)
+  /// Quando pode ser tentado (de novo). Também serve de reserva: quem pega
+  /// o e-mail para enviar empurra este horário para a frente.
+  tentarEm      DateTime        @default(now()) @map("tentar_em")
+  ultimoErro    String?         @map("ultimo_erro")
+  enviadoEm     DateTime?       @map("enviado_em")
+  criadoEm      DateTime        @default(now()) @map("criado_em")
+
+  empresa     Empresa      @relation(fields: [empresaId], references: [id])
+  solicitacao Solicitacao? @relation(fields: [solicitacaoId], references: [id])
+
+  @@index([situacao, tentarEm])
+  @@index([empresaId, solicitacaoId])
+  @@map("emails_saida")
 }

@@ -53,6 +53,8 @@ runcmd:
     STAGING_DB_SENHA=$(openssl rand -hex 24)
     STAGING_JWT_SECRET=$(openssl rand -hex 32)
     STAGING_SEED_SENHA=$(openssl rand -base64 18)
+    STAGING_CHAVE_CIFRA=$(openssl rand -hex 32)
+    STAGING_STORAGE_SEGREDO=$(openssl rand -hex 24)
     EOF
   - systemctl daemon-reload
   - systemctl enable --now docker

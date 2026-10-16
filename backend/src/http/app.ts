@@ -8,10 +8,19 @@ import { pinoHttp } from 'pino-http';
 import type { Env } from '../config/env.js';
 import { rotasDeAdministracao } from '../modulos/administracao/rotas.js';
 import { ServicoDeAdministracao } from '../modulos/administracao/servico.js';
+import { ServicoDeAvisos } from '../modulos/avisos/avisos.js';
+import type { Remetente } from '../modulos/avisos/carteiro.js';
+import { ServicoDeConfiguracaoDeEmail } from '../modulos/avisos/configuracao.js';
+import { ServicoDeNotificacoes } from '../modulos/avisos/notificacoes.js';
+import {
+  rotasDeConfiguracaoDeEmail,
+  rotasDeNotificacoes,
+} from '../modulos/avisos/rotas.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
 import { rotasDeSolicitacoes } from '../modulos/solicitacoes/rotas.js';
 import { ServicoDeSolicitacoes } from '../modulos/solicitacoes/servico.js';
+import { Cifra } from '../seguranca/cifra.js';
 import { protecaoCsrf } from './csrf.js';
 import { tratadorDeErros } from './tratador-de-erros.js';
 
@@ -20,6 +29,8 @@ export interface ModulosDaApp {
   env: Env;
   /** Sobrescreve o limite de tentativas de login (testes). */
   limiteDeLoginPorMinuto?: number;
+  /** Troca o envio SMTP real por um dublê (testes). */
+  remetenteDeEmail?: Remetente;
 }
 
 /**
@@ -116,10 +127,32 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       }),
     );
 
+    const avisos = new ServicoDeAvisos({ urlDoSistema: env.FRONTEND_URL });
     app.use(
       '/api/solicitacoes',
       rotasDeSolicitacoes({
-        servico: new ServicoDeSolicitacoes(prisma),
+        servico: new ServicoDeSolicitacoes(prisma, avisos),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/notificacoes',
+      rotasDeNotificacoes({
+        servico: new ServicoDeNotificacoes(prisma),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/admin/email',
+      rotasDeConfiguracaoDeEmail({
+        servico: new ServicoDeConfiguracaoDeEmail(
+          prisma,
+          new Cifra(env.CHAVE_CIFRA),
+          env.FRONTEND_URL,
+          modulos.remetenteDeEmail,
+        ),
         jwtSecret: env.JWT_SECRET,
       }),
     );
