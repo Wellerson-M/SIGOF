@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
+import { Sino } from '@/components/Sino';
 import { NOME_DO_PERFIL, type Perfil } from '@/lib/api';
 import { useSessao } from '@/lib/sessao';
 
@@ -102,7 +103,8 @@ export function Moldura({ children }: { children: ReactNode }) {
           <p className="hidden truncate text-sm text-texto-suave md:block">
             {usuario.empresa.razaoSocial}
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            <Sino />
             <Link
               href="/conta"
               title="Minha conta"

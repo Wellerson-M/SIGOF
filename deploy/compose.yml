@@ -69,6 +69,8 @@ services:
       NODE_ENV: staging
       DATABASE_URL: postgresql://sigof:${STAGING_DB_SENHA}@postgres-staging:5432/sigof?schema=public
       JWT_SECRET: ${STAGING_JWT_SECRET}
+      # Cifra a senha do e-mail de envio guardada no banco
+      CHAVE_CIFRA: ${STAGING_CHAVE_CIFRA}
       FRONTEND_URL: https://${DOMINIO_STAGING}
       SEMEAR_SE_VAZIO: "true"
       # O staging é público: a senha dos usuários de demonstração é aleatória,

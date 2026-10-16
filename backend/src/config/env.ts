@@ -40,21 +40,39 @@ const esquemaEnv = z
      * site inteiro sem nenhum aviso.
      */
     FRONTEND_URL: z.string().url().optional(),
+
+    /**
+     * Chave que cifra os segredos guardados no banco (ex.: senha do e-mail
+     * de envio). Obrigatória em staging e produção; trocar a chave obriga a
+     * cadastrar de novo esses segredos.
+     */
+    CHAVE_CIFRA: z
+      .string()
+      .min(32, 'CHAVE_CIFRA deve ter no mínimo 32 caracteres')
+      .optional(),
+
+    /** Intervalo entre as rodadas de envio da fila de e-mails. */
+    EMAIL_INTERVALO_SEGUNDOS: z.coerce.number().int().positive().default(15),
   })
   .superRefine((env, ctx) => {
     const publicado =
       env.NODE_ENV === 'staging' || env.NODE_ENV === 'production';
-    if (publicado && env.FRONTEND_URL === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['FRONTEND_URL'],
-        message: `obrigatória em ${env.NODE_ENV}`,
-      });
+    for (const campo of ['FRONTEND_URL', 'CHAVE_CIFRA'] as const) {
+      if (publicado && env[campo] === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [campo],
+          message: `obrigatória em ${env.NODE_ENV}`,
+        });
+      }
     }
   })
   .transform((env) => ({
     ...env,
     FRONTEND_URL: env.FRONTEND_URL ?? 'http://localhost:3000',
+    // Só desenvolvimento e testes chegam aqui sem a variável
+    CHAVE_CIFRA:
+      env.CHAVE_CIFRA ?? 'somente-desenvolvimento-nao-use-em-producao',
   }));
 
 export type Env = z.infer<typeof esquemaEnv>;

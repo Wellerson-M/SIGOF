@@ -33,6 +33,8 @@ import {
   ErroNaoEncontrado,
 } from '../../http/erros.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
+import type { ServicoDeAvisos } from '../avisos/avisos.js';
+import type { Ocorrido } from '../avisos/modelos.js';
 
 export type TipoOcorrencia =
   'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
@@ -90,11 +92,23 @@ export interface MensagemDaConversa {
   criadoEm: Date;
 }
 
+/** Registro de cada e-mail enviado sobre a solicitação (só a equipe vê). */
+export interface EmailDaSolicitacao {
+  id: string;
+  para: string[];
+  situacao: 'PENDENTE' | 'ENVIADO' | 'FALHOU';
+  tentativas: number;
+  ultimoErro: string | null;
+  enviadoEm: Date | null;
+  criadoEm: Date;
+}
+
 export interface Detalhe extends Resumo {
   pagadorCorreto: string | null;
   resolvidoEm: Date | null;
   historico: EventoDoHistorico[];
   mensagens: MensagemDaConversa[];
+  emails: EmailDaSolicitacao[];
   pode: {
     mudarPrioridade: boolean;
     atribuir: boolean;
@@ -174,8 +188,20 @@ function estadoDoSla(s: {
 export class ServicoDeSolicitacoes {
   constructor(
     private readonly prisma: PrismaClient,
+    /** Notificações e e-mails de cada movimentação; ausente, nada é avisado. */
+    private readonly avisos?: ServicoDeAvisos,
     private readonly agora: () => Date = () => new Date(),
   ) {}
+
+  /** Avisa dentro da mesma transação da movimentação. */
+  private async avisar(
+    tx: Transacao,
+    usuario: UsuarioAutenticado,
+    solicitacaoId: string,
+    ocorrido: Ocorrido,
+  ): Promise<void> {
+    await this.avisos?.registrar(tx, usuario, solicitacaoId, ocorrido);
+  }
 
   async abrir(
     usuario: UsuarioAutenticado,
@@ -261,6 +287,8 @@ export class ServicoDeSolicitacoes {
         },
       });
 
+      await this.avisar(tx, usuario, solicitacao.id, { tipo: 'ABERTA' });
+
       return { solicitacao, expediente: expedienteDaEmpresa(empresa) };
     });
 
@@ -340,6 +368,20 @@ export class ServicoDeSolicitacoes {
           include: { autor: pessoa },
           orderBy: { criadoEm: 'asc' },
         },
+        // Quem recebeu e-mail é informação da equipe, não do solicitante
+        emails: {
+          take: ehInterno(usuario.perfil) ? 200 : 0,
+          orderBy: { criadoEm: 'asc' },
+          select: {
+            id: true,
+            para: true,
+            situacao: true,
+            tentativas: true,
+            ultimoErro: true,
+            enviadoEm: true,
+            criadoEm: true,
+          },
+        },
       },
     });
 
@@ -371,6 +413,7 @@ export class ServicoDeSolicitacoes {
         autor: m.autor,
         criadoEm: m.criadoEm,
       })),
+      emails: solicitacao.emails,
       pode: {
         mudarPrioridade:
           !encerrada && PERFIS_QUE_PRIORIZAM.includes(usuario.perfil),
@@ -441,6 +484,13 @@ export class ServicoDeSolicitacoes {
         },
       });
 
+      await this.avisar(tx, usuario, atual.id, {
+        tipo: 'STATUS',
+        de,
+        para,
+        observacao: texto,
+      });
+
       return this.resumirPorId(tx, usuario, atual.id, expediente, agora);
     });
   }
@@ -469,6 +519,11 @@ export class ServicoDeSolicitacoes {
           atual,
           `Prioridade: ${NOME_DA_PRIORIDADE[atual.prioridade]} → ${NOME_DA_PRIORIDADE[prioridade]}`,
         );
+        await this.avisar(tx, usuario, atual.id, {
+          tipo: 'PRIORIDADE',
+          de: atual.prioridade,
+          para: prioridade,
+        });
       }
 
       return this.resumirPorId(
@@ -521,6 +576,10 @@ export class ServicoDeSolicitacoes {
           atual,
           `Responsável: ${responsavel.nome}`,
         );
+        await this.avisar(tx, usuario, atual.id, {
+          tipo: 'RESPONSAVEL',
+          nome: responsavel.nome,
+        });
       }
 
       return this.resumirPorId(
@@ -550,16 +609,24 @@ export class ServicoDeSolicitacoes {
       throw new ErroNaoEncontrado('Solicitação não encontrada');
     }
 
-    const mensagem = await this.prisma.mensagem.create({
-      data: {
-        empresaId: usuario.empresaId,
-        solicitacaoId: solicitacao.id,
-        autorId: usuario.id,
-        conteudo: conteudo.trim(),
+    const mensagem = await this.prisma.$transaction(async (tx) => {
+      const criada = await tx.mensagem.create({
+        data: {
+          empresaId: usuario.empresaId,
+          solicitacaoId: solicitacao.id,
+          autorId: usuario.id,
+          conteudo: conteudo.trim(),
+          interna,
+          criadoEm: this.agora(),
+        },
+        include: { autor: pessoa },
+      });
+      await this.avisar(tx, usuario, solicitacao.id, {
+        tipo: 'MENSAGEM',
+        conteudo: criada.conteudo,
         interna,
-        criadoEm: this.agora(),
-      },
-      include: { autor: pessoa },
+      });
+      return criada;
     });
 
     return {

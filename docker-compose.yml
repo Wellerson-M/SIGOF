@@ -45,6 +45,20 @@ services:
       timeout: 5s
       retries: 5
 
+  # Caixa de correio de mentira: recebe os e-mails do SIGOF sem entregar a
+  # ninguém. Veja em http://localhost:8025. Para usar, configure o envio na
+  # tela Administração → E-mail com servidor "localhost", porta 1025, sem
+  # TLS direto, e qualquer usuário e senha.
+  email:
+    image: axllent/mailpit:v1.31.4
+    container_name: sigof-email
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
 volumes:
   postgres-data:
   storage-data:

@@ -42,6 +42,20 @@ A produção **nunca** recebe um merge direto. O fluxo planejado é este:
 4. Um workflow etiqueta como `producao` **as mesmas imagens já testadas no staging**, sem montar de novo, e o servidor atualiza a produção.
 5. **Voltar atrás:** publicar de novo a release anterior. A produção volta para aquelas imagens.
 
+## E-mail de saída
+
+Cada empresa envia os avisos pela **própria conta de e-mail**, configurada pelo administrador em **Administração → E-mail**:
+
+- **E-mail de envio:** servidor SMTP, porta, login e senha. Para o Gmail: botão *Usar Gmail* (`smtp.gmail.com`, porta 465) e uma **senha de app** (exige verificação em duas etapas; criada em myaccount.google.com/apppasswords). A senha é cifrada com AES-256-GCM antes de ir ao banco, com a chave `CHAVE_CIFRA`, que só existe no servidor.
+- **Caixa central:** recebe cópia de tudo. Quem abriu a solicitação e o responsável também recebem; quem fez a movimentação, não.
+- **Uma conversa por protocolo:** o assunto é fixo (`[SIGOF SOL-AAAA-MM-NNNN] Tipo — CTe`) e cada e-mail responde ao primeiro (`In-Reply-To`/`References`). Gmail e Outlook mostram tudo junto.
+- **Não responda:** toda mensagem avisa que é automática; respostas por e-mail não entram no sistema (a entrada por e-mail fica para depois do TCC).
+- **Notas internas não saem por e-mail.**
+
+**Fila (outbox).** O e-mail é gravado na mesma transação da movimentação, na tabela `emails_saida`, e enviado em segundo plano pela própria API a cada `EMAIL_INTERVALO_SEGUNDOS` (padrão 15). Se o provedor falhar, tenta de novo depois de 1, 5, 15 e 60 minutos; na quinta falha, fica como **Falhou**, com o erro registrado. Cada envio aparece no detalhe da solicitação (para a equipe) e em *Administração → E-mail → Últimos envios*.
+
+**No computador**, o `docker compose up -d` também sobe o **Mailpit**, uma caixa de correio de mentira: configure o envio com servidor `localhost`, porta `1025`, sem conexão segura, qualquer login e senha, e veja os e-mails em http://localhost:8025.
+
 ## Diagnóstico
 
 Ver os últimos logs da API de staging (precisa do `az login`):

@@ -1,12 +1,24 @@
 import pino from 'pino';
 import { carregarEnv } from '../config/env.js';
 import { criarPrismaClient } from '../banco/cliente.js';
+import { Carteiro } from '../modulos/avisos/carteiro.js';
+import { Cifra } from '../seguranca/cifra.js';
 import { criarApp } from './app.js';
 
 const logger = pino();
 const env = carregarEnv();
 const prisma = criarPrismaClient(env.DATABASE_URL);
 const app = criarApp({ prisma, env });
+
+// Fila de e-mails: enviada em segundo plano, no mesmo processo da API
+const carteiro = new Carteiro(
+  prisma,
+  new Cifra(env.CHAVE_CIFRA),
+  undefined,
+  undefined,
+  (mensagem, erro) => logger.error({ err: erro }, mensagem),
+);
+carteiro.iniciar(env.EMAIL_INTERVALO_SEGUNDOS * 1000);
 
 const servidor = app.listen(env.PORT, () => {
   logger.info(
@@ -29,6 +41,7 @@ for (const sinal of ['SIGINT', 'SIGTERM'] as const) {
     encerrando = true;
 
     logger.info({ sinal }, 'Encerrando SIGOF API');
+    carteiro.parar();
     servidor.close(() => {
       void prisma.$disconnect().finally(() => process.exit(0));
     });

@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
+import { notificacoes } from '@/lib/avisos';
 import { api, type Detalhe, type Resumo } from '@/lib/solicitacoes';
 import { DetalheDaSolicitacao } from './DetalheDaSolicitacao';
 
@@ -59,6 +60,7 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
         criadoEm: '2026-10-15T12:30:00Z',
       },
     ],
+    emails: [],
     pode: { mudarPrioridade: true, atribuir: true, comentarInterno: true },
     ...extra,
   };
@@ -67,6 +69,48 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
 const resumo = {} as Resumo;
 
 describe('DetalheDaSolicitacao', () => {
+  it('lista os e-mails enviados e marca as notificações dela como lidas', async () => {
+    const marcar = vi
+      .spyOn(notificacoes, 'marcarLidas')
+      .mockResolvedValue({ naoLidas: 0 });
+    const ouvinte = vi.fn();
+    window.addEventListener('sigof:notificacoes-lidas', ouvinte);
+    vi.spyOn(api, 'detalhar').mockResolvedValue(
+      detalhe({
+        emails: [
+          {
+            id: 'e1',
+            para: ['central@demo.test', 'sofia@demo.test'],
+            situacao: 'ENVIADO',
+            tentativas: 1,
+            ultimoErro: null,
+            enviadoEm: '2026-10-15T12:01:00Z',
+            criadoEm: '2026-10-15T12:00:00Z',
+          },
+          {
+            id: 'e2',
+            para: ['central@demo.test'],
+            situacao: 'PENDENTE',
+            tentativas: 2,
+            ultimoErro: 'connect ETIMEDOUT',
+            enviadoEm: null,
+            criadoEm: '2026-10-15T12:10:00Z',
+          },
+        ],
+      }),
+    );
+    vi.spyOn(api, 'responsaveis').mockResolvedValue([]);
+    render(<DetalheDaSolicitacao id="s1" />);
+
+    expect(await screen.findByText('E-mails enviados')).toBeInTheDocument();
+    expect(screen.getByText('Enviado')).toBeInTheDocument();
+    expect(screen.getByText('Na fila')).toBeInTheDocument();
+    expect(screen.getByText('connect ETIMEDOUT')).toBeInTheDocument();
+    expect(marcar).toHaveBeenCalledWith({ solicitacaoId: 's1' });
+    expect(ouvinte).toHaveBeenCalled();
+    window.removeEventListener('sigof:notificacoes-lidas', ouvinte);
+  });
+
   it('mostra os dados, a conversa e o histórico', async () => {
     vi.spyOn(api, 'detalhar').mockResolvedValue(detalhe());
     vi.spyOn(api, 'responsaveis').mockResolvedValue([]);

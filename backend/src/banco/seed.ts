@@ -95,6 +95,7 @@ async function limpar(prisma: Prisma.TransactionClient): Promise<void> {
   await prisma.eventoAuditoria.deleteMany();
   await prisma.sessao.deleteMany();
   await prisma.notificacao.deleteMany();
+  await prisma.emailSaida.deleteMany();
   await prisma.statusHistorico.deleteMany();
   await prisma.anexo.deleteMany();
   await prisma.mensagem.deleteMany();

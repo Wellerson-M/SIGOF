@@ -58,11 +58,23 @@ export interface Evento {
   criadoEm: string;
 }
 
+/** Cada e-mail enviado sobre a solicitação (a API só manda para a equipe). */
+export interface EmailEnviado {
+  id: string;
+  para: string[];
+  situacao: 'PENDENTE' | 'ENVIADO' | 'FALHOU';
+  tentativas: number;
+  ultimoErro: string | null;
+  enviadoEm: string | null;
+  criadoEm: string;
+}
+
 export interface Detalhe extends Resumo {
   pagadorCorreto: string | null;
   resolvidoEm: string | null;
   historico: Evento[];
   mensagens: Mensagem[];
+  emails: EmailEnviado[];
   pode: {
     mudarPrioridade: boolean;
     atribuir: boolean;

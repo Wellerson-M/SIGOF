@@ -48,6 +48,7 @@ describe('IP do cliente atrás do proxy (Caddy)', () => {
         DATABASE_URL: 'postgresql://x:y@localhost:5432/z',
         JWT_SECRET: 'x'.repeat(32),
         FRONTEND_URL: 'https://app.sigof.test',
+        CHAVE_CIFRA: 'c'.repeat(32),
       }),
       limiteDeLoginPorMinuto: 1,
     });
