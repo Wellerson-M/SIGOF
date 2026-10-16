@@ -18,6 +18,7 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
     prioridade: 'MEDIA',
     solicitante: { id: 'sol', nome: 'Sofia Solicitante' },
     responsavel: { id: 'ana', nome: 'André Analista' },
+    filial: null,
     criadoEm: '2026-10-15T12:00:00Z',
     atualizadoEm: '2026-10-15T12:00:00Z',
     slaVenceEm: '2026-10-15T16:00:00Z',

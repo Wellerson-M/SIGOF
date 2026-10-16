@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import type { PrismaClient } from '@prisma/client';
 import { ehTerminal } from '../../dominio/status.js';
@@ -103,6 +103,7 @@ export class ServicoDeAnexos {
           chaveStorage: chave,
           tipoMime: aceito.mime,
           tamanhoBytes: arquivo.conteudo.length,
+          sha256: createHash('sha256').update(arquivo.conteudo).digest('hex'),
         },
         include: { enviadoPor: { select: { id: true, nome: true } } },
       });

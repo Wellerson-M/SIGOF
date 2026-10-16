@@ -63,6 +63,8 @@ enum AcaoDeAuditoria {
   SENHA_REDEFINIDA
   EMPRESA_ALTERADA
   EMAIL_CONFIGURADO
+  /// Cadastro auxiliar da empresa (filial, causa de erro...) criado ou alterado.
+  CADASTRO_ALTERADO
 }
 
 enum SituacaoDoEmail {
@@ -134,6 +136,7 @@ model Empresa {
   sessoes      Sessao[]
   auditoria    EventoAuditoria[]
   emails       EmailSaida[]
+  filiais      Filial[]
 
   @@map("empresas")
 }
@@ -221,6 +224,9 @@ model Solicitacao {
 
   solicitanteId String  @map("solicitante_id")
   responsavelId String? @map("responsavel_id")
+  /// Filial que emitiu o documento. Duas filiais podem ter CTe com o mesmo
+  /// número, então a duplicidade compara documento + filial.
+  filialId      String? @map("filial_id")
 
   tipo           TipoOcorrencia
   cte            String?
@@ -246,6 +252,7 @@ model Solicitacao {
   empresa     Empresa  @relation(fields: [empresaId], references: [id])
   solicitante Usuario  @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])
   responsavel Usuario? @relation("SolicitacoesAtribuidas", fields: [responsavelId], references: [id])
+  filial      Filial?  @relation(fields: [filialId], references: [id])
 
   mensagens    Mensagem[]
   anexos       Anexo[]
@@ -260,6 +267,23 @@ model Solicitacao {
   @@index([empresaId, nf])
   @@index([empresaId, status])
   @@map("solicitacoes")
+}
+
+/// Filial da transportadora, cadastrada pelo administrador. Cada filial
+/// emite CTe com numeração própria (é outro CNPJ ou outra série).
+model Filial {
+  id        String   @id @default(uuid())
+  empresaId String   @map("empresa_id")
+  nome      String
+  /// Desativada some dos formulários, mas continua nas solicitações antigas.
+  ativa     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  empresa      Empresa       @relation(fields: [empresaId], references: [id])
+  solicitacoes Solicitacao[]
+
+  @@unique([empresaId, nome])
+  @@map("filiais")
 }
 
 /// Contador de protocolo por empresa/ano/mês.
@@ -308,6 +332,9 @@ model Anexo {
   chaveStorage  String   @map("chave_storage")
   tipoMime      String   @map("tipo_mime")
   tamanhoBytes  Int      @map("tamanho_bytes")
+  /// SHA-256 do conteúdo: o mesmo arquivo enviado em outra solicitação
+  /// (com outro CTe digitado, por exemplo) também gera alerta de duplicidade.
+  sha256        String?
   criadoEm      DateTime @default(now()) @map("criado_em")
 
   empresa     Empresa     @relation(fields: [empresaId], references: [id])
@@ -315,6 +342,7 @@ model Anexo {
   enviadoPor  Usuario     @relation(fields: [enviadoPorId], references: [id])
 
   @@index([empresaId, solicitacaoId])
+  @@index([empresaId, sha256])
   @@map("anexos")
 }
 

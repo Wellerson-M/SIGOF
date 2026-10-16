@@ -24,6 +24,8 @@ import {
 import { rotasDeAnexos } from '../modulos/anexos/rotas.js';
 import { ServicoDeAnexos } from '../modulos/anexos/servico.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
+import { rotasDeCadastros } from '../modulos/cadastros/rotas.js';
+import { ServicoDeCadastros } from '../modulos/cadastros/servico.js';
 import {
   ServicoDeIndicadores,
   rotasDeIndicadores,
@@ -187,6 +189,14 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       '/api/indicadores',
       rotasDeIndicadores({
         servico: new ServicoDeIndicadores(prisma),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/cadastros',
+      rotasDeCadastros({
+        servico: new ServicoDeCadastros(prisma),
         jwtSecret: env.JWT_SECRET,
       }),
     );

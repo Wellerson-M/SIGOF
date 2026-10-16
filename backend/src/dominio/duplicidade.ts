@@ -13,6 +13,16 @@
  *
  * O alerta não bloqueia: quem abre decide vincular ou prosseguir
  * (RFC seção 3.2).
+ *
+ * Duas regras vieram do uso real na transportadora piloto:
+ *
+ *  - **Filial.** Cada filial emite CTe com numeração própria, então o mesmo
+ *    número em filiais diferentes é outro documento. A comparação é
+ *    documento + filial; se uma das duas solicitações não tem filial
+ *    informada, o alerta aparece (na dúvida, avisar).
+ *  - **Arquivo anexado.** Mandar os mesmos arquivos digitando outro CTe e
+ *    outra NF passava sem aviso. O conteúdo de cada anexo é comparado pelo
+ *    SHA-256, independentemente da filial.
  */
 
 import type { Status } from './status.js';
@@ -29,6 +39,13 @@ export interface SolicitacaoComparavel {
   nf: string | null;
   status: Status;
   criadoEm: Date;
+  filialId?: string | null | undefined;
+  anexos?: readonly AnexoComparavel[] | undefined;
+}
+
+export interface AnexoComparavel {
+  nomeArquivo: string;
+  sha256: string | null;
 }
 
 export interface CandidataDuplicidade {
@@ -36,12 +53,24 @@ export interface CandidataDuplicidade {
   cte: string | null;
   nf: string | null;
   criadoEm: Date;
+  filialId?: string | null | undefined;
+  /** SHA-256 dos arquivos que a pessoa vai anexar. */
+  hashesDosAnexos?: readonly string[] | undefined;
 }
 
 export interface MotivoDuplicidade {
   solicitacao: SolicitacaoComparavel;
-  documento: 'CTE' | 'NF';
+  documento: 'CTE' | 'NF' | 'ANEXO';
+  /** O número do documento, ou o nome do arquivo igual já anexado. */
   valor: string;
+}
+
+/** Sem filial de um dos lados, não dá para descartar: conta como a mesma. */
+function mesmaFilial(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  return !a || !b || a === b;
 }
 
 /** Tamanho da chave de acesso de CTe e NF-e (44 dígitos). */
@@ -90,7 +119,11 @@ export function encontrarDuplicidades(
   const cteCandidata = normalizarDocumento(candidata.cte);
   const nfCandidata = normalizarDocumento(candidata.nf);
 
-  if (cteCandidata === null && nfCandidata === null) {
+  const hashes = new Set(
+    (candidata.hashesDosAnexos ?? []).map((h) => h.toLowerCase()),
+  );
+
+  if (cteCandidata === null && nfCandidata === null && hashes.size === 0) {
     return [];
   }
 
@@ -121,8 +154,9 @@ export function encontrarDuplicidades(
 
     const cteExistente = normalizarDocumento(existente.cte);
     const nfExistente = normalizarDocumento(existente.nf);
+    const filial = mesmaFilial(candidata.filialId, existente.filialId);
 
-    if (cteCandidata !== null && cteExistente === cteCandidata) {
+    if (filial && cteCandidata !== null && cteExistente === cteCandidata) {
       motivos.push({
         solicitacao: existente,
         documento: 'CTE',
@@ -131,11 +165,23 @@ export function encontrarDuplicidades(
       continue;
     }
 
-    if (nfCandidata !== null && nfExistente === nfCandidata) {
+    if (filial && nfCandidata !== null && nfExistente === nfCandidata) {
       motivos.push({
         solicitacao: existente,
         documento: 'NF',
         valor: nfCandidata,
+      });
+      continue;
+    }
+
+    const arquivoIgual = existente.anexos?.find(
+      (a) => a.sha256 !== null && hashes.has(a.sha256.toLowerCase()),
+    );
+    if (arquivoIgual) {
+      motivos.push({
+        solicitacao: existente,
+        documento: 'ANEXO',
+        valor: arquivoIgual.nomeArquivo,
       });
     }
   }
