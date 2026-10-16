@@ -27,6 +27,7 @@ Staging e produção usam **a mesma imagem Docker**: o que vai para a produção
 2. O workflow **Entrega** (GitHub Actions) monta as imagens da API e das telas, grava o commit nelas e publica no GitHub Container Registry com a etiqueta `staging`.
 3. A cada minuto, o servidor ([`deploy/atualizar.sh`](../deploy/atualizar.sh)) busca a configuração da `main` e as imagens novas. Ele só troca os contêineres quando **API e telas são do mesmo commit**.
 4. O workflow confere em `/health` que o commit novo está no ar e falha se isso não acontecer em 10 minutos.
+5. Se o `deploy/caddy/Caddyfile` mudou, o atualizador manda o Caddy recarregar a configuração (`caddy reload`), sem derrubar conexões. O Caddy só lê o arquivo ao iniciar: sem esse passo, uma rota nova não valeria.
 
 ## Release e produção *(a implementar — issue #48)*
 
