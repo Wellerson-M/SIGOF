@@ -17,6 +17,23 @@ import { ErroNaoAutenticado, ErroNaoEncontrado } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
 import type { ServicoDeAutenticacao, Tokens } from './servico.js';
 
+/**
+ * Regra de senha (RNF03): no mínimo 8 caracteres, com letra e número. O
+ * comprimento pesa mais que a variedade (NIST SP 800-63B), por isso não há
+ * exigência de símbolo.
+ */
+export const esquemaNovaSenha = z
+  .string()
+  .min(8, 'A senha precisa ter pelo menos 8 caracteres')
+  .max(200)
+  .regex(/\p{L}/u, 'A senha precisa ter pelo menos uma letra')
+  .regex(/\d/, 'A senha precisa ter pelo menos um número');
+
+const esquemaTrocaDeSenha = z.object({
+  senhaAtual: z.string().min(1, 'Informe a senha atual').max(200),
+  novaSenha: esquemaNovaSenha,
+});
+
 const esquemaLogin = z.object({
   empresa: z.string().trim().min(1, 'Informe a empresa').max(60),
   email: z.string().trim().email('E-mail inválido').max(254),
@@ -123,7 +140,7 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
   rotas.post('/sair', async (req, res) => {
     const token: unknown = req.cookies?.[COOKIE_SESSAO];
     if (typeof token === 'string') {
-      await servico.sair(token);
+      await servico.sair(token, contexto(req));
     }
 
     limparCookies(res);
@@ -137,6 +154,19 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
     res.status(204).end();
   });
 
+  rotas.post('/senha', autenticar(jwtSecret), async (req, res) => {
+    const { senhaAtual, novaSenha } = validar(esquemaTrocaDeSenha, req.body);
+    const token: unknown = req.cookies?.[COOKIE_SESSAO];
+    await servico.trocarSenha(
+      usuarioDa(req),
+      senhaAtual,
+      novaSenha,
+      typeof token === 'string' ? token : undefined,
+      contexto(req),
+    );
+    res.status(204).end();
+  });
+
   rotas.get('/eu', autenticar(jwtSecret), async (req, res) => {
     const { id, empresaId } = usuarioDa(req);
     const usuario = await prisma.usuario.findFirst({
@@ -147,6 +177,7 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
         email: true,
         perfil: true,
         area: true,
+        trocarSenha: true,
         empresa: { select: { razaoSocial: true, slug: true } },
       },
     });

@@ -52,6 +52,18 @@ enum Prioridade {
   URGENTE
 }
 
+/// O que aconteceu, na trilha de auditoria.
+enum AcaoDeAuditoria {
+  LOGIN
+  LOGIN_RECUSADO
+  SAIDA
+  SENHA_ALTERADA
+  USUARIO_CRIADO
+  USUARIO_ALTERADO
+  SENHA_REDEFINIDA
+  EMPRESA_ALTERADA
+}
+
 // ------------------------------------------------------------- Entidades
 
 /// Transportadora. No MVP existe apenas a empresa piloto, mas é a chave que
@@ -96,6 +108,7 @@ model Empresa {
   historicos   StatusHistorico[]
   notificacoes Notificacao[]
   sessoes      Sessao[]
+  auditoria    EventoAuditoria[]
 
   @@map("empresas")
 }
@@ -117,6 +130,11 @@ model Usuario {
   /// Enquanto estiver no futuro, o login é recusado mesmo com a senha certa.
   bloqueadoAte  DateTime? @map("bloqueado_ate")
 
+  /// A senha foi definida pelo administrador (provisória): no próximo
+  /// login a pessoa é levada a escolher a dela antes de usar o sistema.
+  trocarSenha    Boolean   @default(false) @map("trocar_senha")
+  ultimoAcessoEm DateTime? @map("ultimo_acesso_em")
+
   empresa Empresa @relation(fields: [empresaId], references: [id])
 
   solicitacoesAbertas    Solicitacao[]     @relation("SolicitacoesAbertas")
@@ -126,6 +144,8 @@ model Usuario {
   notificacoes           Notificacao[]
   anexos                 Anexo[]
   sessoes                Sessao[]
+  auditoriaFeita         EventoAuditoria[] @relation("AuditoriaAutor")
+  auditoriaSofrida       EventoAuditoria[] @relation("AuditoriaAlvo")
 
   // O e-mail é único dentro da empresa, não globalmente: em um cenário
   // multi-tenant, a mesma pessoa pode existir em duas transportadoras.
@@ -302,4 +322,29 @@ model Notificacao {
 
   @@index([empresaId, usuarioId, lida])
   @@map("notificacoes")
+}
+
+/// Trilha de auditoria de acesso e administração (RNF09).
+///
+/// Só recebe inserções: a API não tem rota que altere ou apague um evento,
+/// e o banco recusa UPDATE nesta tabela (gatilho criado na migração).
+model EventoAuditoria {
+  id        String          @id @default(uuid())
+  empresaId String          @map("empresa_id")
+  /// Quem fez. Nulo quando não há usuário identificado.
+  autorId   String?         @map("autor_id")
+  /// Sobre quem foi feito (o usuário criado, alterado, que tentou entrar...).
+  alvoId    String?         @map("alvo_id")
+  acao      AcaoDeAuditoria
+  /// O que mudou, com os valores antes e depois quando houver.
+  detalhes  Json?
+  ip        String?
+  criadoEm  DateTime        @default(now()) @map("criado_em")
+
+  empresa Empresa  @relation(fields: [empresaId], references: [id])
+  autor   Usuario? @relation("AuditoriaAutor", fields: [autorId], references: [id])
+  alvo    Usuario? @relation("AuditoriaAlvo", fields: [alvoId], references: [id])
+
+  @@index([empresaId, criadoEm])
+  @@map("eventos_auditoria")
 }
