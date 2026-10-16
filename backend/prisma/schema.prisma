@@ -194,6 +194,11 @@ model Sessao {
   expiraEm      DateTime  @map("expira_em")
   substituidaEm DateTime? @map("substituida_em")
   revogadaEm    DateTime? @map("revogada_em")
+  /// A sessão que nasceu da renovação desta. Serve para reconhecer uma
+  /// resposta de renovação que se perdeu (a sucessora nunca foi usada).
+  substituidaPorId String? @map("substituida_por_id")
+  /// Nasceu de uma resposta perdida: há um teto por família.
+  recuperada    Boolean   @default(false)
   ip            String?
   userAgent     String?   @map("user_agent")
   criadoEm      DateTime  @default(now()) @map("criado_em")

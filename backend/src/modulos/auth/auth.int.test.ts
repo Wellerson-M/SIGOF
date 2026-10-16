@@ -15,6 +15,7 @@ import {
 } from '../../testes/banco-de-teste.js';
 import {
   FALHAS_PARA_BLOQUEIO,
+  RECUPERACOES_POR_FAMILIA,
   SEGUNDOS_DE_RENOVACAO_CONCORRENTE,
 } from './servico.js';
 import { hashDoToken } from './tokens.js';
@@ -226,21 +227,26 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       expect(aba2.status).toBe(204);
     });
 
-    it(`reuso depois de ${SEGUNDOS_DE_RENOVACAO_CONCORRENTE} s derruba a sessão inteira (roubo detectado)`, async () => {
-      const original = cookiesDa(
-        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
-      );
-      const legitimo = cookiesDa(await renovarCom(original.sigof_sessao!));
-
-      // Simula o tempo passando: a troca do token original foi há 31 s
+    /** Simula o tempo passando: a troca do token foi há mais de 30 s. */
+    async function envelhecerTroca(token: string) {
       await prisma.sessao.update({
-        where: { tokenHash: hashDoToken(original.sigof_sessao!) },
+        where: { tokenHash: hashDoToken(token) },
         data: {
           substituidaEm: new Date(
             Date.now() - (SEGUNDOS_DE_RENOVACAO_CONCORRENTE + 1) * 1000,
           ),
         },
       });
+    }
+
+    it(`reuso depois de ${SEGUNDOS_DE_RENOVACAO_CONCORRENTE} s, com o token novo já em uso, derruba a sessão inteira (roubo detectado)`, async () => {
+      const original = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
+      );
+      const segundo = cookiesDa(await renovarCom(original.sigof_sessao!));
+      // O dono continua usando: o token novo também já foi trocado
+      const legitimo = cookiesDa(await renovarCom(segundo.sigof_sessao!));
+      await envelhecerTroca(original.sigof_sessao!);
 
       const atacante = await renovarCom(original.sigof_sessao!);
       const depoisDoAtaque = await renovarCom(legitimo.sigof_sessao!);
@@ -248,6 +254,48 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
       expect(atacante.status).toBe(401);
       // O token mais novo também morreu: a família toda foi revogada
       expect(depoisDoAtaque.status).toBe(401);
+    });
+
+    it('resposta de renovação perdida (token novo nunca usado) não derruba a sessão', async () => {
+      const original = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
+      );
+      // O servidor trocou o token, mas a resposta não chegou ao navegador
+      const perdido = cookiesDa(await renovarCom(original.sigof_sessao!));
+      await envelhecerTroca(original.sigof_sessao!);
+
+      const deNovo = await renovarCom(original.sigof_sessao!);
+      expect(deNovo.status).toBe(204);
+
+      // O token que se perdeu foi descartado; a sessão segue normalmente
+      // com o que acabou de chegar
+      const descartado = await prisma.sessao.findUniqueOrThrow({
+        where: { tokenHash: hashDoToken(perdido.sigof_sessao!) },
+      });
+      expect(descartado.substituidaEm).not.toBeNull();
+      const seguinte = await renovarCom(cookiesDa(deNovo).sigof_sessao!);
+      expect(seguinte.status).toBe(204);
+      const nova = await prisma.sessao.findUniqueOrThrow({
+        where: { tokenHash: hashDoToken(cookiesDa(deNovo).sigof_sessao!) },
+      });
+      expect(nova.recuperada).toBe(true);
+    });
+
+    it(`depois de ${RECUPERACOES_POR_FAMILIA} recuperações, o reuso volta a derrubar a sessão`, async () => {
+      let atual = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
+      ).sigof_sessao!;
+      for (let i = 0; i < RECUPERACOES_POR_FAMILIA; i++) {
+        await renovarCom(atual);
+        await envelhecerTroca(atual);
+        const recuperada = await renovarCom(atual);
+        expect(recuperada.status).toBe(204);
+        atual = cookiesDa(recuperada).sigof_sessao!;
+      }
+
+      await renovarCom(atual);
+      await envelhecerTroca(atual);
+      expect((await renovarCom(atual)).status).toBe(401);
     });
 
     it('sem cookie, responde 401', async () => {
