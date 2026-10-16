@@ -1006,7 +1006,7 @@ Cronograma estimado para o desenvolvimento ao longo do semestre, alinhado às en
 # 9. Apêndices
 
 - **Apêndice A — Mockups:** prompts e telas de alta fidelidade geradas no Google Stitch, documentados em [`mockups/mockup.md`](mockups/mockup.md).
-- **Apêndice B — Guia de imagens:** mapa de onde cada print/diagrama é inserido nesta RFC, em [`guia-de-imagens.md`](guia-de-imagens.md).
+- **Apêndice B — Diagramas:** fontes PlantUML e imagens dos diagramas C4 e de casos de uso, em [`diagrams/`](diagrams/).
 - **Apêndice C — Protótipo:** as telas de alta fidelidade estão versionadas em [`docs/stitch_interface_sigof_corporativa/`](stitch_interface_sigof_corporativa/) e indexadas no Apêndice A; o protótipo navegável (Figma) é publicado no marco M3.
 - **Apêndice D — Evidências de validação:** material de evidência da demanda e da validação com a Aceville — prints anonimizados das threads de e-mail e das planilhas de controle atuais (ver seção 1.2) e o registro das conversas de validação com a equipe de reversões e o financeiro (ver seção 4.4). O roteiro de entrevista e o formulário de satisfação estruturados são aplicados no marco M6.
 - **Apêndice E — Repositório do projeto:** código-fonte, diagramas em PlantUML (`docs/diagrams/`) e histórico de versões desta RFC, disponíveis no repositório GitHub do projeto. Os pareceres da banca são registrados na seção 10.

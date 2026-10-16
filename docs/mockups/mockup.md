@@ -1,18 +1,15 @@
 # Mockups — Prompts para Google Stitch
 
-Este arquivo contém os prompts prontos para gerar os mockups do **SIGOF** no [Google Stitch](https://stitch.withgoogle.com/).
+Prompts usados para gerar os protótipos de alta fidelidade do **SIGOF** no [Google Stitch](https://stitch.withgoogle.com/) (Apêndice A da RFC). As telas geradas estão em [`docs/stitch_interface_sigof_corporativa/`](../stitch_interface_sigof_corporativa/).
 
-## Como usar
+Os protótipos foram a referência visual do planejamento. A interface implementada em `frontend/` segue a identidade visual definida depois: paleta Azul Documento, fonte IBM Plex e o símbolo "S de estrada".
 
-1. Acesse https://stitch.withgoogle.com/ e faça login com sua conta Google.
-2. Crie um novo projeto **Web**.
-3. **Comece colando o "Prompt base" (abaixo) uma vez** para fixar o estilo visual.
-4. Depois, gere **uma tela por vez** colando cada prompt da seção "Telas".
-5. Ajuste o que quiser direto no Stitch e **exporte cada tela como PNG**.
-6. Salve os PNGs na pasta `docs/assets/` do repositório (crie a pasta) com os nomes sugeridos em cada tela.
-7. Veja o arquivo [`guia-de-imagens.md`](../guia-de-imagens.md) para saber onde colar cada print na RFC.
+## Processo
 
-> **Dica:** o Stitch tende a gerar resultados melhores em inglês. Cada prompt abaixo tem a versão em português (principal) e você pode traduzir se quiser refinar. Mantenha o mesmo vocabulário visual entre as telas para consistência.
+1. O "Prompt base" (abaixo) fixa o estilo visual comum a todas as telas.
+2. Cada tela da seção "Telas" foi gerada com o seu prompt, uma por vez, mantendo o mesmo vocabulário visual.
+3. As telas foram exportadas em PNG e HTML para a pasta acima.
+
 
 ---
 
