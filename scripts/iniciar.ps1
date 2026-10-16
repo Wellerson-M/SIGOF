@@ -27,6 +27,19 @@ $branch = git branch --show-current
 Write-Host "Rodando a branch: $branch"
 if ($branch -ne 'main') {
   Write-Host '(é uma versão em teste; a oficial é a main)' -ForegroundColor Yellow
+  Write-Host 'Para usar a oficial: git checkout main' -ForegroundColor Yellow
+} elseif (git status --porcelain) {
+  # Com arquivos alterados, puxar a versão nova poderia misturar as coisas
+  Write-Host 'Há arquivos alterados na pasta: a main não foi atualizada.' -ForegroundColor Yellow
+} else {
+  # Na main, traz o que já foi mesclado no GitHub. Sem internet, segue com o
+  # que já está na pasta
+  git pull --ff-only --quiet
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host 'main atualizada com o GitHub.'
+  } else {
+    Write-Host 'Não deu para atualizar a main (sem internet?); seguindo com a versão da pasta.' -ForegroundColor Yellow
+  }
 }
 
 Passo 'Programas necessários'
