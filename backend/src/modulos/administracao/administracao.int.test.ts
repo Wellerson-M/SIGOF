@@ -50,12 +50,11 @@ describe.skipIf(!temBanco)('administração (integração, banco real)', () => {
     const cookie = `sigof_acesso=${sigof_acesso}; sigof_sessao=${sigof_sessao}`;
     const comCorpo =
       (metodo: 'post' | 'patch') =>
-      (url: string, corpo: object = {}) =>
-        request(app)
-          [metodo](url)
-          .set('Origin', FRONTEND)
-          .set('Cookie', cookie)
-          .send(corpo);
+      (url: string, corpo: object = {}) => {
+        const pedido =
+          metodo === 'post' ? request(app).post(url) : request(app).patch(url);
+        return pedido.set('Origin', FRONTEND).set('Cookie', cookie).send(corpo);
+      };
     return {
       get: (url: string) => request(app).get(url).set('Cookie', cookie),
       post: comCorpo('post'),
