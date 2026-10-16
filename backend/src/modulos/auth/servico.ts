@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
-import { ErroNaoAutenticado } from '../../http/erros.js';
+import { ErroDeRegraDeNegocio, ErroNaoAutenticado } from '../../http/erros.js';
 import { gerarHashDeSenha, verificarSenha } from '../../seguranca/senha.js';
+import { registrar } from '../auditoria/auditoria.js';
 import {
   emitirTokenDeAcesso,
   gerarTokenDeSessao,
@@ -98,8 +99,22 @@ export class ServicoDeAutenticacao {
       credenciais.senha,
     );
 
-    if (bloqueado || !usuario.ativo) {
-      throw new ErroNaoAutenticado(CREDENCIAIS_INVALIDAS);
+    const recusar = async (motivo: string) => {
+      await registrar(this.prisma, {
+        empresaId: usuario.empresaId,
+        acao: 'LOGIN_RECUSADO',
+        alvoId: usuario.id,
+        detalhes: { motivo },
+        ip: contexto.ip,
+      });
+      return new ErroNaoAutenticado(CREDENCIAIS_INVALIDAS);
+    };
+
+    if (!usuario.ativo) {
+      throw await recusar('usuário desativado');
+    }
+    if (bloqueado) {
+      throw await recusar('conta bloqueada por tentativas');
     }
 
     if (!senhaCorreta) {
@@ -122,15 +137,20 @@ export class ServicoDeAutenticacao {
           },
         });
       }
-      throw new ErroNaoAutenticado(CREDENCIAIS_INVALIDAS);
+      throw await recusar('senha errada');
     }
 
-    if (usuario.falhasDeLogin > 0 || usuario.bloqueadoAte !== null) {
-      await this.prisma.usuario.update({
-        where: { id: usuario.id },
-        data: { falhasDeLogin: 0, bloqueadoAte: null },
-      });
-    }
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { falhasDeLogin: 0, bloqueadoAte: null, ultimoAcessoEm: agora },
+    });
+    await registrar(this.prisma, {
+      empresaId: usuario.empresaId,
+      acao: 'LOGIN',
+      autorId: usuario.id,
+      alvoId: usuario.id,
+      ip: contexto.ip,
+    });
 
     return this.abrirSessao(
       { id: usuario.id, empresaId: usuario.empresaId, perfil: usuario.perfil },
@@ -202,14 +222,76 @@ export class ServicoDeAutenticacao {
   }
 
   /** Encerra a sessão deste dispositivo. Token desconhecido não é erro. */
-  async sair(tokenDeSessao: string): Promise<void> {
+  async sair(tokenDeSessao: string, contexto: Contexto = {}): Promise<void> {
     const sessao = await this.prisma.sessao.findUnique({
       where: { tokenHash: hashDoToken(tokenDeSessao) },
     });
 
     if (sessao) {
       await this.revogarFamilia(sessao.familia);
+      await registrar(this.prisma, {
+        empresaId: sessao.empresaId,
+        acao: 'SAIDA',
+        autorId: sessao.usuarioId,
+        alvoId: sessao.usuarioId,
+        ip: contexto.ip,
+      });
     }
+  }
+
+  /**
+   * Troca a própria senha. As outras sessões do usuário são encerradas
+   * (quem trocou a senha por suspeita de vazamento derruba o invasor); a
+   * deste dispositivo continua.
+   */
+  async trocarSenha(
+    usuario: UsuarioAutenticado,
+    senhaAtual: string,
+    novaSenha: string,
+    tokenDeSessao: string | undefined,
+    contexto: Contexto = {},
+  ): Promise<void> {
+    const registro = await this.prisma.usuario.findFirst({
+      where: { id: usuario.id, empresaId: usuario.empresaId, ativo: true },
+    });
+    if (!registro || !(await verificarSenha(registro.senhaHash, senhaAtual))) {
+      throw new ErroDeRegraDeNegocio('A senha atual não confere');
+    }
+    if (senhaAtual === novaSenha) {
+      throw new ErroDeRegraDeNegocio(
+        'A nova senha precisa ser diferente da atual',
+      );
+    }
+
+    const atual = tokenDeSessao
+      ? await this.prisma.sessao.findUnique({
+          where: { tokenHash: hashDoToken(tokenDeSessao) },
+          select: { familia: true },
+        })
+      : null;
+    const senhaHash = await gerarHashDeSenha(novaSenha);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.usuario.update({
+        where: { id: registro.id },
+        data: { senhaHash, trocarSenha: false },
+      });
+      await tx.sessao.updateMany({
+        where: {
+          usuarioId: registro.id,
+          revogadaEm: null,
+          ...(atual ? { familia: { not: atual.familia } } : {}),
+        },
+        data: { revogadaEm: this.agora() },
+      });
+      await registrar(tx, {
+        empresaId: registro.empresaId,
+        acao: 'SENHA_ALTERADA',
+        autorId: registro.id,
+        alvoId: registro.id,
+        ip: contexto.ip,
+      });
+    });
   }
 
   /** Encerra as sessões do usuário em todos os dispositivos. */

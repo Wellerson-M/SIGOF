@@ -66,6 +66,7 @@ export async function apagarEmpresaDeTeste(
   empresaId: string,
 ): Promise<void> {
   const onde = { where: { empresaId } };
+  await prisma.eventoAuditoria.deleteMany(onde);
   await prisma.sessao.deleteMany(onde);
   await prisma.notificacao.deleteMany(onde);
   await prisma.statusHistorico.deleteMany(onde);

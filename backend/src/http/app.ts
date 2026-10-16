@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import { randomUUID } from 'node:crypto';
 import { pinoHttp } from 'pino-http';
 import type { Env } from '../config/env.js';
+import { rotasDeAdministracao } from '../modulos/administracao/rotas.js';
+import { ServicoDeAdministracao } from '../modulos/administracao/servico.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
 import { rotasDeSolicitacoes } from '../modulos/solicitacoes/rotas.js';
@@ -118,6 +120,14 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       '/api/solicitacoes',
       rotasDeSolicitacoes({
         servico: new ServicoDeSolicitacoes(prisma),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/admin',
+      rotasDeAdministracao({
+        servico: new ServicoDeAdministracao(prisma),
         jwtSecret: env.JWT_SECRET,
       }),
     );
