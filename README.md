@@ -26,19 +26,21 @@ O MVP é validado com uma transportadora parceira (projeto de extensão). A arqu
 | **Solicitante** (comercial, financeiro, operacional) | Abre solicitações com CTe/NF obrigatórios, anexa documentos e acompanha o andamento |
 | **Analista** | Atende a fila ordenada por prioridade e SLA, conversa com o solicitante e resolve |
 | **Supervisor** | Reprioriza e reatribui solicitações e acompanha os indicadores |
-| **Administrador** | Gerencia usuários, expediente, SLA e tipos de ocorrência da empresa |
+| **Administrador** | Cadastra os funcionários, ajusta expediente e SLA, configura o e-mail de avisos e consulta a auditoria |
 
 ## Situação atual
 
-Pronto e testado:
-- **Telas de login e painel inicial**, com a identidade visual do produto, tema claro e escuro e versão para celular.
+Pronto e testado (staging atualizado a cada merge na `main`):
+- **Solicitações:** abertura com alerta de duplicidade e anexos, quadro kanban com arrastar, prioridade, responsável, conversa com notas internas e histórico.
+- **Anexos:** PDF, imagens e XML da NF-e/CTe, com checagem do tipo real do arquivo e download só para quem enxerga a solicitação.
+- **Avisos:** notificações no sistema (o sino) e e-mail a cada movimentação, com uma conversa por protocolo, enviados pela conta da própria empresa e configurados na tela.
+- **Indicadores** para o supervisor: em aberto, SLA vencido, atendidas no prazo, tempos médios, gráficos por dia, status, tipo e responsável, e exportação em CSV.
+- **Administração:** funcionários com senha provisória, perfis, desativação, expediente, SLA e trilha de auditoria imutável.
 - **Login** por empresa, e-mail e senha, com sessão em cookie protegido, bloqueio por tentativas, proteção contra CSRF e controle de acesso por perfil.
 - **Protocolo** `SOL-AAAA-MM-NNNN`, sequencial por empresa e seguro sob concorrência.
-- **Máquina de estados** com as transições permitidas para cada perfil.
-- **Duplicidade:** o mesmo CTe ou NF dentro da janela configurada gera alerta. "CTE 12.345", "CT-e nº 012345" e a chave de 44 dígitos são reconhecidos como o mesmo documento.
 - **SLA em minutos úteis**, respeitando o expediente, o fuso e os dias úteis de cada empresa, com pausa enquanto aguarda documento.
 
-Em desenvolvimento: as solicitações (abrir, listar, atender) e as telas delas, e o ambiente de produção. O staging já está no ar e é atualizado a cada merge na `main`. O andamento está no [quadro do projeto](https://github.com/users/Wellerson-M/projects/1).
+Próximos passos: ambiente de produção com release versionada, monitoramento, backup e testes ponta a ponta. O andamento está no [quadro do projeto](https://github.com/users/Wellerson-M/projects/1).
 
 ## Stack
 
@@ -46,7 +48,8 @@ Em desenvolvimento: as solicitações (abrir, listar, atender) e as telas delas,
 |---|---|
 | Backend | Node.js 22, TypeScript, Express 5, Zod, Pino |
 | Banco de dados | PostgreSQL 16 com Prisma 7 (migrações versionadas) |
-| Anexos | Armazenamento S3-compatível (SeaweedFS no ambiente local) |
+| Anexos | Armazenamento S3-compatível (SeaweedFS), acessado só pela API |
+| E-mail | SMTP da própria empresa (ex.: Gmail), com fila de envio no banco; Mailpit no ambiente local |
 | Segurança | Argon2id, sessão em cookie `HttpOnly`, Helmet, isolamento por empresa |
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, IBM Plex |
 | Testes | Vitest + Supertest no backend (mínimo 75%); Vitest + Testing Library no frontend (mínimo 25%) |

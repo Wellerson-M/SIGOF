@@ -26,6 +26,11 @@
   --atencao: #9a6400;
   --critico: #c0352b;
   --pausado: #5b6b85;
+
+  /* Séries dos gráficos (validadas para daltonismo nos dois temas) */
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --grade: #e6eaf0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -48,6 +53,10 @@
     --atencao: #e8b547;
     --critico: #f07068;
     --pausado: #9aa8bf;
+
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --grade: #222b3a;
   }
 }
 
@@ -68,6 +77,9 @@
   --color-atencao: var(--atencao);
   --color-critico: var(--critico);
   --color-pausado: var(--pausado);
+  --color-serie-1: var(--serie-1);
+  --color-serie-2: var(--serie-2);
+  --color-grade: var(--grade);
 
   --font-sans: var(--fonte-plex-sans);
   --font-mono: var(--fonte-plex-mono);
