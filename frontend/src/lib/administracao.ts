@@ -42,6 +42,8 @@ export interface ParametrosDaEmpresa {
   diasUteis: number[];
   slaAtendimentoMinutos: number;
   janelaDuplicidadeDias: number;
+  /** Ao resolver, a causa do erro (controle interno) é obrigatória. */
+  exigirCausaAoResolver: boolean;
 }
 
 export type AcaoDeAuditoria =

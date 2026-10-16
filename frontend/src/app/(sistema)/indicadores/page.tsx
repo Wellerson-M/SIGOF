@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { Barras, GraficoPorDia } from '@/components/indicadores/Graficos';
 import { Alerta, BOTAO_SECUNDARIO } from '@/components/Janela';
 import {
@@ -225,6 +225,53 @@ export default function PaginaDeIndicadores() {
                   ))}
                 </tbody>
               </table>
+            )}
+          </Cartao>
+
+          <Cartao>
+            <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+              De quem foi o erro (resolvidas no período)
+            </h2>
+            {(dados.porCausa ?? []).length === 0 ? (
+              <p className="text-sm text-texto-suave">
+                Nenhuma solicitação resolvida com a causa informada no período.
+              </p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-texto-suave">
+                  <tr>
+                    <th className="py-1.5 font-semibold">Causa</th>
+                    <th className="py-1.5 text-right font-semibold">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {(dados.porCausa ?? []).map((c) => (
+                    <Fragment key={c.causa}>
+                      <tr className="border-t border-borda">
+                        <td className="py-1.5 font-medium">{c.causa}</td>
+                        <td className="py-1.5 text-right font-medium">
+                          {c.total}
+                        </td>
+                      </tr>
+                      {c.detalhes.map((d) => (
+                        <tr key={d.detalhe}>
+                          <td className="py-1 pl-4 text-texto-suave">
+                            {d.detalhe}
+                          </td>
+                          <td className="py-1 text-right text-texto-suave">
+                            {d.total}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {(dados.resolvidasSemCausa ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-texto-suave">
+                {dados.resolvidasSemCausa} resolvida(s) sem a causa informada.
+              </p>
             )}
           </Cartao>
 

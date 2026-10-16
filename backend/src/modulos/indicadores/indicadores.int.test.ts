@@ -159,9 +159,11 @@ describe.skipIf(!temBanco)('indicadores (integração, banco real)', () => {
     const linhas = texto.trim().split('\r\n');
     expect(linhas).toHaveLength(4);
     expect(texto).toContain(
-      ';Ajuste fiscal;30000;;Resolvido;Média;SOLICITANTE;ANALISTA;',
+      // Filial vazia entre o tipo e o CTe
+      ';Ajuste fiscal;;30000;;Resolvido;Média;SOLICITANTE;ANALISTA;',
     );
-    expect(texto).toMatch(/;sim\r\n/);
+    // Sem causa registrada, as três últimas colunas ficam vazias
+    expect(texto).toMatch(/;sim;;;\r\n/);
     expect(texto).not.toContain('De outra empresa');
   });
 });

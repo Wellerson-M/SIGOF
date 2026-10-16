@@ -27,6 +27,7 @@ interface Formulario {
   /** Em horas, que é como as pessoas falam do prazo ("4 horas úteis"). */
   slaHoras: string;
   janelaDuplicidadeDias: string;
+  exigirCausaAoResolver: boolean;
 }
 
 function paraFormulario(p: Parametros): Formulario {
@@ -38,6 +39,7 @@ function paraFormulario(p: Parametros): Formulario {
     diasUteis: p.diasUteis,
     slaHoras: String(p.slaAtendimentoMinutos / 60),
     janelaDuplicidadeDias: String(p.janelaDuplicidadeDias),
+    exigirCausaAoResolver: p.exigirCausaAoResolver,
   };
 }
 
@@ -103,6 +105,7 @@ export function ParametrosDaEmpresa() {
           Number(formulario.slaHoras.replace(',', '.')) * 60,
         ),
         janelaDuplicidadeDias: Number(formulario.janelaDuplicidadeDias),
+        exigirCausaAoResolver: formulario.exigirCausaAoResolver,
       });
       setParametros(dados);
       setFormulario(paraFormulario(dados));
@@ -256,6 +259,21 @@ export function ParametrosDaEmpresa() {
           alerta avisa quando o mesmo CTe ou NF já teve solicitação nesse
           período (0 desliga).
         </p>
+        <label className="flex items-start gap-2 text-sm text-texto">
+          <input
+            type="checkbox"
+            checked={formulario.exigirCausaAoResolver}
+            onChange={(e) => mudar({ exigirCausaAoResolver: e.target.checked })}
+            className="mt-0.5"
+          />
+          <span>
+            Exigir “De quem foi o erro” ao resolver
+            <span className="block text-xs text-texto-suave">
+              A lista de causas fica na aba Causas de erro. Desligado, o campo
+              aparece mas pode ficar em branco.
+            </span>
+          </span>
+        </label>
       </fieldset>
 
       {erro && <Alerta>{erro}</Alerta>}

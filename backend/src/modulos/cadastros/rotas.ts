@@ -15,6 +15,20 @@ const esquemaNovaFilial = z.object({ nome });
 const esquemaAlteracaoDeFilial = z
   .object({ nome: nome.optional(), ativa: z.boolean().optional() })
   .strict();
+const opcoes = z
+  .array(z.string().trim().max(80))
+  .max(100, 'No máximo 100 opções');
+const esquemaNovaCausa = z.object({
+  nome,
+  opcoes: opcoes.optional(),
+  rotuloDasOpcoes: z.string().trim().max(40).nullable().optional(),
+  ordem: z.number().int().min(0).max(1000).optional(),
+});
+const esquemaAlteracaoDeCausa = esquemaNovaCausa
+  .partial()
+  .extend({ ativa: z.boolean().optional() })
+  .strict();
+
 const esquemaListagem = z.object({
   todas: z
     .enum(['0', '1'])
@@ -61,6 +75,33 @@ export function rotasDeCadastros(opcoes: {
     const alteracao = validar(esquemaAlteracaoDeFilial, req.body);
     res.json(
       await servico.alterarFilial(usuarioDa(req), idDa(req), alteracao, req.ip),
+    );
+  });
+
+  // Causa do erro é controle interno: o solicitante nem sabe que existe
+  rotas.get(
+    '/causas',
+    exigirPerfil('ANALISTA', 'SUPERVISOR', 'ADMIN'),
+    async (req, res) => {
+      const usuario = usuarioDa(req);
+      const { todas } = validar(esquemaListagem, req.query);
+      res.json(
+        await servico.causas(usuario, todas && usuario.perfil === 'ADMIN'),
+      );
+    },
+  );
+
+  rotas.post('/causas', soAdmin, async (req, res) => {
+    const dados = validar(esquemaNovaCausa, req.body);
+    res
+      .status(201)
+      .json(await servico.criarCausa(usuarioDa(req), dados, req.ip));
+  });
+
+  rotas.patch('/causas/:id', soAdmin, async (req, res) => {
+    const alteracao = validar(esquemaAlteracaoDeCausa, req.body);
+    res.json(
+      await servico.alterarCausa(usuarioDa(req), idDa(req), alteracao, req.ip),
     );
   });
 

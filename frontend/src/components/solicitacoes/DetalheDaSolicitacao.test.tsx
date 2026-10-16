@@ -3,8 +3,22 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
 import { notificacoes } from '@/lib/avisos';
+import { cadastros } from '@/lib/cadastros';
 import { api, type Detalhe, type Resumo } from '@/lib/solicitacoes';
 import { DetalheDaSolicitacao } from './DetalheDaSolicitacao';
+
+vi.mock('@/lib/sessao', () => ({
+  useSessao: () => ({
+    usuario: {
+      id: 'ana',
+      nome: 'André Analista',
+      email: 'andre@demo.test',
+      perfil: 'ANALISTA',
+      area: null,
+      empresa: { razaoSocial: 'Transportadora Demo Ltda.', slug: 'demo' },
+    },
+  }),
+}));
 
 function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
   return {
@@ -64,7 +78,13 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
     emails: [],
     anexos: [],
     totais: { anexos: 0, mensagens: 1 },
-    pode: { mudarPrioridade: true, atribuir: true, comentarInterno: true },
+    causa: null,
+    pode: {
+      mudarPrioridade: true,
+      atribuir: true,
+      comentarInterno: true,
+      classificar: false,
+    },
     ...extra,
   };
 }
@@ -150,8 +170,138 @@ describe('DetalheDaSolicitacao', () => {
       within(dialogo).getByRole('button', { name: 'Confirmar' }),
     );
 
-    expect(mover).toHaveBeenCalledWith('s1', 'RESOLVIDO', 'Emitido CTe novo');
+    expect(mover).toHaveBeenCalledWith(
+      's1',
+      'RESOLVIDO',
+      'Emitido CTe novo',
+      undefined,
+    );
     expect(detalhar).toHaveBeenCalledTimes(2);
+  });
+
+  it('resolver com causa do erro e documento: anexa antes e manda a causa', async () => {
+    vi.spyOn(api, 'detalhar').mockResolvedValue(detalhe());
+    vi.spyOn(api, 'responsaveis').mockResolvedValue([]);
+    vi.spyOn(cadastros, 'causas').mockResolvedValue([
+      {
+        id: 'dig',
+        nome: 'Erro de digitação',
+        opcoes: ['Ana', 'Bruno'],
+        rotuloDasOpcoes: 'Digitador',
+        ordem: 1,
+        ativa: true,
+      },
+      {
+        id: 'cli',
+        nome: 'Erro do cliente',
+        opcoes: [],
+        rotuloDasOpcoes: null,
+        ordem: 2,
+        ativa: true,
+      },
+    ]);
+    const ordem: string[] = [];
+    vi.spyOn(api, 'anexar').mockImplementation(async () => {
+      ordem.push('anexar');
+      return {
+        id: 'a1',
+        nomeArquivo: 'cte.pdf',
+        tipoMime: 'application/pdf',
+        tamanhoBytes: 4,
+        enviadoPor: { id: 'ana', nome: 'André' },
+        criadoEm: '2026-10-16T10:00:00Z',
+      };
+    });
+    const mover = vi.spyOn(api, 'mover').mockImplementation(async () => {
+      ordem.push('mover');
+      return resumo;
+    });
+    render(<DetalheDaSolicitacao id="s1" />);
+    const usuario = userEvent.setup();
+
+    await usuario.click(
+      await screen.findByRole('button', { name: 'Resolver' }),
+    );
+    const dialogo = screen.getByRole('dialog');
+    await usuario.type(
+      within(dialogo).getByLabelText('O que foi feito para resolver?'),
+      'CTe corrigido',
+    );
+    await usuario.selectOptions(
+      await within(dialogo).findByLabelText('De quem foi o erro'),
+      'dig',
+    );
+    await usuario.selectOptions(
+      within(dialogo).getByLabelText('Digitador'),
+      'Bruno',
+    );
+    await usuario.type(
+      within(dialogo).getByLabelText('Comentário'),
+      'CNPJ trocado',
+    );
+    await usuario.upload(within(dialogo).getByLabelText('Anexar documento'), [
+      new File(['%PDF'], 'cte.pdf', { type: 'application/pdf' }),
+    ]);
+    await usuario.click(
+      within(dialogo).getByRole('button', { name: 'Confirmar' }),
+    );
+
+    await vi.waitFor(() => expect(mover).toHaveBeenCalled());
+    expect(mover).toHaveBeenCalledWith('s1', 'RESOLVIDO', 'CTe corrigido', {
+      causaId: 'dig',
+      detalhe: 'Bruno',
+      comentario: 'CNPJ trocado',
+    });
+    expect(ordem).toEqual(['anexar', 'mover']);
+  });
+
+  it('mostra de quem foi o erro e deixa corrigir', async () => {
+    vi.spyOn(api, 'detalhar').mockResolvedValue(
+      detalhe({
+        status: 'RESOLVIDO',
+        acoes: [],
+        causa: {
+          id: 'cli',
+          nome: 'Erro do cliente',
+          detalhe: null,
+          comentario: 'Mandou a nota errada',
+        },
+        pode: {
+          mudarPrioridade: false,
+          atribuir: false,
+          comentarInterno: true,
+          classificar: true,
+        },
+      }),
+    );
+    vi.spyOn(cadastros, 'causas').mockResolvedValue([
+      {
+        id: 'dig',
+        nome: 'Erro de digitação',
+        opcoes: [],
+        rotuloDasOpcoes: null,
+        ordem: 1,
+        ativa: true,
+      },
+    ]);
+    const classificar = vi.spyOn(api, 'classificar').mockResolvedValue({
+      id: 'dig',
+      nome: 'Erro de digitação',
+      detalhe: null,
+      comentario: null,
+    });
+    render(<DetalheDaSolicitacao id="s1" />);
+    const usuario = userEvent.setup();
+
+    expect(await screen.findByText('Erro do cliente')).toBeInTheDocument();
+    expect(screen.getByText('Mandou a nota errada')).toBeInTheDocument();
+
+    await usuario.click(screen.getByRole('button', { name: 'Corrigir' }));
+    await usuario.selectOptions(await screen.findByLabelText('Causa'), 'dig');
+    await usuario.clear(screen.getByLabelText('Comentário'));
+    await usuario.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(classificar).toHaveBeenCalledWith('s1', { causaId: 'dig' });
   });
 
   it('a janela de observação fecha com Voltar sem mover', async () => {
@@ -237,6 +387,7 @@ describe('DetalheDaSolicitacao', () => {
           mudarPrioridade: false,
           atribuir: false,
           comentarInterno: false,
+          classificar: false,
         },
       }),
     );

@@ -123,9 +123,26 @@ export interface EmailDaSolicitacao {
   criadoEm: Date;
 }
 
+/** De quem foi o erro: informado ao resolver; nunca vai para o solicitante. */
+export interface Classificacao {
+  causaId: string;
+  /** O "qual" da causa (ex.: o digitador), quando ela tem opções. */
+  detalhe?: string | undefined;
+  comentario?: string | undefined;
+}
+
+export interface CausaRegistrada {
+  id: string;
+  nome: string;
+  detalhe: string | null;
+  comentario: string | null;
+}
+
 export interface Detalhe extends Resumo {
   pagadorCorreto: string | null;
   resolvidoEm: Date | null;
+  /** Só para a equipe interna; o solicitante recebe sempre null. */
+  causa: CausaRegistrada | null;
   historico: EventoDoHistorico[];
   mensagens: MensagemDaConversa[];
   emails: EmailDaSolicitacao[];
@@ -134,6 +151,8 @@ export interface Detalhe extends Resumo {
     mudarPrioridade: boolean;
     atribuir: boolean;
     comentarInterno: boolean;
+    /** Registrar ou corrigir a causa do erro (resolvida, equipe). */
+    classificar: boolean;
   };
 }
 
@@ -201,6 +220,7 @@ const PERFIS_QUE_ABREM: readonly Perfil[] = [
 const PERFIS_QUE_PRIORIZAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
 const PERFIS_QUE_ATRIBUEM: readonly Perfil[] = ['SUPERVISOR'];
 const PERFIS_RESPONSAVEIS: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
+const PERFIS_QUE_CLASSIFICAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
 const MAXIMO_NO_QUADRO = 500;
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -529,6 +549,7 @@ export class ServicoDeSolicitacoes {
       include: {
         ...incluirNoResumo,
         empresa: true,
+        causa: { select: { id: true, nome: true } },
         historicos: {
           include: { autor: pessoa },
           orderBy: { criadoEm: 'asc' },
@@ -573,6 +594,14 @@ export class ServicoDeSolicitacoes {
       ),
       pagadorCorreto: solicitacao.pagadorCorreto,
       resolvidoEm: solicitacao.resolvidoEm,
+      causa:
+        ehInterno(usuario.perfil) && solicitacao.causa
+          ? {
+              ...solicitacao.causa,
+              detalhe: solicitacao.causaDetalhe,
+              comentario: solicitacao.causaComentario,
+            }
+          : null,
       historico: solicitacao.historicos.map((h) => ({
         id: h.id,
         statusAnterior: h.statusAnterior,
@@ -602,6 +631,9 @@ export class ServicoDeSolicitacoes {
           !encerrada && PERFIS_QUE_PRIORIZAM.includes(usuario.perfil),
         atribuir: !encerrada && PERFIS_QUE_ATRIBUEM.includes(usuario.perfil),
         comentarInterno: ehInterno(usuario.perfil),
+        classificar:
+          solicitacao.status === 'RESOLVIDO' &&
+          PERFIS_QUE_CLASSIFICAM.includes(usuario.perfil),
       },
     };
   }
@@ -615,6 +647,7 @@ export class ServicoDeSolicitacoes {
     id: string,
     para: Status,
     observacao?: string,
+    classificacao?: Classificacao,
   ): Promise<Resumo> {
     const texto = observacao?.trim() || null;
     if (STATUS_COM_OBSERVACAO.includes(para) && texto === null) {
@@ -634,6 +667,15 @@ export class ServicoDeSolicitacoes {
       const agora = this.agora();
       const expediente = expedienteDaEmpresa(atual.empresa);
       const sla = this.slaDepoisDaMudanca(atual, de, para, agora, expediente);
+      const causa =
+        para === 'RESOLVIDO'
+          ? await this.conferirClassificacao(
+              tx,
+              usuario.empresaId,
+              classificacao,
+              atual.empresa.exigirCausaAoResolver,
+            )
+          : {};
 
       // Só grava se ninguém mexeu nela desde a leitura: duas pessoas
       // arrastando o mesmo cartão ao mesmo tempo não se atropelam
@@ -647,6 +689,7 @@ export class ServicoDeSolicitacoes {
             ? { responsavelId: usuario.id }
             : {}),
           resolvidoEm: para === 'RESOLVIDO' ? agora : null,
+          ...causa,
         },
       });
       if (count === 0) {
@@ -675,6 +718,52 @@ export class ServicoDeSolicitacoes {
       });
 
       return this.resumirPorId(tx, usuario, atual.id, expediente, agora);
+    });
+  }
+
+  /**
+   * Registra ou corrige a causa do erro de uma solicitação já resolvida
+   * (quem resolveu esqueceu, ou o supervisor reclassificou). Não gera
+   * aviso nem entra no histórico, que o solicitante vê.
+   */
+  async classificar(
+    usuario: UsuarioAutenticado,
+    id: string,
+    classificacao: Classificacao,
+  ): Promise<CausaRegistrada> {
+    if (!PERFIS_QUE_CLASSIFICAM.includes(usuario.perfil)) {
+      throw new ErroAcessoNegado(
+        'Só analista e supervisor registram a causa do erro',
+      );
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const atual = await this.carregar(tx, usuario, id);
+      if (atual.status !== 'RESOLVIDO') {
+        throw new ErroDeRegraDeNegocio(
+          'A causa do erro é registrada em solicitação resolvida',
+        );
+      }
+      const dados = await this.conferirClassificacao(
+        tx,
+        usuario.empresaId,
+        classificacao,
+        true,
+      );
+      const salva = await tx.solicitacao.update({
+        where: { id: atual.id },
+        data: dados,
+        select: {
+          causa: { select: { id: true, nome: true } },
+          causaDetalhe: true,
+          causaComentario: true,
+        },
+      });
+      return {
+        id: salva.causa!.id,
+        nome: salva.causa!.nome,
+        detalhe: salva.causaDetalhe,
+        comentario: salva.causaComentario,
+      };
     });
   }
 
@@ -981,6 +1070,52 @@ export class ServicoDeSolicitacoes {
       throw new ErroNaoEncontrado('Solicitação não encontrada');
     }
     return solicitacao;
+  }
+
+  /**
+   * A causa precisa ser da empresa e estar ativa; o "qual", uma das opções
+   * dela (sem opções, não há "qual"). Devolve os campos para gravar.
+   */
+  private async conferirClassificacao(
+    tx: Transacao,
+    empresaId: string,
+    classificacao: Classificacao | undefined,
+    obrigatoria: boolean,
+  ): Promise<{
+    causaId?: string | null;
+    causaDetalhe?: string | null;
+    causaComentario?: string | null;
+  }> {
+    if (!classificacao) {
+      if (obrigatoria) {
+        throw new ErroDeRegraDeNegocio('Informe de quem foi o erro');
+      }
+      return {};
+    }
+
+    const causa = await tx.causaDeErro.findFirst({
+      where: { id: classificacao.causaId, empresaId, ativa: true },
+      select: { id: true, opcoes: true, rotuloDasOpcoes: true },
+    });
+    if (!causa) {
+      throw new ErroDeRegraDeNegocio('Escolha uma causa ativa da empresa');
+    }
+
+    const detalhe = classificacao.detalhe?.trim() || null;
+    if (
+      detalhe !== null &&
+      causa.opcoes.length > 0 &&
+      !causa.opcoes.includes(detalhe)
+    ) {
+      const qual = causa.rotuloDasOpcoes?.toLowerCase() ?? 'uma opção';
+      throw new ErroDeRegraDeNegocio(`Escolha ${qual} da lista`);
+    }
+
+    return {
+      causaId: causa.id,
+      causaDetalhe: causa.opcoes.length > 0 ? detalhe : null,
+      causaComentario: classificacao.comentario?.trim() || null,
+    };
   }
 
   /** 403 quando o perfil não pode; 422 quando o movimento não existe. */

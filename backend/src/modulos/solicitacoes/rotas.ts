@@ -44,9 +44,16 @@ const esquemaAbertura = z.object({
   confirmarDuplicidade: z.boolean().optional(),
 });
 
+const esquemaClassificacao = z.object({
+  causaId: z.string().uuid('Causa inválida'),
+  detalhe: opcional(80),
+  comentario: opcional(1000),
+});
+
 const esquemaStatus = z.object({
   status: z.enum(STATUS, { message: 'Status inválido' }),
   observacao: z.string().max(2000).optional(),
+  classificacao: esquemaClassificacao.optional(),
 });
 
 const esquemaPrioridade = z.object({
@@ -137,9 +144,25 @@ export function rotasDeSolicitacoes(opcoes: {
   });
 
   rotas.post('/:id/status', async (req, res) => {
-    const { status, observacao } = validar(esquemaStatus, req.body);
+    const { status, observacao, classificacao } = validar(
+      esquemaStatus,
+      req.body,
+    );
     res.json(
-      await servico.mudarStatus(usuarioDa(req), idDa(req), status, observacao),
+      await servico.mudarStatus(
+        usuarioDa(req),
+        idDa(req),
+        status,
+        observacao,
+        classificacao,
+      ),
+    );
+  });
+
+  rotas.put('/:id/causa', async (req, res) => {
+    const classificacao = validar(esquemaClassificacao, req.body);
+    res.json(
+      await servico.classificar(usuarioDa(req), idDa(req), classificacao),
     );
   });
 

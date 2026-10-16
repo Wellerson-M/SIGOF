@@ -69,6 +69,17 @@ const DADOS: Indicadores = {
     abertas: i,
     resolvidas: i % 2,
   })),
+  porCausa: [
+    {
+      causa: 'Erro de digitação',
+      total: 3,
+      detalhes: [
+        { detalhe: 'Bruno', total: 2 },
+        { detalhe: 'Ana', total: 1 },
+      ],
+    },
+  ],
+  resolvidasSemCausa: 1,
 };
 
 beforeEach(() => {
@@ -110,6 +121,11 @@ describe('página de indicadores', () => {
     expect(screen.getByText('André')).toBeInTheDocument();
     expect(
       screen.getByText(/abertas mesmo com o alerta de duplicidade/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Erro de digitação')).toBeInTheDocument();
+    expect(screen.getByText('Bruno')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 resolvida(s) sem a causa informada.'),
     ).toBeInTheDocument();
     expect(calcular).toHaveBeenCalledWith(30);
 
