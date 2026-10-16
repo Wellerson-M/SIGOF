@@ -21,7 +21,8 @@ export interface ConfiguracaoDeEmail {
   usuario: string | null;
   temSenha: boolean;
   nomeDoRemetente: string | null;
-  caixaCentral: string | null;
+  /** Recebem cópia de tudo (registro e backup). */
+  caixasCentrais: string[];
 }
 
 export interface AlteracaoDeEmail {
@@ -33,7 +34,7 @@ export interface AlteracaoDeEmail {
   /** Só quando for trocar; ausente mantém a senha guardada. */
   senha?: string | undefined;
   nomeDoRemetente?: string | null | undefined;
-  caixaCentral?: string | null | undefined;
+  caixasCentrais?: string[] | undefined;
 }
 
 export interface EnvioRegistrado {
@@ -75,7 +76,7 @@ export class ServicoDeConfiguracaoDeEmail {
       usuario: e.smtpUsuario,
       temSenha: e.smtpSenhaCifrada !== null,
       nomeDoRemetente: e.emailRemetenteNome,
-      caixaCentral: e.emailCaixaCentral,
+      caixasCentrais: e.emailsCaixaCentral,
     };
   }
 
@@ -95,7 +96,16 @@ export class ServicoDeConfiguracaoDeEmail {
       tlsDireto: alteracao.tlsDireto,
       usuario: vazioViraNulo(alteracao.usuario)?.toLowerCase(),
       nomeDoRemetente: vazioViraNulo(alteracao.nomeDoRemetente),
-      caixaCentral: vazioViraNulo(alteracao.caixaCentral)?.toLowerCase(),
+      caixasCentrais:
+        alteracao.caixasCentrais === undefined
+          ? undefined
+          : [
+              ...new Set(
+                alteracao.caixasCentrais
+                  .map((c) => c.trim().toLowerCase())
+                  .filter(Boolean),
+              ),
+            ],
     };
     const senhaNova = alteracao.senha?.trim() ? alteracao.senha.trim() : null;
 
@@ -127,8 +137,8 @@ export class ServicoDeConfiguracaoDeEmail {
     if (novos.usuario !== undefined) dados.smtpUsuario = novos.usuario;
     if (novos.nomeDoRemetente !== undefined)
       dados.emailRemetenteNome = novos.nomeDoRemetente;
-    if (novos.caixaCentral !== undefined)
-      dados.emailCaixaCentral = novos.caixaCentral;
+    if (novos.caixasCentrais !== undefined)
+      dados.emailsCaixaCentral = novos.caixasCentrais;
     if (senhaNova !== null)
       dados.smtpSenhaCifrada = this.cifra.cifrar(senhaNova);
 

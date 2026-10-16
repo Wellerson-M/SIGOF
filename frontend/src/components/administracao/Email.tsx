@@ -27,7 +27,8 @@ interface Formulario {
   usuario: string;
   senha: string;
   nomeDoRemetente: string;
-  caixaCentral: string;
+  /** Um endereço por linha. */
+  caixasCentrais: string;
 }
 
 function paraFormulario(c: ConfiguracaoDeEmail): Formulario {
@@ -39,7 +40,7 @@ function paraFormulario(c: ConfiguracaoDeEmail): Formulario {
     usuario: c.usuario ?? '',
     senha: '',
     nomeDoRemetente: c.nomeDoRemetente ?? '',
-    caixaCentral: c.caixaCentral ?? '',
+    caixasCentrais: c.caixasCentrais.join('\n'),
   };
 }
 
@@ -121,7 +122,10 @@ export function Email() {
         usuario: formulario.usuario,
         ...(formulario.senha ? { senha: formulario.senha } : {}),
         nomeDoRemetente: formulario.nomeDoRemetente,
-        caixaCentral: formulario.caixaCentral,
+        caixasCentrais: formulario.caixasCentrais
+          .split(/[\n,;]/)
+          .map((linha) => linha.trim())
+          .filter(Boolean),
       });
       setConfig(dados);
       setFormulario(paraFormulario(dados));
@@ -146,17 +150,22 @@ export function Email() {
             Caixa central
           </legend>
           <label className={ROTULO}>
-            E-mail que recebe cópia de tudo
-            <input
-              type="email"
-              value={formulario.caixaCentral}
-              onChange={(e) => mudar({ caixaCentral: e.target.value })}
-              placeholder="ocorrencias@suaempresa.com.br"
-              className={CAMPO}
+            E-mails que recebem cópia de tudo
+            <textarea
+              value={formulario.caixasCentrais}
+              onChange={(e) => mudar({ caixasCentrais: e.target.value })}
+              rows={3}
+              placeholder={
+                'ocorrencias@suaempresa.com.br\ngerente@suaempresa.com.br'
+              }
+              className="rounded-md border border-borda bg-superficie px-3 py-2 text-sm text-texto"
             />
             <span className="text-xs font-normal text-texto-suave">
-              Registro de cada abertura e movimentação. Quem abriu a solicitação
-              e o responsável também recebem.
+              Um por linha (até 10). Recebem cada abertura e movimentação, como
+              registro. Além deles, recebem o e-mail cadastrado de quem abriu a
+              solicitação e do responsável; quem fez a movimentação não recebe
+              aviso do que ele mesmo fez. Nota interna e registro rápido não
+              saem por e-mail.
             </span>
           </label>
         </fieldset>

@@ -92,15 +92,20 @@ export class ServicoDeAvisos {
       return;
     }
 
+    // Para quem vai: as caixas centrais configuradas pelo administrador e,
+    // do cadastro de usuários, quem abriu e o responsável (se ativos)
+    const caixas = s.empresa.emailsCaixaCentral;
     const para = this.enderecos(
       [
-        s.empresa.emailCaixaCentral,
+        ...caixas,
         s.solicitante.ativo ? s.solicitante.email : null,
         s.responsavel?.ativo ? s.responsavel.email : null,
       ],
-      // Quem fez a movimentação não precisa ser avisado dela; a caixa
-      // central recebe sempre, como registro
-      s.empresa.emailCaixaCentral === quemFez.email ? null : quemFez.email,
+      // Quem fez a movimentação não precisa ser avisado dela; as caixas
+      // centrais recebem sempre, como registro
+      caixas.some((c) => c.toLowerCase() === quemFez.email.toLowerCase())
+        ? null
+        : quemFez.email,
     );
     if (para.length === 0) {
       return;

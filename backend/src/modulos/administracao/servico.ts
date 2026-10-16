@@ -1,4 +1,8 @@
-import { Prisma, type PrismaClient } from '@prisma/client';
+import {
+  Prisma,
+  type AcaoDeAuditoria,
+  type PrismaClient,
+} from '@prisma/client';
 import type { Perfil } from '../../dominio/status.js';
 import {
   ErroDeConflito,
@@ -8,6 +12,7 @@ import {
 import { gerarHashDeSenha } from '../../seguranca/senha.js';
 import { diferencas, registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
+import { inicioDoDia } from '../solicitacoes/servico.js';
 import { gerarSenhaProvisoria } from './senha-provisoria.js';
 
 export type Area = 'FINANCEIRO' | 'COMERCIAL' | 'OPERACIONAL';
@@ -77,6 +82,17 @@ export interface EventoDaTrilha {
 }
 
 export const EVENTOS_POR_PAGINA = 50;
+
+export interface FiltrosDaTrilha {
+  acoes?: AcaoDeAuditoria[] | undefined;
+  /** Eventos feitos por essa pessoa ou sobre ela. */
+  usuarioId?: string | undefined;
+  /** "AAAA-MM-DD", no fuso da empresa; o "até" inclui o dia inteiro. */
+  de?: string | undefined;
+  ate?: string | undefined;
+}
+
+const DIA = 24 * 60 * 60 * 1000;
 
 const camposDoUsuario = {
   id: true,
@@ -354,8 +370,37 @@ export class ServicoDeAdministracao {
   async trilha(
     admin: UsuarioAutenticado,
     pagina = 1,
+    filtros: FiltrosDaTrilha = {},
   ): Promise<{ eventos: EventoDaTrilha[]; total: number; pagina: number }> {
-    const onde = { empresaId: admin.empresaId };
+    const { fusoHorario } = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: admin.empresaId },
+      select: { fusoHorario: true },
+    });
+    const onde: Prisma.EventoAuditoriaWhereInput = {
+      empresaId: admin.empresaId,
+      ...(filtros.acoes?.length ? { acao: { in: filtros.acoes } } : {}),
+      ...(filtros.usuarioId
+        ? {
+            OR: [{ autorId: filtros.usuarioId }, { alvoId: filtros.usuarioId }],
+          }
+        : {}),
+      ...(filtros.de || filtros.ate
+        ? {
+            criadoEm: {
+              ...(filtros.de
+                ? { gte: inicioDoDia(filtros.de, fusoHorario) }
+                : {}),
+              ...(filtros.ate
+                ? {
+                    lt: new Date(
+                      inicioDoDia(filtros.ate, fusoHorario).getTime() + DIA,
+                    ),
+                  }
+                : {}),
+            },
+          }
+        : {}),
+    };
     const [eventos, total] = await Promise.all([
       this.prisma.eventoAuditoria.findMany({
         where: onde,

@@ -476,6 +476,41 @@ describe.skipIf(!temBanco)('administração (integração, banco real)', () => {
       );
     });
 
+    it('filtra por ação, por pessoa (quem fez ou sobre quem) e por período', async () => {
+      const admin = await como('ADMIN');
+      const supervisor = empresa.usuarios.SUPERVISOR.id;
+
+      const recusados = await admin.get(
+        `/api/admin/auditoria?acao=LOGIN_RECUSADO,SAIDA&usuarioId=${supervisor}`,
+      );
+      expect(recusados.status).toBe(200);
+      expect(recusados.body.total).toBeGreaterThan(0);
+      for (const evento of recusados.body.eventos as {
+        acao: string;
+        autor: { id: string } | null;
+        alvo: { id: string } | null;
+      }[]) {
+        expect(['LOGIN_RECUSADO', 'SAIDA']).toContain(evento.acao);
+        expect([evento.autor?.id, evento.alvo?.id]).toContain(supervisor);
+      }
+
+      const hoje = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+      }).format(new Date());
+      const deHoje = await admin.get(
+        `/api/admin/auditoria?de=${hoje}&ate=${hoje}`,
+      );
+      const doAnoPassado = await admin.get(
+        '/api/admin/auditoria?de=2025-01-01&ate=2025-12-31',
+      );
+      expect(deHoje.body.total).toBeGreaterThan(0);
+      expect(doAnoPassado.body.total).toBe(0);
+
+      expect(
+        (await admin.get('/api/admin/auditoria?acao=INVENTADA')).status,
+      ).toBe(400);
+    });
+
     it('o banco recusa alterar um evento já gravado', async () => {
       const evento = await prisma.eventoAuditoria.findFirstOrThrow({
         where: { empresaId: empresa.id },

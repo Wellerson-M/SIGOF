@@ -54,7 +54,16 @@ export type AcaoDeAuditoria =
   | 'USUARIO_CRIADO'
   | 'USUARIO_ALTERADO'
   | 'SENHA_REDEFINIDA'
-  | 'EMPRESA_ALTERADA';
+  | 'EMPRESA_ALTERADA'
+  | 'EMAIL_CONFIGURADO'
+  | 'CADASTRO_ALTERADO';
+
+export interface FiltrosDaTrilha {
+  acoes?: AcaoDeAuditoria[];
+  usuarioId?: string;
+  de?: string;
+  ate?: string;
+}
 
 export interface EventoDaTrilha {
   id: string;
@@ -96,8 +105,14 @@ export const admin = {
   alterarEmpresa: (
     alteracao: Partial<Omit<ParametrosDaEmpresa, 'cnpj' | 'slug'>>,
   ) => pedir<ParametrosDaEmpresa>('/admin/empresa', json('PATCH', alteracao)),
-  auditoria: (pagina: number) =>
-    pedir<PaginaDaTrilha>(`/admin/auditoria?pagina=${pagina}`),
+  auditoria: (pagina: number, filtros: FiltrosDaTrilha = {}) => {
+    const consulta = new URLSearchParams({ pagina: String(pagina) });
+    if (filtros.acoes?.length) consulta.set('acao', filtros.acoes.join(','));
+    if (filtros.usuarioId) consulta.set('usuarioId', filtros.usuarioId);
+    if (filtros.de) consulta.set('de', filtros.de);
+    if (filtros.ate) consulta.set('ate', filtros.ate);
+    return pedir<PaginaDaTrilha>(`/admin/auditoria?${consulta.toString()}`);
+  },
 };
 
 export function trocarMinhaSenha(senhaAtual: string, novaSenha: string) {
@@ -136,7 +151,28 @@ export const NOME_DA_ACAO: Record<AcaoDeAuditoria, string> = {
   USUARIO_ALTERADO: 'Usuário alterado',
   SENHA_REDEFINIDA: 'Senha redefinida',
   EMPRESA_ALTERADA: 'Parâmetros alterados',
+  EMAIL_CONFIGURADO: 'E-mail configurado',
+  CADASTRO_ALTERADO: 'Cadastro alterado',
 };
+
+/** Grupos do filtro da auditoria: o que o administrador costuma procurar. */
+export const GRUPOS_DE_ACAO: { rotulo: string; acoes: AcaoDeAuditoria[] }[] = [
+  { rotulo: 'Entradas e saídas', acoes: ['LOGIN', 'SAIDA'] },
+  { rotulo: 'Logins recusados', acoes: ['LOGIN_RECUSADO'] },
+  {
+    rotulo: 'Usuários e senhas',
+    acoes: [
+      'USUARIO_CRIADO',
+      'USUARIO_ALTERADO',
+      'SENHA_REDEFINIDA',
+      'SENHA_ALTERADA',
+    ],
+  },
+  {
+    rotulo: 'Configurações',
+    acoes: ['EMPRESA_ALTERADA', 'EMAIL_CONFIGURADO', 'CADASTRO_ALTERADO'],
+  },
+];
 
 export const DIAS_DA_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 

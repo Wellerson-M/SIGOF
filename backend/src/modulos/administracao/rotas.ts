@@ -75,8 +75,37 @@ const esquemaAlteracaoDaEmpresa = z
   })
   .strict();
 
-const esquemaPagina = z.object({
+const ACOES = [
+  'LOGIN',
+  'LOGIN_RECUSADO',
+  'SAIDA',
+  'SENHA_ALTERADA',
+  'USUARIO_CRIADO',
+  'USUARIO_ALTERADO',
+  'SENHA_REDEFINIDA',
+  'EMPRESA_ALTERADA',
+  'EMAIL_CONFIGURADO',
+  'CADASTRO_ALTERADO',
+] as const;
+
+const data = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a data no formato AAAA-MM-DD')
+  .optional();
+
+const esquemaTrilha = z.object({
   pagina: z.coerce.number().int().min(1).max(10_000).default(1),
+  // "LOGIN,LOGIN_RECUSADO" → ['LOGIN', 'LOGIN_RECUSADO']
+  acao: z
+    .string()
+    .optional()
+    .transform((texto) =>
+      texto ? texto.split(',').filter(Boolean) : undefined,
+    )
+    .pipe(z.array(z.enum(ACOES)).optional()),
+  usuarioId: z.string().uuid('Usuário inválido').optional(),
+  de: data,
+  ate: data,
 });
 
 function idDa(req: Request): string {
@@ -134,8 +163,13 @@ export function rotasDeAdministracao(opcoes: {
   });
 
   rotas.get('/auditoria', async (req, res) => {
-    const { pagina } = validar(esquemaPagina, req.query);
-    res.json(await servico.trilha(usuarioDa(req), pagina));
+    const { pagina, acao, ...filtros } = validar(esquemaTrilha, req.query);
+    res.json(
+      await servico.trilha(usuarioDa(req), pagina, {
+        ...filtros,
+        acoes: acao,
+      }),
+    );
   });
 
   return rotas;

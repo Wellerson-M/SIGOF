@@ -294,7 +294,40 @@ describe('Auditoria', () => {
     expect(screen.getByText('senha errada')).toBeInTheDocument();
     expect(screen.getByText('Página 1 de 3')).toBeInTheDocument();
     await userEvent.click(screen.getByText('Mais antigos'));
-    expect(auditoria).toHaveBeenLastCalledWith(2);
+    expect(auditoria).toHaveBeenLastCalledWith(2, {});
+  });
+
+  it('filtra por tipo de evento, pessoa e período, voltando à página 1', async () => {
+    vi.spyOn(admin, 'usuarios').mockResolvedValue([usuario()]);
+    const auditoria = vi.spyOn(admin, 'auditoria').mockResolvedValue({
+      pagina: 1,
+      total: 0,
+      eventos: [],
+    });
+    render(<Auditoria />);
+    const usuarioDoTeste = userEvent.setup();
+
+    await usuarioDoTeste.selectOptions(
+      await screen.findByLabelText('O quê'),
+      'Logins recusados',
+    );
+    await usuarioDoTeste.selectOptions(
+      await screen.findByLabelText('Pessoa'),
+      'u1',
+    );
+    await usuarioDoTeste.type(screen.getByLabelText('De'), '2026-10-01');
+
+    expect(auditoria).toHaveBeenLastCalledWith(1, {
+      acoes: ['LOGIN_RECUSADO'],
+      usuarioId: 'u1',
+      de: '2026-10-01',
+    });
+    expect(
+      await screen.findByText('Nenhum evento com esses filtros.'),
+    ).toBeInTheDocument();
+
+    await usuarioDoTeste.click(screen.getByText('Limpar filtros'));
+    expect(auditoria).toHaveBeenLastCalledWith(1, {});
   });
 
   it('sem eventos', async () => {

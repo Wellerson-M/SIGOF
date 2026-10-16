@@ -108,9 +108,9 @@ model Empresa {
   janelaDuplicidadeDias  Int     @default(7) @map("janela_duplicidade_dias")
   /// Ao resolver, a causa do erro (controle interno) é obrigatória.
   exigirCausaAoResolver  Boolean @default(false) @map("exigir_causa_ao_resolver")
-  /// Caixa de e-mail do setor que recebe cópia de toda ocorrência e
-  /// movimentação, como registro e backup. Opcional.
-  emailCaixaCentral      String? @map("email_caixa_central")
+  /// Caixas de e-mail que recebem cópia de toda ocorrência e
+  /// movimentação, como registro e backup (o setor, o gerente...).
+  emailsCaixaCentral     String[] @default([]) @map("emails_caixa_central")
 
   // --- E-mail de saída (RF13) ---
   // Cada empresa envia pela própria conta (ex.: Gmail com senha de app),

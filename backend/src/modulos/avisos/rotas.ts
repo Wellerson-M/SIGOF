@@ -31,7 +31,10 @@ const esquemaConfiguracao = z
     usuario: emailOuNulo,
     senha: z.string().max(200).optional(),
     nomeDoRemetente: textoOuNulo(120),
-    caixaCentral: emailOuNulo,
+    caixasCentrais: z
+      .array(z.string().trim().email('E-mail inválido').max(254))
+      .max(10, 'No máximo 10 caixas centrais')
+      .optional(),
   })
   .strict();
 
