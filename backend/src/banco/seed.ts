@@ -17,6 +17,7 @@ import type {
 } from '@prisma/client';
 import { competenciaDe, formatarProtocolo } from '../dominio/protocolo.js';
 import { expedienteDaEmpresa, iniciarSla } from '../dominio/sla.js';
+import { CAUSAS_PADRAO } from '../modulos/cadastros/servico.js';
 import { gerarHashDeSenha } from '../seguranca/senha.js';
 import { criarPrismaClient } from './cliente.js';
 
@@ -100,6 +101,8 @@ async function limpar(prisma: Prisma.TransactionClient): Promise<void> {
   await prisma.anexo.deleteMany();
   await prisma.mensagem.deleteMany();
   await prisma.solicitacao.deleteMany();
+  await prisma.filial.deleteMany();
+  await prisma.causaDeErro.deleteMany();
   await prisma.sequenciaProtocolo.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.empresa.deleteMany();
@@ -124,6 +127,13 @@ async function semear(
       cnpj: '99888777000166',
       slug: 'outra-transportadora',
     },
+  });
+
+  // Toda empresa começa com a lista padrão de causas de erro
+  await prisma.causaDeErro.createMany({
+    data: [demo, outra].flatMap((empresa) =>
+      CAUSAS_PADRAO.map((causa) => ({ empresaId: empresa.id, ...causa })),
+    ),
   });
 
   const usuario = (

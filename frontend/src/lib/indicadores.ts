@@ -31,6 +31,13 @@ export interface Indicadores {
     resolvidasNoPeriodo: number;
   }[];
   porDia: { dia: string; abertas: number; resolvidas: number }[];
+  /** De quem foi o erro, entre as resolvidas no período. */
+  porCausa?: {
+    causa: string;
+    total: number;
+    detalhes: { detalhe: string; total: number }[];
+  }[];
+  resolvidasSemCausa?: number;
 }
 
 export const indicadores = {

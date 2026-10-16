@@ -163,6 +163,69 @@ describe('calcularIndicadores', () => {
   });
 });
 
+describe('por causa do erro', () => {
+  const resolvida = (
+    causa: { nome: string; detalhe: string | null } | null,
+    resolvidoEm = antes(HORA),
+  ) =>
+    s({
+      status: 'RESOLVIDO',
+      criadoEm: antes(2 * DIA),
+      resolvidoEm,
+      causa,
+    });
+
+  it('conta as resolvidas no período por causa e por "qual"', () => {
+    const resultado = calcularIndicadores(
+      [
+        resolvida({ nome: 'Erro de digitação', detalhe: 'Ana' }),
+        resolvida({ nome: 'Erro de digitação', detalhe: 'Ana' }),
+        resolvida({ nome: 'Erro de digitação', detalhe: 'Bruno' }),
+        resolvida({ nome: 'Erro de digitação', detalhe: null }),
+        resolvida({ nome: 'Erro do cliente', detalhe: null }),
+        resolvida(null),
+        // Fora do período: não entra
+        resolvida({ nome: 'Erro comercial', detalhe: null }, antes(40 * DIA)),
+        // Em aberto não tem causa ainda
+        s(),
+      ],
+      AGORA,
+      30,
+      EXPEDIENTE_PADRAO,
+    );
+
+    expect(resultado.porCausa).toEqual([
+      {
+        causa: 'Erro de digitação',
+        total: 4,
+        detalhes: [
+          { detalhe: 'Ana', total: 2 },
+          { detalhe: 'Bruno', total: 1 },
+        ],
+      },
+      { causa: 'Erro do cliente', total: 1, detalhes: [] },
+    ]);
+    expect(resultado.resolvidasSemCausa).toBe(1);
+  });
+
+  it('empate no total: ordem alfabética', () => {
+    const resultado = calcularIndicadores(
+      [
+        resolvida({ nome: 'Outros', detalhe: null }),
+        resolvida({ nome: 'Erro operacional', detalhe: null }),
+      ],
+      AGORA,
+      30,
+      EXPEDIENTE_PADRAO,
+    );
+
+    expect(resultado.porCausa.map((c) => c.causa)).toEqual([
+      'Erro operacional',
+      'Outros',
+    ]);
+  });
+});
+
 describe('CSV', () => {
   it('escapa separador e aspas e neutraliza fórmulas', () => {
     expect(celulaCsv('simples')).toBe('simples');

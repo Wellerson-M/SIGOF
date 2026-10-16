@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { EVENTO_NOTIFICACOES_LIDAS } from '@/components/Sino';
 import { ErroDaApi } from '@/lib/api';
+import { useSessao } from '@/lib/sessao';
 import { COR_DA_SITUACAO, NOME_DA_SITUACAO, notificacoes } from '@/lib/avisos';
 import {
   ACAO_PARA,
@@ -21,8 +22,12 @@ import {
   type Prioridade,
   type Status,
 } from '@/lib/solicitacoes';
-import { Anexos } from './Anexos';
-import { DialogoDeObservacao } from './DialogoDeObservacao';
+import { Anexos, enviarAnexos } from './Anexos';
+import { CausaDoErro } from './CausaDoErro';
+import {
+  DialogoDeObservacao,
+  type ExtrasDaResolucao,
+} from './DialogoDeObservacao';
 import {
   EtiquetaDePrioridade,
   EtiquetaDeStatus,
@@ -34,6 +39,7 @@ const SELECAO =
 
 /** Tudo de uma solicitação: dados, ações, conversa e histórico. */
 export function DetalheDaSolicitacao({ id }: { id: string }) {
+  const { usuario } = useSessao();
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const [naoExiste, setNaoExiste] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -104,6 +110,21 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
     } finally {
       setOcupado(false);
     }
+  }
+
+  /** Anexa o documento final (se houver) e só então move. */
+  async function resolverCom(
+    para: Status,
+    observacao: string,
+    extras: ExtrasDaResolucao,
+  ) {
+    if (extras.arquivos.length > 0) {
+      const erros = await enviarAnexos(id, extras.arquivos);
+      if (erros.length > 0) {
+        throw new ErroDaApi(422, 'ANEXO', erros.join('; '));
+      }
+    }
+    await api.mover(id, para, observacao, extras.classificacao);
   }
 
   function mover(para: Status) {
@@ -297,6 +318,16 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
             </dl>
           </section>
 
+          {(detalhe.causa || detalhe.pode.classificar) && (
+            <CausaDoErro
+              causa={detalhe.causa}
+              podeAlterar={detalhe.pode.classificar}
+              aoSalvar={(classificacao) =>
+                executar(() => api.classificar(id, classificacao))
+              }
+            />
+          )}
+
           <section className="rounded-lg border border-borda bg-superficie p-4">
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">
               Histórico
@@ -359,11 +390,13 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
         <DialogoDeObservacao
           titulo={`${ACAO_PARA[pendente]} — ${detalhe.protocolo}`}
           pergunta={PEDE_OBSERVACAO[pendente] ?? ''}
+          resolucao={pendente === 'RESOLVIDO'}
+          exigirCausa={usuario.empresa.exigirCausaAoResolver ?? false}
           aoFechar={() => setPendente(null)}
-          aoConfirmar={(observacao) => {
+          aoConfirmar={(observacao, extras) => {
             const para = pendente;
             setPendente(null);
-            void executar(() => api.mover(id, para, observacao));
+            void executar(() => resolverCom(para, observacao, extras));
           }}
         />
       )}

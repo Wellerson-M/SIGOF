@@ -22,7 +22,11 @@ import {
   type Resumo,
   type Status,
 } from '@/lib/solicitacoes';
-import { DialogoDeObservacao } from './DialogoDeObservacao';
+import { enviarAnexos } from './Anexos';
+import {
+  DialogoDeObservacao,
+  type ExtrasDaResolucao,
+} from './DialogoDeObservacao';
 import { AlternarVisao } from './Lista';
 import { EtiquetaDePrioridade, IndicadorDeSla } from './Etiquetas';
 
@@ -82,8 +86,22 @@ export function Quadro() {
     return () => clearInterval(intervalo);
   }, [busca, carregar]);
 
-  async function mover(item: Resumo, para: Status, observacao?: string) {
+  async function mover(
+    item: Resumo,
+    para: Status,
+    observacao?: string,
+    extras?: ExtrasDaResolucao,
+  ) {
     setAviso(null);
+    // O documento final vai antes de resolver: depois de resolvida, a
+    // solicitação não recebe mais anexos
+    if (extras && extras.arquivos.length > 0) {
+      const erros = await enviarAnexos(item.id, extras.arquivos);
+      if (erros.length > 0) {
+        setAviso(`${item.protocolo}: ${erros.join('; ')}`);
+        return;
+      }
+    }
     const antes = itens;
     // Mostra o cartão na coluna nova na hora; se a API recusar, volta
     setItens(
@@ -93,7 +111,12 @@ export function Quadro() {
         ) ?? null,
     );
     try {
-      const atualizado = await api.mover(item.id, para, observacao);
+      const atualizado = await api.mover(
+        item.id,
+        para,
+        observacao,
+        extras?.classificacao,
+      );
       setItens(
         (atuais) =>
           atuais?.map((i) => (i.id === item.id ? atualizado : i)) ?? null,
@@ -236,11 +259,13 @@ export function Quadro() {
         <DialogoDeObservacao
           titulo={`${ACAO_PARA[pendente.para]} — ${pendente.item.protocolo}`}
           pergunta={PEDE_OBSERVACAO[pendente.para] ?? ''}
+          resolucao={pendente.para === 'RESOLVIDO'}
+          exigirCausa={usuario.empresa.exigirCausaAoResolver ?? false}
           aoFechar={() => setPendente(null)}
-          aoConfirmar={(observacao) => {
+          aoConfirmar={(observacao, extras) => {
             const { item, para } = pendente;
             setPendente(null);
-            void mover(item, para, observacao);
+            void mover(item, para, observacao, extras);
           }}
         />
       )}

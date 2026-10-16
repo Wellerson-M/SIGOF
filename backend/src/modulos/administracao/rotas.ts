@@ -71,6 +71,7 @@ const esquemaAlteracaoDaEmpresa = z
       .max(7 * 24 * 60, 'O prazo máximo é de 7 dias')
       .optional(),
     janelaDuplicidadeDias: z.number().int().min(0).max(90).optional(),
+    exigirCausaAoResolver: z.boolean().optional(),
   })
   .strict();
 

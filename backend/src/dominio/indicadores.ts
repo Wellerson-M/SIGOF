@@ -30,6 +30,8 @@ export interface SolicitacaoParaIndicadores {
   slaMinutosPausados: number;
   responsavel: { id: string; nome: string } | null;
   abertaComAlertaDeDuplicidade: boolean;
+  /** Causa do erro registrada ao resolver (controle interno). */
+  causa?: { nome: string; detalhe: string | null } | null | undefined;
 }
 
 export interface Indicadores {
@@ -60,6 +62,16 @@ export interface Indicadores {
     resolvidasNoPeriodo: number;
   }[];
   porDia: { dia: string; abertas: number; resolvidas: number }[];
+  /**
+   * De quem foi o erro, entre as resolvidas no período, com o "qual"
+   * (ex.: cada digitador) quando a causa tem opções.
+   */
+  porCausa: {
+    causa: string;
+    total: number;
+    detalhes: { detalhe: string; total: number }[];
+  }[];
+  resolvidasSemCausa: number;
 }
 
 const MINUTO = 60_000;
@@ -186,6 +198,45 @@ export function calcularIndicadores(
     if (dia) dia.resolvidas += 1;
   }
 
+  const causas = new Map<
+    string,
+    { total: number; detalhes: Map<string, number> }
+  >();
+  let resolvidasSemCausa = 0;
+  for (const s of resolvidasNoPeriodo) {
+    if (!s.causa) {
+      resolvidasSemCausa += 1;
+      continue;
+    }
+    const linha = causas.get(s.causa.nome) ?? {
+      total: 0,
+      detalhes: new Map<string, number>(),
+    };
+    linha.total += 1;
+    if (s.causa.detalhe) {
+      linha.detalhes.set(
+        s.causa.detalhe,
+        (linha.detalhes.get(s.causa.detalhe) ?? 0) + 1,
+      );
+    }
+    causas.set(s.causa.nome, linha);
+  }
+  const maisPrimeiro = (
+    a: { total: number; nome: string },
+    b: { total: number; nome: string },
+  ) => b.total - a.total || a.nome.localeCompare(b.nome);
+  const porCausa = [...causas.entries()]
+    .map(([nome, linha]) => ({ nome, ...linha }))
+    .sort(maisPrimeiro)
+    .map(({ nome, total, detalhes }) => ({
+      causa: nome,
+      total,
+      detalhes: [...detalhes.entries()]
+        .map(([detalhe, n]) => ({ nome: detalhe, total: n }))
+        .sort(maisPrimeiro)
+        .map(({ nome: detalhe, total: n }) => ({ detalhe, total: n })),
+    }));
+
   return {
     periodo: { dias, de, ate: agora },
     agora: { abertas, porStatus, slaVencido, semResponsavel },
@@ -223,6 +274,8 @@ export function calcularIndicadores(
           (a.emAberto + a.resolvidasNoPeriodo) || a.nome.localeCompare(b.nome),
     ),
     porDia: [...porDia.entries()].map(([dia, n]) => ({ dia, ...n })),
+    porCausa,
+    resolvidasSemCausa,
   };
 }
 

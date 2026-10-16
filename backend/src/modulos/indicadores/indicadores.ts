@@ -75,6 +75,7 @@ export class ServicoDeIndicadores {
         extra.protocolo,
         dataHora(s.criadoEm),
         NOME_DO_TIPO[s.tipo],
+        extra.filial,
         extra.cte,
         extra.nf,
         NOME_DO_STATUS[s.status],
@@ -85,6 +86,9 @@ export class ServicoDeIndicadores {
         dataHora(s.assumidaEm),
         dataHora(s.resolvidoEm),
         atendidaNoPrazo(s),
+        s.causa?.nome ?? null,
+        s.causa?.detalhe ?? null,
+        extra.causaComentario,
       ]);
 
     return montarCsv(
@@ -92,6 +96,7 @@ export class ServicoDeIndicadores {
         'Protocolo',
         'Aberta em',
         'Tipo',
+        'Filial',
         'CTe',
         'NF',
         'Status',
@@ -102,6 +107,9 @@ export class ServicoDeIndicadores {
         'Assumida em',
         'Resolvida em',
         'Atendida no prazo',
+        'Causa do erro',
+        'Qual',
+        'Comentário da causa',
       ],
       linhas,
     );
@@ -139,6 +147,8 @@ export class ServicoDeIndicadores {
         include: {
           responsavel: { select: { id: true, nome: true } },
           solicitante: { select: { nome: true } },
+          filial: { select: { nome: true } },
+          causa: { select: { nome: true } },
           historicos: {
             where: {
               OR: [
@@ -179,12 +189,15 @@ export class ServicoDeIndicadores {
         (h) =>
           h.statusAnterior === null && h.observacao === ALERTA_DE_DUPLICIDADE,
       ),
+      causa: r.causa ? { nome: r.causa.nome, detalhe: r.causaDetalhe } : null,
     }));
     const extras = registros.map((r) => ({
       protocolo: r.protocolo,
       cte: r.cte,
       nf: r.nf,
       solicitante: r.solicitante.nome,
+      filial: r.filial?.nome ?? null,
+      causaComentario: r.causaComentario,
     }));
 
     return { empresa, solicitacoes, extras, agora };

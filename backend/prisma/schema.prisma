@@ -106,6 +106,8 @@ model Empresa {
   slaAtendimentoMinutos  Int     @default(240) @map("sla_atendimento_minutos")
   /// Janela de detecção de duplicidade de CTe/NF, em dias corridos.
   janelaDuplicidadeDias  Int     @default(7) @map("janela_duplicidade_dias")
+  /// Ao resolver, a causa do erro (controle interno) é obrigatória.
+  exigirCausaAoResolver  Boolean @default(false) @map("exigir_causa_ao_resolver")
   /// Caixa de e-mail do setor que recebe cópia de toda ocorrência e
   /// movimentação, como registro e backup. Opcional.
   emailCaixaCentral      String? @map("email_caixa_central")
@@ -137,6 +139,7 @@ model Empresa {
   auditoria    EventoAuditoria[]
   emails       EmailSaida[]
   filiais      Filial[]
+  causas       CausaDeErro[]
 
   @@map("empresas")
 }
@@ -249,10 +252,18 @@ model Solicitacao {
   atualizadoEm DateTime  @updatedAt @map("atualizado_em")
   resolvidoEm  DateTime? @map("resolvido_em")
 
+  // --- Causa do erro (controle interno; nunca vai para e-mail nem para o
+  // solicitante). Informada ao resolver. O detalhe é gravado como texto:
+  // se a lista de opções mudar, o registro antigo continua dizendo o que foi.
+  causaId         String? @map("causa_id")
+  causaDetalhe    String? @map("causa_detalhe")
+  causaComentario String? @map("causa_comentario")
+
   empresa     Empresa  @relation(fields: [empresaId], references: [id])
   solicitante Usuario  @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])
   responsavel Usuario? @relation("SolicitacoesAtribuidas", fields: [responsavelId], references: [id])
   filial      Filial?  @relation(fields: [filialId], references: [id])
+  causa       CausaDeErro? @relation(fields: [causaId], references: [id])
 
   mensagens    Mensagem[]
   anexos       Anexo[]
@@ -284,6 +295,29 @@ model Filial {
 
   @@unique([empresaId, nome])
   @@map("filiais")
+}
+
+/// De quem foi o erro que gerou a solicitação, para o controle interno da
+/// empresa (quantos erros de digitação, de cliente, comerciais...). Cada
+/// empresa monta a sua lista.
+model CausaDeErro {
+  id        String   @id @default(uuid())
+  empresaId String   @map("empresa_id")
+  nome      String
+  /// Escolhas do "qual" (ex.: os digitadores em "Erro de digitação").
+  /// Vazio: a causa não tem detalhe a escolher.
+  opcoes    String[] @default([])
+  /// Como o "qual" aparece na tela (ex.: "Digitador").
+  rotuloDasOpcoes String? @map("rotulo_das_opcoes")
+  ordem     Int      @default(0)
+  ativa     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  empresa      Empresa       @relation(fields: [empresaId], references: [id])
+  solicitacoes Solicitacao[]
+
+  @@unique([empresaId, nome])
+  @@map("causas_de_erro")
 }
 
 /// Contador de protocolo por empresa/ano/mês.

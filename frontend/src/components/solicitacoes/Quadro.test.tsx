@@ -99,7 +99,12 @@ describe('Quadro', () => {
     });
     arrastar(cartao, coluna('Em andamento'));
 
-    expect(mover).toHaveBeenCalledWith('s1', 'EM_ANDAMENTO', undefined);
+    expect(mover).toHaveBeenCalledWith(
+      's1',
+      'EM_ANDAMENTO',
+      undefined,
+      undefined,
+    );
     expect(
       await within(coluna('Em andamento')).findByText('SOL-2026-10-0001'),
     ).toBeInTheDocument();
@@ -149,6 +154,7 @@ describe('Quadro', () => {
       's2',
       'RESOLVIDO',
       'CTe substituto emitido',
+      undefined,
     );
     expect(screen.queryByRole('dialog')).toBeNull();
   });

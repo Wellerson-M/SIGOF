@@ -10,6 +10,25 @@ export interface Filial {
   ativa: boolean;
 }
 
+/** De quem foi o erro (controle interno; o solicitante não vê). */
+export interface CausaDeErro {
+  id: string;
+  nome: string;
+  /** Escolhas do "qual" (ex.: os digitadores). Vazio: sem detalhe. */
+  opcoes: string[];
+  rotuloDasOpcoes: string | null;
+  ordem: number;
+  ativa: boolean;
+}
+
+export interface DadosDaCausa {
+  nome?: string;
+  opcoes?: string[];
+  rotuloDasOpcoes?: string | null;
+  ordem?: number;
+  ativa?: boolean;
+}
+
 const json = (corpo: unknown) => ({ body: JSON.stringify(corpo) });
 
 export const cadastros = {
@@ -19,6 +38,18 @@ export const cadastros = {
     pedir<Filial>('/cadastros/filiais', { method: 'POST', ...json({ nome }) }),
   alterarFilial: (id: string, alteracao: { nome?: string; ativa?: boolean }) =>
     pedir<Filial>(`/cadastros/filiais/${id}`, {
+      method: 'PATCH',
+      ...json(alteracao),
+    }),
+  causas: (todas = false) =>
+    pedir<CausaDeErro[]>(`/cadastros/causas${todas ? '?todas=1' : ''}`),
+  criarCausa: (dados: DadosDaCausa & { nome: string }) =>
+    pedir<CausaDeErro>('/cadastros/causas', {
+      method: 'POST',
+      ...json(dados),
+    }),
+  alterarCausa: (id: string, alteracao: DadosDaCausa) =>
+    pedir<CausaDeErro>(`/cadastros/causas/${id}`, {
       method: 'PATCH',
       ...json(alteracao),
     }),

@@ -83,6 +83,8 @@ export interface EmailEnviado {
 export interface Detalhe extends Resumo {
   pagadorCorreto: string | null;
   resolvidoEm: string | null;
+  /** De quem foi o erro; null para o solicitante e quando não informada. */
+  causa: CausaRegistrada | null;
   historico: Evento[];
   mensagens: Mensagem[];
   emails: EmailEnviado[];
@@ -91,6 +93,7 @@ export interface Detalhe extends Resumo {
     mudarPrioridade: boolean;
     atribuir: boolean;
     comentarInterno: boolean;
+    classificar: boolean;
   };
 }
 
@@ -127,6 +130,20 @@ export function consultaDaLista(filtros: FiltrosDaLista): string {
   return parametros.toString();
 }
 
+/** De quem foi o erro, informado ao resolver (só a equipe vê). */
+export interface Classificacao {
+  causaId: string;
+  detalhe?: string;
+  comentario?: string;
+}
+
+export interface CausaRegistrada {
+  id: string;
+  nome: string;
+  detalhe: string | null;
+  comentario: string | null;
+}
+
 export interface Duplicidade {
   id: string;
   protocolo: string;
@@ -161,10 +178,20 @@ export const api = {
   detalhar: (id: string) => pedir<Detalhe>(`/solicitacoes/${id}`),
   abrir: (dados: DadosDeAbertura) =>
     pedir<Resumo>('/solicitacoes', { method: 'POST', ...json(dados) }),
-  mover: (id: string, status: Status, observacao?: string) =>
+  mover: (
+    id: string,
+    status: Status,
+    observacao?: string,
+    classificacao?: Classificacao,
+  ) =>
     pedir<Resumo>(`/solicitacoes/${id}/status`, {
       method: 'POST',
-      ...json({ status, observacao }),
+      ...json({ status, observacao, classificacao }),
+    }),
+  classificar: (id: string, classificacao: Classificacao) =>
+    pedir<CausaRegistrada>(`/solicitacoes/${id}/causa`, {
+      method: 'PUT',
+      ...json(classificacao),
     }),
   priorizar: (id: string, prioridade: Prioridade) =>
     pedir<Resumo>(`/solicitacoes/${id}/prioridade`, {

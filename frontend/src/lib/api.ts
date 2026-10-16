@@ -16,7 +16,12 @@ export interface UsuarioLogado {
   area: 'FINANCEIRO' | 'COMERCIAL' | 'OPERACIONAL' | null;
   /** Ainda com a senha provisória: precisa trocar antes de usar o sistema. */
   trocarSenha: boolean;
-  empresa: { razaoSocial: string; slug: string };
+  empresa: {
+    razaoSocial: string;
+    slug: string;
+    /** Ao resolver, a causa do erro é obrigatória (a empresa decide). */
+    exigirCausaAoResolver?: boolean;
+  };
 }
 
 /** Erro devolvido pela API, com a mensagem pronta para mostrar ao usuário. */

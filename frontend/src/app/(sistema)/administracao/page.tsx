@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Auditoria } from '@/components/administracao/Auditoria';
+import { Causas } from '@/components/administracao/Causas';
 import { Email } from '@/components/administracao/Email';
 import { Filiais } from '@/components/administracao/Filiais';
 import { ParametrosDaEmpresa } from '@/components/administracao/ParametrosDaEmpresa';
@@ -13,6 +14,7 @@ const ABAS = [
   { id: 'usuarios', rotulo: 'Usuários' },
   { id: 'empresa', rotulo: 'Empresa e expediente' },
   { id: 'filiais', rotulo: 'Filiais' },
+  { id: 'causas', rotulo: 'Causas de erro' },
   { id: 'email', rotulo: 'E-mail' },
   { id: 'auditoria', rotulo: 'Auditoria' },
   { id: 'sistema', rotulo: 'Sistema' },
@@ -65,6 +67,7 @@ export default function PaginaDeAdministracao() {
         {aba === 'usuarios' && <Usuarios />}
         {aba === 'empresa' && <ParametrosDaEmpresa />}
         {aba === 'filiais' && <Filiais />}
+        {aba === 'causas' && <Causas />}
         {aba === 'email' && <Email />}
         {aba === 'auditoria' && <Auditoria />}
         {aba === 'sistema' && <Sistema />}

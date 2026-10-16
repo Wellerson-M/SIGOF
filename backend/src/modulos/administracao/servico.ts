@@ -58,6 +58,7 @@ export interface ParametrosDaEmpresa {
   diasUteis: number[];
   slaAtendimentoMinutos: number;
   janelaDuplicidadeDias: number;
+  exigirCausaAoResolver: boolean;
 }
 
 export type AlteracaoDaEmpresa = {
@@ -104,6 +105,7 @@ const camposDaEmpresa = {
   diasUteis: true,
   slaAtendimentoMinutos: true,
   janelaDuplicidadeDias: true,
+  exigirCausaAoResolver: true,
 } satisfies Prisma.EmpresaSelect;
 
 /**

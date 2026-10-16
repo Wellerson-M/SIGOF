@@ -178,7 +178,13 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
         perfil: true,
         area: true,
         trocarSenha: true,
-        empresa: { select: { razaoSocial: true, slug: true } },
+        empresa: {
+          select: {
+            razaoSocial: true,
+            slug: true,
+            exigirCausaAoResolver: true,
+          },
+        },
       },
     });
 

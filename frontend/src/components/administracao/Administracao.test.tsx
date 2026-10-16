@@ -55,6 +55,7 @@ const PARAMETROS: Parametros = {
   diasUteis: [1, 2, 3, 4, 5],
   slaAtendimentoMinutos: 240,
   janelaDuplicidadeDias: 7,
+  exigirCausaAoResolver: false,
 };
 
 beforeEach(() => {
