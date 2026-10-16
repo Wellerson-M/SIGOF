@@ -30,6 +30,8 @@ export interface SolicitacaoParaIndicadores {
   slaMinutosPausados: number;
   responsavel: { id: string; nome: string } | null;
   abertaComAlertaDeDuplicidade: boolean;
+  /** Já resolvida por fora: não conta no tempo até resolver. */
+  registroRapido?: boolean | undefined;
   /** Causa do erro registrada ao resolver (controle interno). */
   causa?: { nome: string; detalhe: string | null } | null | undefined;
 }
@@ -53,6 +55,8 @@ export interface Indicadores {
     minutosMedioAteAssumir: number | null;
     minutosMedioAteResolver: number | null;
     abertasComAlertaDeDuplicidade: number;
+    /** Registradas já resolvidas (resolvidas por fora). */
+    registrosRapidos: number;
   };
   porTipo: { tipo: Tipo; total: number }[];
   porResponsavel: {
@@ -257,14 +261,18 @@ export function calcularIndicadores(
         ),
       ),
       minutosMedioAteResolver: media(
-        resolvidasNoPeriodo.map(
-          (s) =>
-            ((s.resolvidoEm as Date).getTime() - s.criadoEm.getTime()) / MINUTO,
-        ),
+        resolvidasNoPeriodo
+          .filter((s) => !s.registroRapido)
+          .map(
+            (s) =>
+              ((s.resolvidoEm as Date).getTime() - s.criadoEm.getTime()) /
+              MINUTO,
+          ),
       ),
       abertasComAlertaDeDuplicidade: abertasNoPeriodo.filter(
         (s) => s.abertaComAlertaDeDuplicidade,
       ).length,
+      registrosRapidos: abertasNoPeriodo.filter((s) => s.registroRapido).length,
     },
     porTipo,
     porResponsavel: [...responsaveis.values()].sort(

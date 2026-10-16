@@ -40,6 +40,7 @@ function item(n: number): Resumo {
     solicitante: { id: 'x', nome: 'Sofia' },
     responsavel: n % 2 ? { id: 'eu', nome: 'André' } : null,
     filial: null,
+    registroRapido: false,
     criadoEm: '2026-08-10T12:00:00Z',
     atualizadoEm: '2026-08-10T12:00:00Z',
     slaVenceEm: null,

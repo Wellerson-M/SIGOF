@@ -16,13 +16,11 @@ const DIGITACAO: CausaDeErro = {
 describe('Causas', () => {
   it('lista, cria e edita as opções (uma por linha)', async () => {
     vi.spyOn(cadastros, 'causas').mockResolvedValue([DIGITACAO]);
-    const criar = vi
-      .spyOn(cadastros, 'criarCausa')
-      .mockResolvedValue({
-        ...DIGITACAO,
-        id: 'novo',
-        nome: 'Erro de cadastro',
-      });
+    const criar = vi.spyOn(cadastros, 'criarCausa').mockResolvedValue({
+      ...DIGITACAO,
+      id: 'novo',
+      nome: 'Erro de cadastro',
+    });
     const alterar = vi
       .spyOn(cadastros, 'alterarCausa')
       .mockResolvedValue(DIGITACAO);

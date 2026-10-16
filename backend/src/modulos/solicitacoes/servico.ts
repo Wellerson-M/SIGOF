@@ -56,6 +56,16 @@ export interface DadosDeAbertura {
   hashesDosAnexos?: string[] | undefined;
   /** O usuário viu o alerta de duplicidade e decidiu abrir mesmo assim. */
   confirmarDuplicidade?: boolean | undefined;
+  /**
+   * Registro rápido (analista e supervisor): já foi resolvido por fora e
+   * só entra para ter o registro. A solicitação nasce resolvida.
+   */
+  registro?:
+    | {
+        acaoTomada: string;
+        classificacao?: Classificacao | undefined;
+      }
+    | undefined;
 }
 
 export interface Pessoa {
@@ -76,6 +86,7 @@ export interface Resumo {
   solicitante: Pessoa;
   responsavel: Pessoa | null;
   filial: Pessoa | null;
+  registroRapido: boolean;
   criadoEm: Date;
   atualizadoEm: Date;
   slaVenceEm: Date | null;
@@ -221,6 +232,9 @@ const PERFIS_QUE_PRIORIZAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
 const PERFIS_QUE_ATRIBUEM: readonly Perfil[] = ['SUPERVISOR'];
 const PERFIS_RESPONSAVEIS: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
 const PERFIS_QUE_CLASSIFICAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
+const PERFIS_QUE_REGISTRAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
+
+export const OBSERVACAO_DO_REGISTRO_RAPIDO = 'Registro rápido';
 const MAXIMO_NO_QUADRO = 500;
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -302,6 +316,16 @@ export class ServicoDeSolicitacoes {
     if (!PERFIS_QUE_ABREM.includes(usuario.perfil)) {
       throw new ErroAcessoNegado('Seu perfil não abre solicitações');
     }
+    const registro = dados.registro;
+    if (registro && !PERFIS_QUE_REGISTRAM.includes(usuario.perfil)) {
+      throw new ErroAcessoNegado(
+        'Só analista e supervisor fazem registro rápido',
+      );
+    }
+    const acaoTomada = registro?.acaoTomada.trim() ?? '';
+    if (registro && acaoTomada === '') {
+      throw new ErroDeRegraDeNegocio('Diga o que foi feito');
+    }
 
     const cte = normalizarDocumento(dados.cte ?? null);
     const nf = normalizarDocumento(dados.nf ?? null);
@@ -355,6 +379,14 @@ export class ServicoDeSolicitacoes {
         empresa.slaAtendimentoMinutos,
         expedienteDaEmpresa(empresa),
       );
+      const causa = registro
+        ? await this.conferirClassificacao(
+            tx,
+            usuario.empresaId,
+            registro.classificacao,
+            empresa.exigirCausaAoResolver,
+          )
+        : {};
 
       const solicitacao = await tx.solicitacao.create({
         data: {
@@ -368,8 +400,17 @@ export class ServicoDeSolicitacoes {
           pagadorCorreto,
           descricao: dados.descricao.trim(),
           prioridade: dados.prioridade ?? 'MEDIA',
-          slaVenceEm: sla.venceEm,
           criadoEm: agora,
+          ...(registro
+            ? {
+                // Já resolvida: quem registra é o responsável, sem prazo
+                status: 'RESOLVIDO' as const,
+                responsavelId: usuario.id,
+                resolvidoEm: agora,
+                registroRapido: true,
+                ...causa,
+              }
+            : { slaVenceEm: sla.venceEm }),
         },
         include: incluirNoResumo,
       });
@@ -383,12 +424,30 @@ export class ServicoDeSolicitacoes {
           statusNovo: 'NOVO',
           observacao: dados.confirmarDuplicidade
             ? 'Aberta mesmo com o alerta de duplicidade'
-            : null,
+            : registro
+              ? OBSERVACAO_DO_REGISTRO_RAPIDO
+              : null,
           criadoEm: agora,
         },
       });
 
-      await this.avisar(tx, usuario, solicitacao.id, { tipo: 'ABERTA' });
+      if (registro) {
+        // Resolvida por fora: entra direto como resolvida, com o que foi
+        // feito no histórico, e ninguém precisa ser avisado
+        await tx.statusHistorico.create({
+          data: {
+            empresaId: usuario.empresaId,
+            solicitacaoId: solicitacao.id,
+            autorId: usuario.id,
+            statusAnterior: 'NOVO',
+            statusNovo: 'RESOLVIDO',
+            observacao: acaoTomada,
+            criadoEm: agora,
+          },
+        });
+      } else {
+        await this.avisar(tx, usuario, solicitacao.id, { tipo: 'ABERTA' });
+      }
 
       return { solicitacao, expediente: expedienteDaEmpresa(empresa) };
     });
@@ -1228,6 +1287,7 @@ export class ServicoDeSolicitacoes {
       solicitante: s.solicitante,
       responsavel: s.responsavel,
       filial: s.filial,
+      registroRapido: s.registroRapido,
       criadoEm: s.criadoEm,
       atualizadoEm: s.atualizadoEm,
       slaVenceEm: s.slaVenceEm,

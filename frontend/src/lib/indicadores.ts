@@ -22,6 +22,8 @@ export interface Indicadores {
     minutosMedioAteAssumir: number | null;
     minutosMedioAteResolver: number | null;
     abertasComAlertaDeDuplicidade: number;
+    /** Registradas já resolvidas: fora do tempo médio de resolução. */
+    registrosRapidos?: number;
   };
   porTipo: { tipo: Tipo; total: number }[];
   porResponsavel: {

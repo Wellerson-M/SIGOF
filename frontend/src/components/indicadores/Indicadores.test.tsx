@@ -194,6 +194,7 @@ describe('resumo da página inicial', () => {
       status: 'NOVO',
       responsavel: null,
       filial: null,
+      registroRapido: false,
       sla: { situacao: 'NO_PRAZO', minutosRestantes: 60 },
       ...parte,
     }) as Resumo;
