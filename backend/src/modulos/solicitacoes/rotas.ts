@@ -59,6 +59,36 @@ const esquemaMensagem = z.object({
 
 const esquemaBusca = z.object({ busca: z.string().max(100).optional() });
 
+/** "NOVO,EM_ANDAMENTO" → ['NOVO', 'EM_ANDAMENTO']; vazio → sem filtro. */
+const lista = <T extends [string, ...string[]]>(valores: T) =>
+  z
+    .string()
+    .optional()
+    .transform((texto) =>
+      texto ? texto.split(',').filter(Boolean) : undefined,
+    )
+    .pipe(z.array(z.enum(valores)).optional());
+
+const data = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a data no formato AAAA-MM-DD')
+  .optional();
+
+const esquemaLista = z.object({
+  pagina: z.coerce.number().int().min(1).max(10_000).default(1),
+  status: lista([...STATUS]),
+  prioridade: lista([...PRIORIDADES]),
+  tipo: lista([...TIPOS]),
+  responsavelId: z.string().uuid().optional(),
+  minhas: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+  busca: z.string().max(100).optional(),
+  de: data,
+  ate: data,
+});
+
 /** Id que nem é UUID não existe: responde 404 sem ir ao banco. */
 function idDa(req: Request): string {
   const resultado = z.string().uuid().safeParse(req.params.id);
@@ -85,6 +115,11 @@ export function rotasDeSolicitacoes(opcoes: {
   rotas.post('/', async (req, res) => {
     const dados = validar(esquemaAbertura, req.body);
     res.status(201).json(await servico.abrir(usuarioDa(req), dados));
+  });
+
+  rotas.get('/lista', async (req, res) => {
+    const filtros = validar(esquemaLista, req.query);
+    res.json(await servico.pesquisar(usuarioDa(req), filtros));
   });
 
   // Antes de /:id, senão "responsaveis" seria lido como um id
