@@ -111,7 +111,7 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
     usuario: 'Envio@Demo.test',
     senha: 'abcd efgh ijkl mnop',
     nomeDoRemetente: 'SIGOF Demo',
-    caixaCentral: 'Ocorrencias@Demo.test',
+    caixasCentrais: ['Ocorrencias@Demo.test', 'gerente@demo.test'],
   };
 
   async function ligarEmail(de: EmpresaDeTeste = empresa) {
@@ -173,7 +173,7 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
         usuario: 'envio@demo.test',
         temSenha: true,
         nomeDoRemetente: 'SIGOF Demo',
-        caixaCentral: 'ocorrencias@demo.test',
+        caixasCentrais: ['ocorrencias@demo.test', 'gerente@demo.test'],
       });
       expect(JSON.stringify(config)).not.toContain('abcd');
 
@@ -251,7 +251,10 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
       const [primeiro] = await emailsDa(id);
 
       // Quem abriu não recebe aviso do que ele mesmo fez
-      expect(primeiro?.para).toEqual(['ocorrencias@demo.test']);
+      expect(primeiro?.para).toEqual([
+        'ocorrencias@demo.test',
+        'gerente@demo.test',
+      ]);
       expect(primeiro?.assunto).toContain(`[SIGOF ${protocolo}]`);
       expect(primeiro?.messageId).toBe(`<sigof.${id}@localhost>`);
       expect(primeiro?.respondendoA).toBeNull();
@@ -281,6 +284,7 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
         expect(email.para).toEqual(
           expect.arrayContaining([
             'ocorrencias@demo.test',
+            'gerente@demo.test',
             empresa.usuarios.SOLICITANTE.email,
           ]),
         );

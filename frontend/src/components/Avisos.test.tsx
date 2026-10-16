@@ -139,7 +139,7 @@ const CONFIG: ConfiguracaoDeEmail = {
   usuario: null,
   temSenha: false,
   nomeDoRemetente: null,
-  caixaCentral: null,
+  caixasCentrais: [],
 };
 
 describe('aba E-mail da administração', () => {
@@ -157,7 +157,7 @@ describe('aba E-mail da administração', () => {
       porta: 465,
       usuario: 'avisos@gmail.com',
       temSenha: true,
-      caixaCentral: 'central@demo.test',
+      caixasCentrais: ['central@demo.test', 'gerente@demo.test'],
     });
     render(<Email />);
 
@@ -179,8 +179,8 @@ describe('aba E-mail da administração', () => {
       'abcd efgh ijkl mnop',
     );
     await userEvent.type(
-      screen.getByLabelText(/^E-mail que recebe cópia de tudo/),
-      'central@demo.test',
+      screen.getByLabelText(/^E-mails que recebem cópia de tudo/),
+      'central@demo.test{Enter} gerente@demo.test {Enter}',
     );
     await userEvent.click(screen.getByLabelText('Enviar os avisos por e-mail'));
     await userEvent.click(screen.getByText('Salvar'));
@@ -193,7 +193,7 @@ describe('aba E-mail da administração', () => {
       usuario: 'avisos@gmail.com',
       senha: 'abcd efgh ijkl mnop',
       nomeDoRemetente: '',
-      caixaCentral: 'central@demo.test',
+      caixasCentrais: ['central@demo.test', 'gerente@demo.test'],
     });
     expect(
       await screen.findByText(

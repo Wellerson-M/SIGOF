@@ -25,7 +25,8 @@ export interface ConfiguracaoDeEmail {
   usuario: string | null;
   temSenha: boolean;
   nomeDoRemetente: string | null;
-  caixaCentral: string | null;
+  /** Recebem cópia de tudo (registro e backup). */
+  caixasCentrais: string[];
 }
 
 export interface AlteracaoDeEmail {
@@ -36,7 +37,7 @@ export interface AlteracaoDeEmail {
   usuario?: string | null;
   senha?: string;
   nomeDoRemetente?: string | null;
-  caixaCentral?: string | null;
+  caixasCentrais?: string[];
 }
 
 export type SituacaoDoEmail = 'PENDENTE' | 'ENVIADO' | 'FALHOU';

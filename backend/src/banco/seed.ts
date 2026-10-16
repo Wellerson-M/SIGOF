@@ -117,7 +117,7 @@ async function semear(
       razaoSocial: 'Transportadora Demo Ltda.',
       cnpj: '11222333000181',
       slug: 'transportadora-demo',
-      emailCaixaCentral: 'ocorrencias@demo.sigof.local',
+      emailsCaixaCentral: ['ocorrencias@demo.sigof.local'],
     },
   });
 
