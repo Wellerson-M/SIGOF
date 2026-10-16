@@ -56,12 +56,22 @@ export class ServicoDeAnexos {
   ): Promise<AnexoResumido> {
     const solicitacao = await this.prisma.solicitacao.findFirst({
       where: { id: solicitacaoId, ...visiveisPara(usuario) },
-      select: { id: true, status: true, _count: { select: { anexos: true } } },
+      select: {
+        id: true,
+        status: true,
+        registroRapido: true,
+        _count: { select: { anexos: true } },
+      },
     });
     if (!solicitacao) {
       throw new ErroNaoEncontrado('Solicitação não encontrada');
     }
-    if (ehTerminal(solicitacao.status)) {
+    // A equipe ainda anexa o documento final numa resolvida (o registro
+    // rápido nasce resolvida); cancelada e, para o solicitante, encerrada,
+    // não recebem mais nada
+    const equipeEmResolvida =
+      solicitacao.status === 'RESOLVIDO' && usuario.perfil !== 'SOLICITANTE';
+    if (ehTerminal(solicitacao.status) && !equipeEmResolvida) {
       throw new ErroDeRegraDeNegocio('Solicitação encerrada não recebe anexos');
     }
     if (solicitacao._count.anexos >= ANEXOS_POR_SOLICITACAO) {
@@ -107,10 +117,13 @@ export class ServicoDeAnexos {
         },
         include: { enviadoPor: { select: { id: true, nome: true } } },
       });
-      await this.avisos?.registrar(tx, usuario, solicitacao.id, {
-        tipo: 'ANEXO',
-        nomeArquivo: nome,
-      });
+      // Registro rápido é só para constar: não gera aviso
+      if (!solicitacao.registroRapido) {
+        await this.avisos?.registrar(tx, usuario, solicitacao.id, {
+          tipo: 'ANEXO',
+          nomeArquivo: nome,
+        });
+      }
       return this.resumir(anexo);
     });
   }

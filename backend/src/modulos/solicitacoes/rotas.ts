@@ -25,24 +25,44 @@ const opcional = (maximo: number) =>
     .optional()
     .transform((valor) => valor || undefined);
 
-const esquemaAbertura = z.object({
-  tipo: z.enum(TIPOS, { message: 'Escolha o tipo de ocorrência' }),
-  cte: opcional(60),
-  nf: opcional(60),
-  pagadorCorreto: opcional(200),
-  descricao: z
-    .string()
-    .trim()
-    .min(10, 'Descreva o problema com pelo menos 10 caracteres')
-    .max(5000),
-  prioridade: z.enum(PRIORIDADES).optional(),
-  filialId: z.string().uuid('Filial inválida').optional(),
-  hashesDosAnexos: z
-    .array(z.string().regex(/^[0-9a-f]{64}$/i, 'Hash de anexo inválido'))
-    .max(10)
-    .optional(),
-  confirmarDuplicidade: z.boolean().optional(),
-});
+const esquemaAbertura = z
+  .object({
+    tipo: z.enum(TIPOS, { message: 'Escolha o tipo de ocorrência' }),
+    cte: opcional(60),
+    nf: opcional(60),
+    pagadorCorreto: opcional(200),
+    descricao: z.string().trim().min(3, 'Diga o que era').max(5000),
+    prioridade: z.enum(PRIORIDADES).optional(),
+    filialId: z.string().uuid('Filial inválida').optional(),
+    hashesDosAnexos: z
+      .array(z.string().regex(/^[0-9a-f]{64}$/i, 'Hash de anexo inválido'))
+      .max(10)
+      .optional(),
+    confirmarDuplicidade: z.boolean().optional(),
+    registro: z
+      .object({
+        acaoTomada: z.string().trim().min(3, 'Diga o que foi feito').max(2000),
+        classificacao: z
+          .object({
+            causaId: z.string().uuid('Causa inválida'),
+            detalhe: opcional(80),
+            comentario: opcional(1000),
+          })
+          .optional(),
+      })
+      .optional(),
+  })
+  .superRefine((dados, contexto) => {
+    // Quem abre para a equipe precisa explicar; no registro rápido, que já
+    // foi resolvido, basta dizer o que era
+    if (!dados.registro && dados.descricao.length < 10) {
+      contexto.addIssue({
+        code: 'custom',
+        path: ['descricao'],
+        message: 'Descreva o problema com pelo menos 10 caracteres',
+      });
+    }
+  });
 
 const esquemaClassificacao = z.object({
   causaId: z.string().uuid('Causa inválida'),

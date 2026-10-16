@@ -101,7 +101,33 @@ describe('calcularIndicadores', () => {
       minutosMedioAteAssumir: 135,
       minutosMedioAteResolver: 24 * 60,
       abertasComAlertaDeDuplicidade: 1,
+      registrosRapidos: 0,
     });
+  });
+
+  it('registro rápido conta como resolvida, mas fica fora do tempo médio', () => {
+    const resultado = calcularIndicadores(
+      [
+        s({
+          status: 'RESOLVIDO',
+          criadoEm: antes(2 * HORA),
+          resolvidoEm: antes(HORA),
+        }),
+        s({
+          status: 'RESOLVIDO',
+          criadoEm: antes(HORA),
+          resolvidoEm: antes(HORA),
+          registroRapido: true,
+        }),
+      ],
+      AGORA,
+      7,
+      EXPEDIENTE_PADRAO,
+    );
+
+    expect(resultado.noPeriodo.resolvidas).toBe(2);
+    expect(resultado.noPeriodo.registrosRapidos).toBe(1);
+    expect(resultado.noPeriodo.minutosMedioAteResolver).toBe(60);
   });
 
   it('por tipo, do mais comum para o menos', () => {

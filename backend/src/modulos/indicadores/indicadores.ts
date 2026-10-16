@@ -190,6 +190,7 @@ export class ServicoDeIndicadores {
           h.statusAnterior === null && h.observacao === ALERTA_DE_DUPLICIDADE,
       ),
       causa: r.causa ? { nome: r.causa.nome, detalhe: r.causaDetalhe } : null,
+      registroRapido: r.registroRapido,
     }));
     const extras = registros.map((r) => ({
       protocolo: r.protocolo,

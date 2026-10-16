@@ -26,6 +26,11 @@ const MENU: ItemDoMenu[] = [
     perfis: ['SOLICITANTE', 'ANALISTA', 'SUPERVISOR'],
   },
   {
+    rotulo: 'Registro rápido',
+    href: '/solicitacoes/registro',
+    perfis: ['ANALISTA', 'SUPERVISOR'],
+  },
+  {
     rotulo: 'Indicadores',
     href: '/indicadores',
     perfis: ['SUPERVISOR', 'ADMIN'],
@@ -57,7 +62,8 @@ export function Moldura({ children }: { children: ReactNode }) {
     caminho === href ||
     (href === '/solicitacoes' &&
       caminho.startsWith('/solicitacoes/') &&
-      caminho !== '/solicitacoes/nova');
+      caminho !== '/solicitacoes/nova' &&
+      caminho !== '/solicitacoes/registro');
   const itens = MENU.filter(
     (item) => !item.perfis || item.perfis.includes(usuario.perfil),
   );

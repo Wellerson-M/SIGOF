@@ -259,6 +259,11 @@ model Solicitacao {
   causaDetalhe    String? @map("causa_detalhe")
   causaComentario String? @map("causa_comentario")
 
+  /// Registro rápido: algo que a equipe já resolveu por fora (WhatsApp,
+  /// telefone) e só registra para ter o histórico. Nasce resolvida, sem
+  /// SLA e sem avisos; fica fora do tempo médio de resolução.
+  registroRapido Boolean @default(false) @map("registro_rapido")
+
   empresa     Empresa  @relation(fields: [empresaId], references: [id])
   solicitante Usuario  @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])
   responsavel Usuario? @relation("SolicitacoesAtribuidas", fields: [responsavelId], references: [id])

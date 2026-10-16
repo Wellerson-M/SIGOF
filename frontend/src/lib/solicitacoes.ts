@@ -35,6 +35,8 @@ export interface Resumo {
   solicitante: Pessoa;
   responsavel: Pessoa | null;
   filial: Pessoa | null;
+  /** Registrada já resolvida (resolvida por fora, só para constar). */
+  registroRapido: boolean;
   criadoEm: string;
   atualizadoEm: string;
   slaVenceEm: string | null;
@@ -164,6 +166,8 @@ export interface DadosDeAbertura {
   filialId?: string;
   hashesDosAnexos?: string[];
   confirmarDuplicidade?: boolean;
+  /** Registro rápido: já foi resolvido; a solicitação nasce resolvida. */
+  registro?: { acaoTomada: string; classificacao?: Classificacao };
 }
 
 const json = (corpo: unknown) => ({ body: JSON.stringify(corpo) });

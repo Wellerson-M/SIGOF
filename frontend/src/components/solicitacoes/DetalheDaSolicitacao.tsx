@@ -174,6 +174,11 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
           <EtiquetaDeStatus status={detalhe.status} />
           <EtiquetaDePrioridade prioridade={detalhe.prioridade} />
           <IndicadorDeSla sla={detalhe.sla} />
+          {detalhe.registroRapido && (
+            <span className="rounded-full border border-borda px-2 py-0.5 text-xs text-texto-suave">
+              Registro rápido
+            </span>
+          )}
         </div>
       </div>
 

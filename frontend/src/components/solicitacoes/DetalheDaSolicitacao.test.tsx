@@ -33,6 +33,7 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
     solicitante: { id: 'sol', nome: 'Sofia Solicitante' },
     responsavel: { id: 'ana', nome: 'André Analista' },
     filial: null,
+    registroRapido: false,
     criadoEm: '2026-10-15T12:00:00Z',
     atualizadoEm: '2026-10-15T12:00:00Z',
     slaVenceEm: '2026-10-15T16:00:00Z',

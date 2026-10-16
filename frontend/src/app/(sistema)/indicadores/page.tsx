@@ -275,6 +275,12 @@ export default function PaginaDeIndicadores() {
             )}
           </Cartao>
 
+          {(n.registrosRapidos ?? 0) > 0 && (
+            <p className="text-sm text-texto-suave">
+              {n.registrosRapidos} registro(s) rápido(s) no período: contam como
+              resolvidas, mas ficam fora do tempo médio até resolver.
+            </p>
+          )}
           {n.abertasComAlertaDeDuplicidade > 0 && (
             <p className="text-sm text-texto-suave">
               {n.abertasComAlertaDeDuplicidade} solicitação(ões) foram abertas
