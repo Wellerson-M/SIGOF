@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Auditoria } from '@/components/administracao/Auditoria';
 import { Email } from '@/components/administracao/Email';
 import { ParametrosDaEmpresa } from '@/components/administracao/ParametrosDaEmpresa';
+import { Sistema } from '@/components/administracao/Sistema';
 import { Usuarios } from '@/components/administracao/Usuarios';
 import { useSessao } from '@/lib/sessao';
 
@@ -12,6 +13,7 @@ const ABAS = [
   { id: 'empresa', rotulo: 'Empresa e expediente' },
   { id: 'email', rotulo: 'E-mail' },
   { id: 'auditoria', rotulo: 'Auditoria' },
+  { id: 'sistema', rotulo: 'Sistema' },
 ] as const;
 
 type Aba = (typeof ABAS)[number]['id'];
@@ -62,6 +64,7 @@ export default function PaginaDeAdministracao() {
         {aba === 'empresa' && <ParametrosDaEmpresa />}
         {aba === 'email' && <Email />}
         {aba === 'auditoria' && <Auditoria />}
+        {aba === 'sistema' && <Sistema />}
       </div>
     </div>
   );

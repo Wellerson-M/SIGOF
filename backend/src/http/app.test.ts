@@ -15,6 +15,19 @@ describe('GET /health', () => {
   });
 });
 
+describe('GET /api/sistema', () => {
+  it('diz a versão e o ambiente no ar, sem precisar de login', async () => {
+    const resposta = await request(criarApp()).get('/api/sistema');
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toEqual({
+      versao: 'local',
+      ambiente: 'development',
+      construidoEm: null,
+    });
+  });
+});
+
 describe('correlation id', () => {
   it('reaproveita o x-request-id enviado pelo cliente', async () => {
     const resposta = await request(criarApp())

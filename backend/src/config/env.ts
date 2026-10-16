@@ -23,6 +23,8 @@ const esquemaEnv = z
 
     /** Commit da imagem em execução, gravado no build do Docker. */
     VERSAO: z.string().default('local'),
+    /** Data do commit da imagem (ISO 8601), gravada no build do Docker. */
+    CONSTRUIDO_EM: z.string().optional(),
 
     DATABASE_URL: z.string().url(),
 

@@ -130,6 +130,16 @@ export function criarApp(modulos?: ModulosDaApp): Express {
     });
   });
 
+  // Qual versão está no ar: aparece no rodapé do menu e na Administração.
+  // Sem login, como o /health: a tela de entrada também mostra.
+  app.get('/api/sistema', (_req: Request, res: Response) => {
+    res.json({
+      versao: modulos?.env.VERSAO ?? 'local',
+      ambiente: modulos?.env.NODE_ENV ?? 'development',
+      construidoEm: modulos?.env.CONSTRUIDO_EM || null,
+    });
+  });
+
   if (modulos) {
     const { prisma, env } = modulos;
     const servico = new ServicoDeAutenticacao(prisma, {

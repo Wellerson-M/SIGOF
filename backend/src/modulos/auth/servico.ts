@@ -46,6 +46,9 @@ export const MINUTOS_DE_BLOQUEIO = 15;
  */
 export const SEGUNDOS_DE_RENOVACAO_CONCORRENTE = 30;
 
+/** Quantas respostas de renovação perdidas uma sessão aguenta (ver abaixo). */
+export const RECUPERACOES_POR_FAMILIA = 5;
+
 const MINUTO = 60_000;
 const DIA = 24 * 60 * MINUTO;
 
@@ -185,9 +188,16 @@ export class ServicoDeAutenticacao {
       data: { substituidaEm: agora },
     });
 
+    let sucessoraDescartada: string | null = null;
     if (count === 0 && !(await this.foiTrocadaAgoraHaPouco(sessao.id, agora))) {
-      await this.revogarFamilia(sessao.familia);
-      throw new ErroNaoAutenticado('Sessão expirada');
+      sucessoraDescartada = await this.descartarSucessoraNuncaUsada(
+        sessao,
+        agora,
+      );
+      if (sucessoraDescartada === null) {
+        await this.revogarFamilia(sessao.familia);
+        throw new ErroNaoAutenticado('Sessão expirada');
+      }
     }
 
     // Usuário desativado ou empresa desativada perdem o acesso na hora
@@ -196,7 +206,7 @@ export class ServicoDeAutenticacao {
       throw new ErroNaoAutenticado('Sessão expirada');
     }
 
-    const tokens = await this.abrirSessao(
+    const { sessaoId, ...tokens } = await this.abrirSessao(
       {
         id: sessao.usuario.id,
         empresaId: sessao.usuario.empresaId,
@@ -204,7 +214,22 @@ export class ServicoDeAutenticacao {
       },
       sessao.familia,
       contexto,
+      sucessoraDescartada !== null,
     );
+
+    // Quem substituiu quem: é o que permite reconhecer, numa próxima vez,
+    // uma resposta de renovação que se perdeu no caminho
+    await this.prisma.sessao.updateMany({
+      where: {
+        id: {
+          in: [
+            sessao.id,
+            ...(sucessoraDescartada ? [sucessoraDescartada] : []),
+          ],
+        },
+      },
+      data: { substituidaPorId: sessaoId },
+    });
 
     // Uma saída (ou detecção de reuso) que aconteceu enquanto esta
     // renovação rodava revogou a família antes de a sessão nova existir.
@@ -317,6 +342,52 @@ export class ServicoDeAutenticacao {
     );
   }
 
+  /**
+   * Resposta de renovação perdida: o servidor trocou o token, mas a
+   * resposta com o token novo não chegou ao navegador (notebook que
+   * hibernou no meio do pedido, Wi-Fi que caiu, página recarregada, servidor
+   * reiniciando numa entrega). O navegador continua com o token antigo e,
+   * sem esta regra, a próxima renovação seria tomada por roubo e
+   * derrubaria a sessão no meio do expediente.
+   *
+   * O sinal é a sucessora nunca ter sido usada: ninguém provou ter o token
+   * novo. Ela é descartada (marcada como substituída) e a renovação segue.
+   * Se o token antigo estava mesmo com um invasor, o dono legítimo, ao usar
+   * o dele, cai na mesma regra; mas assim que um dos dois renovar de novo,
+   * o outro apresenta um token cuja sucessora já foi usada e a família
+   * inteira é revogada. O teto de recuperações por família impede que os
+   * dois fiquem se alternando indefinidamente.
+   *
+   * Devolve o id da sucessora descartada, ou null se não é o caso.
+   */
+  private async descartarSucessoraNuncaUsada(
+    sessao: { familia: string; substituidaPorId: string | null },
+    agora: Date,
+  ): Promise<string | null> {
+    if (sessao.substituidaPorId === null) {
+      return null;
+    }
+
+    const recuperacoes = await this.prisma.sessao.count({
+      where: { familia: sessao.familia, recuperada: true },
+    });
+    if (recuperacoes >= RECUPERACOES_POR_FAMILIA) {
+      return null;
+    }
+
+    const { count } = await this.prisma.sessao.updateMany({
+      where: {
+        id: sessao.substituidaPorId,
+        familia: sessao.familia,
+        substituidaEm: null,
+        revogadaEm: null,
+        expiraEm: { gt: agora },
+      },
+      data: { substituidaEm: agora },
+    });
+    return count === 1 ? sessao.substituidaPorId : null;
+  }
+
   private async revogarFamilia(familia: string): Promise<void> {
     await this.prisma.sessao.updateMany({
       where: { familia, revogadaEm: null },
@@ -328,22 +399,25 @@ export class ServicoDeAutenticacao {
     usuario: UsuarioAutenticado,
     familia: string,
     contexto: Contexto,
-  ): Promise<Tokens> {
+    recuperada = false,
+  ): Promise<Tokens & { sessaoId: string }> {
     const sessao = gerarTokenDeSessao();
     const sessaoExpiraEm = new Date(
       this.agora().getTime() + this.config.sessaoDias * DIA,
     );
 
-    await this.prisma.sessao.create({
+    const { id } = await this.prisma.sessao.create({
       data: {
         empresaId: usuario.empresaId,
         usuarioId: usuario.id,
         familia,
         tokenHash: hashDoToken(sessao),
         expiraEm: sessaoExpiraEm,
+        recuperada,
         ip: contexto.ip ?? null,
         userAgent: contexto.userAgent?.slice(0, 255) ?? null,
       },
+      select: { id: true },
     });
 
     const acesso = await emitirTokenDeAcesso(
@@ -352,6 +426,6 @@ export class ServicoDeAutenticacao {
       this.config.acessoMinutos,
     );
 
-    return { acesso, sessao, sessaoExpiraEm };
+    return { acesso, sessao, sessaoExpiraEm, sessaoId: id };
   }
 }

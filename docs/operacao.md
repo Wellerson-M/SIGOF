@@ -30,6 +30,8 @@ Staging e produção usam **a mesma imagem Docker**: o que vai para a produção
 4. O workflow confere em `/health` que o commit novo está no ar e falha se isso não acontecer em 10 minutos.
 5. Se o `deploy/caddy/Caddyfile` mudou, o atualizador manda o Caddy recarregar a configuração (`caddy reload`), sem derrubar conexões. O Caddy só lê o arquivo ao iniciar: sem esse passo, uma rota nova não valeria.
 
+**Qual versão está no ar?** O rodapé do menu lateral e a aba *Administração → Sistema* mostram o ambiente e a versão (por enquanto o commit da `main`; depois da v1.0.0, a etiqueta da release). Os dados vêm de `GET /api/sistema`, que não exige login.
+
 ## Release e produção *(a implementar — issue #48)*
 
 A produção **nunca** recebe um merge direto. O fluxo planejado é este:
