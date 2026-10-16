@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
 import { Sino } from '@/components/Sino';
+import { VersaoDoSistema } from '@/components/VersaoDoSistema';
 import { NOME_DO_PERFIL, type Perfil } from '@/lib/api';
 import { useSessao } from '@/lib/sessao';
 
@@ -92,6 +93,9 @@ export function Moldura({ children }: { children: ReactNode }) {
             ),
           )}
         </nav>
+        <div className="mt-auto">
+          <VersaoDoSistema />
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

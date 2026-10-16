@@ -25,6 +25,9 @@ ENV NODE_ENV=production
 # Commit que gerou a imagem; aparece em GET /health
 ARG VERSAO=local
 ENV VERSAO=$VERSAO
+# Data do commit, mostrada junto com a versão na tela
+ARG CONSTRUIDO_EM=
+ENV CONSTRUIDO_EM=$CONSTRUIDO_EM
 
 # As dependências de desenvolvimento ficam: o CLI do Prisma aplica as
 # migrações na subida, e o tsx roda o seed no staging

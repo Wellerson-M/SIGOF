@@ -51,7 +51,9 @@ jobs:
         with:
           context: backend
           push: true
-          build-args: VERSAO=${{ github.sha }}
+          build-args: |
+            VERSAO=${{ github.sha }}
+            CONSTRUIDO_EM=${{ github.event.head_commit.timestamp }}
           tags: |
             ghcr.io/wellerson-m/sigof-backend:staging
             ghcr.io/wellerson-m/sigof-backend:${{ github.sha }}
