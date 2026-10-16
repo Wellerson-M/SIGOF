@@ -54,7 +54,11 @@ Em desenvolvimento: as solicitações (abrir, listar, atender) e as telas delas,
 
 ## Como rodar localmente
 
-Pré-requisitos: **Node.js 22** e **Docker**.
+Pré-requisitos: **Node.js 22**, **Docker** e **Git**.
+
+**Windows, em um clique:** clique duas vezes em `scripts/iniciar.cmd`. Ele liga o banco, instala o que falta, prepara os dados de demonstração, abre a API e as telas e abre o navegador em http://localhost:3000. Para desligar: `scripts/parar.cmd`.
+
+**Passo a passo (qualquer sistema):**
 
 ```bash
 # 1. Variáveis de ambiente (os valores de exemplo servem para desenvolvimento)
@@ -111,6 +115,9 @@ Empresa `transportadora-demo`, senha `Demo@2026` para todos:
 - Os ambientes de staging e de produção recebem deploy automático pelo GitHub Actions *(em implantação)*.
 
 ## Documentação
+
+- [Como contribuir](CONTRIBUTING.md): rodar, fluxo de branches e PRs, o que o CI confere e padrões de código
+- [Operação](docs/operacao.md): ambientes, publicação no staging, release para produção, diagnóstico e recuperação
 
 - [RFC — especificação técnica](docs/rfc.md): requisitos, arquitetura, modelo de dados e segurança
 - [Diagramas C4 e casos de uso](docs/diagrams/)

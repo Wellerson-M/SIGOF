@@ -2,3 +2,6 @@
 *.sh text eol=lf
 # Arquivos que rodam no servidor Linux (cloud-init, compose, Caddyfile): sempre LF
 deploy/** text eol=lf
+# Scripts do Windows: BOM e CRLF preservados (o PowerShell 5 precisa)
+*.ps1 text eol=crlf
+*.cmd text eol=crlf

@@ -30,6 +30,9 @@ export const SENHA_DEMO = 'Demo@2026';
 
 const MINUTO = 60_000;
 
+/** Número arbitrário que identifica a trava do seed no Postgres. */
+const TRAVA_DO_SEED = 7_430_281;
+
 interface SolicitacaoExemplo {
   tipo: TipoOcorrencia;
   cte: string | null;
@@ -252,27 +255,34 @@ async function main(): Promise<void> {
 
   const prisma = criarPrismaClient(databaseUrl);
   try {
-    if (
-      process.argv.includes('--se-vazio') &&
-      (await prisma.empresa.count()) > 0
-    ) {
-      // eslint-disable-next-line no-console -- saída de script de linha de comando
-      console.log('Seed ignorado: o banco já tem dados.');
-      return;
-    }
-
+    const soSeVazio = process.argv.includes('--se-vazio');
     const senha = process.env.SEED_SENHA || SENHA_DEMO;
     const senhaHash = await gerarHashDeSenha(senha);
 
     // Tudo numa transação: se o seed for interrompido no meio, nada fica
     // gravado e a próxima subida tenta de novo do zero
-    await prisma.$transaction(
+    const semeou = await prisma.$transaction(
       async (tx) => {
+        // Trava do próprio Postgres: dois seeds ao mesmo tempo (ex.: dois
+        // "iniciar") esperam um pelo outro, em vez de um apagar o que o
+        // outro acabou de gravar. É liberada no fim da transação.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${TRAVA_DO_SEED})`;
+
+        if (soSeVazio && (await tx.empresa.count()) > 0) {
+          return false;
+        }
         await limpar(tx);
         await semear(tx, senhaHash);
+        return true;
       },
       { timeout: 60_000 },
     );
+
+    if (!semeou) {
+      // eslint-disable-next-line no-console -- saída de script de linha de comando
+      console.log('Seed ignorado: o banco já tem dados.');
+      return;
+    }
 
     // eslint-disable-next-line no-console -- saída de script de linha de comando
     console.log(
