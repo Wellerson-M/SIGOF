@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx src/banco/seed.ts",
+    "db:seed:se-vazio": "tsx src/banco/seed.ts --se-vazio",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "postinstall": "prisma generate"
   },
@@ -52,5 +53,8 @@
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
     "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "mysql2": "^3.22.0"
   }
 }
