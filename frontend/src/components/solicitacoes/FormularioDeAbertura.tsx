@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { ErroDaApi } from '@/lib/api';
+import { enviarAnexos } from './Anexos';
 import {
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
   NOME_DO_TIPO,
   PRIORIDADES,
+  ANEXO,
   TIPOS,
   api,
   dataCurta,
@@ -38,6 +40,8 @@ export function FormularioDeAbertura() {
   const [erro, setErro] = useState<string | null>(null);
   const [duplicidades, setDuplicidades] = useState<Duplicidade[] | null>(null);
   const [criada, setCriada] = useState<Resumo | null>(null);
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [errosDosAnexos, setErrosDosAnexos] = useState<string[]>([]);
 
   async function enviar(confirmarDuplicidade = false) {
     setEnviando(true);
@@ -55,7 +59,15 @@ export function FormularioDeAbertura() {
       confirmarDuplicidade,
     };
     try {
-      setCriada(await api.abrir(dados));
+      const nova = await api.abrir(dados);
+      // Os arquivos vão depois que a solicitação existe; se algum for
+      // recusado, a solicitação continua aberta e o motivo aparece
+      setErrosDosAnexos(
+        arquivos.length > 0
+          ? await enviarAnexos(nova.id, arquivos.slice(0, ANEXO.porSolicitacao))
+          : [],
+      );
+      setCriada(nova);
       setDuplicidades(null);
     } catch (falha) {
       if (falha instanceof ErroDaApi && falha.status === 409) {
@@ -80,6 +92,8 @@ export function FormularioDeAbertura() {
     setPagadorCorreto('');
     setDescricao('');
     setPrioridade('MEDIA');
+    setArquivos([]);
+    setErrosDosAnexos([]);
     setCriada(null);
   }
 
@@ -96,6 +110,17 @@ export function FormularioDeAbertura() {
         <p className="text-sm text-texto-suave">
           Ela já está na coluna “Novo” do quadro, aguardando um analista.
         </p>
+        {errosDosAnexos.length > 0 && (
+          <div className="rounded-md border border-atencao/40 bg-atencao/10 px-3 py-2 text-sm text-texto">
+            <p className="font-medium">Alguns arquivos não foram anexados:</p>
+            <ul className="list-disc pl-5">
+              {errosDosAnexos.map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+            <p>Você pode anexá-los de novo no detalhe da solicitação.</p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/solicitacoes/${criada.id}`}
@@ -203,6 +228,21 @@ export function FormularioDeAbertura() {
           placeholder="Descreva o problema e o que espera que seja feito"
           className="rounded-md border border-borda bg-superficie px-3 py-2 text-sm text-texto"
         />
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+        Anexos (opcional)
+        <input
+          type="file"
+          multiple
+          accept={ANEXO.aceitos}
+          onChange={(evento) => setArquivos([...(evento.target.files ?? [])])}
+          className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
+        />
+        <span className="text-xs font-normal text-texto-suave">
+          PDF, imagem ou XML da nota, até 5 MB cada e no máximo{' '}
+          {ANEXO.porSolicitacao} arquivos.
+        </span>
       </label>
 
       {erro && (

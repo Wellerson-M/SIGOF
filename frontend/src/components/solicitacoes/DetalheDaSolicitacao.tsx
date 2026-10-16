@@ -21,6 +21,7 @@ import {
   type Prioridade,
   type Status,
 } from '@/lib/solicitacoes';
+import { Anexos } from './Anexos';
 import { DialogoDeObservacao } from './DialogoDeObservacao';
 import {
   EtiquetaDePrioridade,
@@ -256,6 +257,15 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
               {detalhe.descricao}
             </p>
           </section>
+
+          <Anexos
+            solicitacaoId={detalhe.id}
+            anexos={detalhe.anexos}
+            podeAnexar={
+              detalhe.status !== 'RESOLVIDO' && detalhe.status !== 'CANCELADO'
+            }
+            aoMudar={carregar}
+          />
 
           <Conversa
             detalhe={detalhe}

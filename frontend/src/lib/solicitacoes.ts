@@ -4,7 +4,7 @@
  * Quem pode fazer o quê vem pronto da API (`acoes` e `pode`): a tela só
  * mostra o que o servidor vai aceitar, e o servidor confere de novo.
  */
-import { ErroDaApi, pedir } from './api';
+import { ErroDaApi, pedir, pedirArquivo } from './api';
 
 export type Status =
   | 'NOVO'
@@ -39,6 +39,16 @@ export interface Resumo {
   slaVenceEm: string | null;
   sla: { situacao: SituacaoDoSla; minutosRestantes: number | null };
   acoes: Status[];
+  totais: { anexos: number; mensagens: number };
+}
+
+export interface Anexo {
+  id: string;
+  nomeArquivo: string;
+  tipoMime: string;
+  tamanhoBytes: number;
+  enviadoPor: Pessoa;
+  criadoEm: string;
 }
 
 export interface Mensagem {
@@ -75,6 +85,7 @@ export interface Detalhe extends Resumo {
   historico: Evento[];
   mensagens: Mensagem[];
   emails: EmailEnviado[];
+  anexos: Anexo[];
   pode: {
     mudarPrioridade: boolean;
     atribuir: boolean;
@@ -132,7 +143,48 @@ export const api = {
       ...json({ conteudo, interna }),
     }),
   responsaveis: () => pedir<Pessoa[]>('/solicitacoes/responsaveis'),
+  anexar: (id: string, arquivo: File) => {
+    const formulario = new FormData();
+    formulario.append('arquivo', arquivo);
+    return pedir<Anexo>(`/solicitacoes/${id}/anexos`, {
+      method: 'POST',
+      body: formulario,
+    });
+  },
+  baixarAnexo: (id: string, anexoId: string) =>
+    pedirArquivo(`/solicitacoes/${id}/anexos/${anexoId}`),
 };
+
+/** Mesmos limites da API: conferir antes poupa o envio de um arquivo recusado. */
+export const ANEXO = {
+  tamanhoMaximo: 5 * 1024 * 1024,
+  porSolicitacao: 10,
+  aceitos: '.pdf,.png,.jpg,.jpeg,.webp,.xml',
+  extensoes: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'xml'],
+};
+
+/** Motivo para recusar o arquivo antes de enviar, ou null se estiver ok. */
+export function problemaNoArquivo(arquivo: File): string | null {
+  const extensao = arquivo.name.split('.').pop()?.toLowerCase() ?? '';
+  if (!ANEXO.extensoes.includes(extensao)) {
+    return `${arquivo.name}: envie PDF, PNG, JPG, WEBP ou XML`;
+  }
+  if (arquivo.size > ANEXO.tamanhoMaximo) {
+    return `${arquivo.name}: o limite é 5 MB por arquivo`;
+  }
+  if (arquivo.size === 0) {
+    return `${arquivo.name}: o arquivo está vazio`;
+  }
+  return null;
+}
+
+/** "820 KB", "1,4 MB" */
+export function tamanhoLegivel(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+  return `${(bytes / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
+}
 
 /** Colunas do quadro, na ordem do fluxo. */
 export const COLUNAS: Status[] = [

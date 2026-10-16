@@ -73,6 +73,17 @@ export interface Resumo {
   sla: IndicadorDeSla;
   /** Status para onde *este usuário* pode mover a solicitação agora. */
   acoes: Status[];
+  /** Quantos anexos e mensagens tem (o quadro mostra no cartão). */
+  totais: { anexos: number; mensagens: number };
+}
+
+export interface AnexoDaSolicitacao {
+  id: string;
+  nomeArquivo: string;
+  tipoMime: string;
+  tamanhoBytes: number;
+  enviadoPor: Pessoa;
+  criadoEm: Date;
 }
 
 export interface EventoDoHistorico {
@@ -109,6 +120,7 @@ export interface Detalhe extends Resumo {
   historico: EventoDoHistorico[];
   mensagens: MensagemDaConversa[];
   emails: EmailDaSolicitacao[];
+  anexos: AnexoDaSolicitacao[];
   pode: {
     mudarPrioridade: boolean;
     atribuir: boolean;
@@ -150,6 +162,11 @@ const pessoa = { select: { id: true, nome: true } } as const;
 const incluirNoResumo = {
   solicitante: pessoa,
   responsavel: pessoa,
+  // Só as mensagens visíveis a todos: contar as notas internas revelaria ao
+  // solicitante que elas existem
+  _count: {
+    select: { anexos: true, mensagens: { where: { interna: false } } },
+  },
 } satisfies Prisma.SolicitacaoInclude;
 
 type SolicitacaoComPessoas = Prisma.SolicitacaoGetPayload<{
@@ -163,7 +180,7 @@ function ehInterno(perfil: Perfil): boolean {
 }
 
 /** Solicitante só enxerga o que ele mesmo abriu; os internos, a empresa toda. */
-function visiveisPara(
+export function visiveisPara(
   usuario: UsuarioAutenticado,
 ): Prisma.SolicitacaoWhereInput {
   return usuario.perfil === 'SOLICITANTE'
@@ -368,6 +385,10 @@ export class ServicoDeSolicitacoes {
           include: { autor: pessoa },
           orderBy: { criadoEm: 'asc' },
         },
+        anexos: {
+          include: { enviadoPor: pessoa },
+          orderBy: { criadoEm: 'asc' },
+        },
         // Quem recebeu e-mail é informação da equipe, não do solicitante
         emails: {
           take: ehInterno(usuario.perfil) ? 200 : 0,
@@ -414,6 +435,14 @@ export class ServicoDeSolicitacoes {
         criadoEm: m.criadoEm,
       })),
       emails: solicitacao.emails,
+      anexos: solicitacao.anexos.map((a) => ({
+        id: a.id,
+        nomeArquivo: a.nomeArquivo,
+        tipoMime: a.tipoMime,
+        tamanhoBytes: a.tamanhoBytes,
+        enviadoPor: a.enviadoPor,
+        criadoEm: a.criadoEm,
+      })),
       pode: {
         mudarPrioridade:
           !encerrada && PERFIS_QUE_PRIORIZAM.includes(usuario.perfil),
@@ -863,6 +892,7 @@ export class ServicoDeSolicitacoes {
       slaVenceEm: s.slaVenceEm,
       sla: indicadorDeSla(s.status, estadoDoSla(s), agora, expediente),
       acoes: transicoesPermitidas(s.status, usuario.perfil).map((t) => t.para),
+      totais: { anexos: s._count.anexos, mensagens: s._count.mensagens },
     };
   }
 }

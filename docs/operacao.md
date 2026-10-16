@@ -17,9 +17,10 @@ Staging e produção usam **a mesma imagem Docker**: o que vai para a produção
   - **Caddy** (HTTPS automático): manda `/api` e `/health` para a API e o resto para as telas;
   - **API**;
   - **telas**;
-  - **PostgreSQL**, sem porta aberta para a internet.
+  - **PostgreSQL**, sem porta aberta para a internet;
+  - **SeaweedFS** (armazenamento S3 dos anexos), também só na rede interna.
 - Só as portas 80 e 443 estão abertas. **Não há acesso por SSH**: a manutenção usa `az vm run-command`, autenticado na Azure.
-- Os segredos (senha do banco, chave dos tokens, senha de demonstração) são gerados na própria VM, em `/opt/sigof/.env`, e nunca passam pelo GitHub.
+- Os segredos (senha do banco, chave dos tokens, senha de demonstração, chave de cifra e senha do armazenamento) são gerados na própria VM, em `/opt/sigof/.env`, e nunca passam pelo GitHub.
 
 ## Como uma mudança chega ao staging
 
@@ -55,6 +56,14 @@ Cada empresa envia os avisos pela **própria conta de e-mail**, configurada pelo
 **Fila (outbox).** O e-mail é gravado na mesma transação da movimentação, na tabela `emails_saida`, e enviado em segundo plano pela própria API a cada `EMAIL_INTERVALO_SEGUNDOS` (padrão 15). Se o provedor falhar, tenta de novo depois de 1, 5, 15 e 60 minutos; na quinta falha, fica como **Falhou**, com o erro registrado. Cada envio aparece no detalhe da solicitação (para a equipe) e em *Administração → E-mail → Últimos envios*.
 
 **No computador**, o `docker compose up -d` também sobe o **Mailpit**, uma caixa de correio de mentira: configure o envio com servidor `localhost`, porta `1025`, sem conexão segura, qualquer login e senha, e veja os e-mails em http://localhost:8025.
+
+## Anexos
+
+- Até **10 arquivos de 5 MB** por solicitação: **PDF, PNG, JPG, WEBP e XML** (o XML da NF-e e do CTe).
+- O tipo é conferido pelo **conteúdo** (os primeiros bytes), não pelo nome: um `.exe` renomeado para `.pdf` é recusado, e a extensão precisa bater com o conteúdo.
+- Os arquivos ficam no SeaweedFS com a chave `empresas/<empresa>/solicitacoes/<solicitação>/<id aleatório>.<ext>`; o nome original fica só no banco.
+- O download **passa pela API**, que confere se quem pede enxerga a solicitação. O armazenamento não tem porta aberta, então não existe link direto para um arquivo. PDF e imagens abrem no navegador; XML é sempre baixado, para o navegador não interpretar o conteúdo.
+- Sem `STORAGE_ENDPOINT`, anexar e baixar respondem 503.
 
 ## Diagnóstico
 
