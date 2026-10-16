@@ -247,6 +247,9 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
             </h2>
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Dado nome="Tipo">{NOME_DO_TIPO[detalhe.tipo]}</Dado>
+              {detalhe.filial && (
+                <Dado nome="Filial">{detalhe.filial.nome}</Dado>
+              )}
               <Dado nome="CTe">{detalhe.cte ?? '—'}</Dado>
               <Dado nome="NF">{detalhe.nf ?? '—'}</Dado>
               {detalhe.pagadorCorreto && (

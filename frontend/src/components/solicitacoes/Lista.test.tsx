@@ -39,6 +39,7 @@ function item(n: number): Resumo {
     prioridade: 'MEDIA',
     solicitante: { id: 'x', nome: 'Sofia' },
     responsavel: n % 2 ? { id: 'eu', nome: 'André' } : null,
+    filial: null,
     criadoEm: '2026-08-10T12:00:00Z',
     atualizadoEm: '2026-08-10T12:00:00Z',
     slaVenceEm: null,

@@ -46,6 +46,14 @@ export interface DadosDeAbertura {
   pagadorCorreto?: string | undefined;
   descricao: string;
   prioridade?: Prioridade | undefined;
+  /** Filial que emitiu o documento (obrigatória se a empresa tem filiais). */
+  filialId?: string | undefined;
+  /**
+   * SHA-256 dos arquivos que vão ser anexados logo depois de abrir. Só
+   * serve para o alerta de duplicidade: o hash gravado no anexo é sempre o
+   * calculado pelo servidor ao receber o arquivo.
+   */
+  hashesDosAnexos?: string[] | undefined;
   /** O usuário viu o alerta de duplicidade e decidiu abrir mesmo assim. */
   confirmarDuplicidade?: boolean | undefined;
 }
@@ -67,6 +75,7 @@ export interface Resumo {
   prioridade: Prioridade;
   solicitante: Pessoa;
   responsavel: Pessoa | null;
+  filial: Pessoa | null;
   criadoEm: Date;
   atualizadoEm: Date;
   slaVenceEm: Date | null;
@@ -207,6 +216,7 @@ const pessoa = { select: { id: true, nome: true } } as const;
 const incluirNoResumo = {
   solicitante: pessoa,
   responsavel: pessoa,
+  filial: pessoa,
   // Só as mensagens visíveis a todos: contar as notas internas revelaria ao
   // solicitante que elas existem
   _count: {
@@ -291,11 +301,19 @@ export class ServicoDeSolicitacoes {
       const empresa = await tx.empresa.findUniqueOrThrow({
         where: { id: usuario.empresaId },
       });
+      const filialId = await this.conferirFilial(
+        tx,
+        usuario.empresaId,
+        dados.filialId,
+        cte !== null || nf !== null,
+      );
 
       if (!dados.confirmarDuplicidade) {
         await this.barrarDuplicidade(tx, usuario.empresaId, {
           cte,
           nf,
+          filialId,
+          hashes: dados.hashesDosAnexos ?? [],
           agora,
           janelaDias: empresa.janelaDuplicidadeDias,
         });
@@ -323,6 +341,7 @@ export class ServicoDeSolicitacoes {
           empresaId: usuario.empresaId,
           protocolo: formatarProtocolo({ ano, mes, sequencial: ultimo }),
           solicitanteId: usuario.id,
+          filialId,
           tipo: dados.tipo,
           cte,
           nf,
@@ -820,18 +839,51 @@ export class ServicoDeSolicitacoes {
 
   // ------------------------------------------------------------ Internos
 
+  /**
+   * Com filiais cadastradas, quem informa CTe ou NF precisa dizer de qual
+   * filial é: sem isso, a duplicidade não sabe se o número é o mesmo
+   * documento. A filial tem de ser ativa e da mesma empresa.
+   */
+  private async conferirFilial(
+    tx: Transacao,
+    empresaId: string,
+    filialId: string | undefined,
+    temDocumento: boolean,
+  ): Promise<string | null> {
+    if (filialId) {
+      const filial = await tx.filial.findFirst({
+        where: { id: filialId, empresaId, ativa: true },
+        select: { id: true },
+      });
+      if (!filial) {
+        throw new ErroDeRegraDeNegocio('Escolha uma filial ativa da empresa');
+      }
+      return filial.id;
+    }
+    if (
+      temDocumento &&
+      (await tx.filial.count({ where: { empresaId, ativa: true } })) > 0
+    ) {
+      throw new ErroDeRegraDeNegocio('Escolha a filial que emitiu o documento');
+    }
+    return null;
+  }
+
   private async barrarDuplicidade(
     tx: Transacao,
     empresaId: string,
     candidata: {
       cte: string | null;
       nf: string | null;
+      filialId: string | null;
+      hashes: string[];
       agora: Date;
       janelaDias: number;
     },
   ): Promise<void> {
-    const { cte, nf, agora, janelaDias } = candidata;
-    if (cte === null && nf === null) {
+    const { cte, nf, filialId, agora, janelaDias } = candidata;
+    const hashes = [...new Set(candidata.hashes.map((h) => h.toLowerCase()))];
+    if (cte === null && nf === null && hashes.length === 0) {
       return;
     }
 
@@ -840,7 +892,13 @@ export class ServicoDeSolicitacoes {
         empresaId,
         status: { not: 'CANCELADO' },
         criadoEm: { gte: new Date(agora.getTime() - janelaDias * DIA) },
-        OR: [...(cte ? [{ cte }] : []), ...(nf ? [{ nf }] : [])],
+        OR: [
+          ...(cte ? [{ cte }] : []),
+          ...(nf ? [{ nf }] : []),
+          ...(hashes.length > 0
+            ? [{ anexos: { some: { sha256: { in: hashes } } } }]
+            : []),
+        ],
       },
       select: {
         id: true,
@@ -848,14 +906,26 @@ export class ServicoDeSolicitacoes {
         protocolo: true,
         cte: true,
         nf: true,
+        filialId: true,
         status: true,
         criadoEm: true,
+        anexos: {
+          where: { sha256: { in: hashes } },
+          select: { nomeArquivo: true, sha256: true },
+        },
       },
     });
 
     // O banco já filtrou; a regra de domínio confere de novo e diz o motivo
     const motivos = encontrarDuplicidades(
-      { empresaId, cte, nf, criadoEm: agora },
+      {
+        empresaId,
+        cte,
+        nf,
+        filialId,
+        hashesDosAnexos: hashes,
+        criadoEm: agora,
+      },
       existentes,
       janelaDias,
     );
@@ -1022,6 +1092,7 @@ export class ServicoDeSolicitacoes {
       prioridade: s.prioridade,
       solicitante: s.solicitante,
       responsavel: s.responsavel,
+      filial: s.filial,
       criadoEm: s.criadoEm,
       atualizadoEm: s.atualizadoEm,
       slaVenceEm: s.slaVenceEm,

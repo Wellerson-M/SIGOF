@@ -36,6 +36,11 @@ const esquemaAbertura = z.object({
     .min(10, 'Descreva o problema com pelo menos 10 caracteres')
     .max(5000),
   prioridade: z.enum(PRIORIDADES).optional(),
+  filialId: z.string().uuid('Filial inválida').optional(),
+  hashesDosAnexos: z
+    .array(z.string().regex(/^[0-9a-f]{64}$/i, 'Hash de anexo inválido'))
+    .max(10)
+    .optional(),
   confirmarDuplicidade: z.boolean().optional(),
 });
 

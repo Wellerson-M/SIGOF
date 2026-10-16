@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Auditoria } from '@/components/administracao/Auditoria';
 import { Email } from '@/components/administracao/Email';
+import { Filiais } from '@/components/administracao/Filiais';
 import { ParametrosDaEmpresa } from '@/components/administracao/ParametrosDaEmpresa';
 import { Sistema } from '@/components/administracao/Sistema';
 import { Usuarios } from '@/components/administracao/Usuarios';
@@ -11,6 +12,7 @@ import { useSessao } from '@/lib/sessao';
 const ABAS = [
   { id: 'usuarios', rotulo: 'Usuários' },
   { id: 'empresa', rotulo: 'Empresa e expediente' },
+  { id: 'filiais', rotulo: 'Filiais' },
   { id: 'email', rotulo: 'E-mail' },
   { id: 'auditoria', rotulo: 'Auditoria' },
   { id: 'sistema', rotulo: 'Sistema' },
@@ -62,6 +64,7 @@ export default function PaginaDeAdministracao() {
       <div role="tabpanel">
         {aba === 'usuarios' && <Usuarios />}
         {aba === 'empresa' && <ParametrosDaEmpresa />}
+        {aba === 'filiais' && <Filiais />}
         {aba === 'email' && <Email />}
         {aba === 'auditoria' && <Auditoria />}
         {aba === 'sistema' && <Sistema />}

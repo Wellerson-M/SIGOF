@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ErroDaApi } from '@/lib/api';
+import { cadastros, hashDoArquivo, type Filial } from '@/lib/cadastros';
 import { enviarAnexos } from './Anexos';
 import {
   NOME_DA_PRIORIDADE,
@@ -25,10 +26,16 @@ const CAMPO =
   'h-10 rounded-md border border-borda bg-superficie px-3 text-sm text-texto';
 
 /**
- * Abertura de solicitação (RFC seção 3.2). Se o mesmo CTe ou NF já tiver
- * pedido recente, a API responde 409 com a lista: a pessoa vê qual é e
- * decide entre ir até a existente ou abrir mesmo assim.
+ * Abertura de solicitação (RFC seção 3.2). Se o mesmo CTe ou NF (da mesma
+ * filial) ou um dos mesmos arquivos já tiver pedido recente, a API responde
+ * 409 com a lista: a pessoa vê qual é e decide entre ir até a existente ou
+ * abrir mesmo assim.
  */
+
+function descreverMotivo(d: Duplicidade): string {
+  if (d.documento === 'ANEXO') return `mesmo arquivo (${d.valor})`;
+  return `${d.documento === 'CTE' ? 'CTe' : 'NF'} ${d.valor}`;
+}
 export function FormularioDeAbertura() {
   const [tipo, setTipo] = useState<Tipo>('REVERSAO');
   const [cte, setCte] = useState('');
@@ -42,10 +49,33 @@ export function FormularioDeAbertura() {
   const [criada, setCriada] = useState<Resumo | null>(null);
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [errosDosAnexos, setErrosDosAnexos] = useState<string[]>([]);
+  const [filiais, setFiliais] = useState<Filial[]>([]);
+  const [filialId, setFilialId] = useState('');
+
+  // Sem filiais cadastradas, o campo nem aparece; se a lista falhar, a API
+  // ainda confere e responde com a mensagem certa
+  useEffect(() => {
+    let cancelado = false;
+    cadastros.filiais().then(
+      (lista) => {
+        if (cancelado) return;
+        setFiliais(lista);
+        if (lista.length === 1) setFilialId(lista[0]!.id);
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   async function enviar(confirmarDuplicidade = false) {
     setEnviando(true);
     setErro(null);
+    const anexaveis = arquivos.slice(0, ANEXO.porSolicitacao);
+    const hashes = (await Promise.all(anexaveis.map(hashDoArquivo))).filter(
+      (h): h is string => h !== null,
+    );
     const dados: DadosDeAbertura = {
       tipo,
       cte: cte.trim() || undefined,
@@ -56,6 +86,8 @@ export function FormularioDeAbertura() {
           : undefined,
       descricao,
       prioridade,
+      filialId: filialId || undefined,
+      hashesDosAnexos: hashes.length > 0 ? hashes : undefined,
       confirmarDuplicidade,
     };
     try {
@@ -63,9 +95,7 @@ export function FormularioDeAbertura() {
       // Os arquivos vão depois que a solicitação existe; se algum for
       // recusado, a solicitação continua aberta e o motivo aparece
       setErrosDosAnexos(
-        arquivos.length > 0
-          ? await enviarAnexos(nova.id, arquivos.slice(0, ANEXO.porSolicitacao))
-          : [],
+        anexaveis.length > 0 ? await enviarAnexos(nova.id, anexaveis) : [],
       );
       setCriada(nova);
       setDuplicidades(null);
@@ -179,6 +209,23 @@ export function FormularioDeAbertura() {
             ))}
           </select>
         </label>
+        {filiais.length > 0 && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto sm:col-span-2">
+            Filial que emitiu o documento
+            <select
+              value={filialId}
+              onChange={(evento) => setFilialId(evento.target.value)}
+              className={CAMPO}
+            >
+              <option value="">Escolha a filial</option>
+              {filiais.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
           Número do CTe
           <input
@@ -260,7 +307,7 @@ export function FormularioDeAbertura() {
           className="flex flex-col gap-3 rounded-md border border-atencao/50 bg-atencao/10 p-4"
         >
           <p className="text-sm font-semibold text-texto">
-            Este documento já tem solicitação recente:
+            Já existe solicitação recente parecida:
           </p>
           <ul className="flex flex-col gap-1 text-sm text-texto">
             {duplicidades.map((d) => (
@@ -271,9 +318,8 @@ export function FormularioDeAbertura() {
                 >
                   {d.protocolo}
                 </Link>{' '}
-                — {d.documento === 'CTE' ? 'CTe' : 'NF'} {d.valor},{' '}
-                {NOME_DO_STATUS[d.status].toLowerCase()}, aberta em{' '}
-                {dataCurta(d.criadoEm)}
+                — {descreverMotivo(d)}, {NOME_DO_STATUS[d.status].toLowerCase()}
+                , aberta em {dataCurta(d.criadoEm)}
               </li>
             ))}
           </ul>

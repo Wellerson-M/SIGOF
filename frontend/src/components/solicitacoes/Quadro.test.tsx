@@ -31,6 +31,7 @@ function solicitacao(extra: Partial<Resumo> = {}): Resumo {
     prioridade: 'ALTA',
     solicitante: { id: 'sol-1', nome: 'Sofia' },
     responsavel: null,
+    filial: null,
     criadoEm: '2026-10-15T12:00:00Z',
     atualizadoEm: '2026-10-15T12:00:00Z',
     slaVenceEm: '2026-10-15T16:00:00Z',

@@ -34,6 +34,7 @@ export interface Resumo {
   prioridade: Prioridade;
   solicitante: Pessoa;
   responsavel: Pessoa | null;
+  filial: Pessoa | null;
   criadoEm: string;
   atualizadoEm: string;
   slaVenceEm: string | null;
@@ -131,7 +132,8 @@ export interface Duplicidade {
   protocolo: string;
   status: Status;
   criadoEm: string;
-  documento: 'CTE' | 'NF';
+  /** ANEXO: um dos arquivos é igual a um já enviado (valor = nome dele). */
+  documento: 'CTE' | 'NF' | 'ANEXO';
   valor: string;
 }
 
@@ -142,6 +144,8 @@ export interface DadosDeAbertura {
   pagadorCorreto?: string;
   descricao: string;
   prioridade: Prioridade;
+  filialId?: string;
+  hashesDosAnexos?: string[];
   confirmarDuplicidade?: boolean;
 }
 

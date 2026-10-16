@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
+import { cadastros } from '@/lib/cadastros';
 import { api, type Resumo } from '@/lib/solicitacoes';
 import { FormularioDeAbertura } from './FormularioDeAbertura';
 
@@ -149,5 +150,61 @@ describe('FormularioDeAbertura', () => {
         'Descreva o problema com pelo menos 10 caracteres',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('com filiais cadastradas, pede a filial e manda junto', async () => {
+    vi.spyOn(cadastros, 'filiais').mockResolvedValue([
+      { id: 'cwb', nome: 'Curitiba', ativa: true },
+      { id: 'jve', nome: 'Joinville', ativa: true },
+    ]);
+    const abrir = vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+    render(<FormularioDeAbertura />);
+
+    const filial = await screen.findByLabelText(
+      'Filial que emitiu o documento',
+    );
+    const usuario = await preencher();
+    await usuario.selectOptions(filial, 'jve');
+    await usuario.click(
+      screen.getByRole('button', { name: 'Abrir solicitação' }),
+    );
+
+    expect(abrir).toHaveBeenCalledWith(
+      expect.objectContaining({ filialId: 'jve' }),
+    );
+  });
+
+  it('manda o hash dos arquivos e explica o alerta de arquivo repetido', async () => {
+    const abrir = vi.spyOn(api, 'abrir').mockRejectedValueOnce(
+      new ErroDaApi(409, 'CONFLITO', 'Já existe', {
+        duplicidades: [
+          {
+            id: 'velha',
+            protocolo: 'SOL-2026-10-0007',
+            status: 'NOVO',
+            criadoEm: '2026-10-14T12:00:00Z',
+            documento: 'ANEXO',
+            valor: 'cte-antigo.pdf',
+          },
+        ],
+      }),
+    );
+    render(<FormularioDeAbertura />);
+    const usuario = await preencher();
+    await usuario.upload(screen.getByLabelText(/^Anexos/), [
+      new File(['%PDF'], 'nota.pdf', { type: 'application/pdf' }),
+    ]);
+    await usuario.click(
+      screen.getByRole('button', { name: 'Abrir solicitação' }),
+    );
+
+    expect(
+      await screen.findByText(/mesmo arquivo \(cte-antigo\.pdf\)/),
+    ).toBeInTheDocument();
+    expect(abrir).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hashesDosAnexos: [expect.stringMatching(/^[0-9a-f]{64}$/)],
+      }),
+    );
   });
 });

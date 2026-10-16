@@ -187,6 +187,120 @@ describe('encontrarDuplicidades', () => {
   });
 });
 
+describe('filiais', () => {
+  it('mesmo CTe em filiais diferentes não é duplicidade', () => {
+    const motivos = encontrarDuplicidades(candidata({ filialId: 'curitiba' }), [
+      solicitacao({ filialId: 'joinville' }),
+    ]);
+
+    expect(motivos).toHaveLength(0);
+  });
+
+  it('mesmo CTe na mesma filial é duplicidade', () => {
+    const motivos = encontrarDuplicidades(candidata({ filialId: 'curitiba' }), [
+      solicitacao({ filialId: 'curitiba' }),
+    ]);
+
+    expect(motivos).toHaveLength(1);
+  });
+
+  it('sem filial de um dos lados, avisa (na dúvida, é a mesma)', () => {
+    expect(
+      encontrarDuplicidades(candidata({ filialId: 'curitiba' }), [
+        solicitacao({ filialId: null }),
+      ]),
+    ).toHaveLength(1);
+    expect(
+      encontrarDuplicidades(candidata({ filialId: null }), [
+        solicitacao({ filialId: 'curitiba' }),
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it('a NF também respeita a filial', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: null, nf: '555', filialId: 'curitiba' }),
+      [solicitacao({ cte: null, nf: '555', filialId: 'joinville' })],
+    );
+
+    expect(motivos).toHaveLength(0);
+  });
+});
+
+describe('arquivos anexados', () => {
+  const HASH = 'a'.repeat(64);
+
+  it('o mesmo arquivo com outro CTe e outra NF é duplicidade', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: '999', nf: '888', hashesDosAnexos: [HASH] }),
+      [
+        solicitacao({
+          cte: '111',
+          nf: '222',
+          anexos: [{ nomeArquivo: 'cte.pdf', sha256: HASH.toUpperCase() }],
+        }),
+      ],
+    );
+
+    expect(motivos).toEqual([
+      expect.objectContaining({ documento: 'ANEXO', valor: 'cte.pdf' }),
+    ]);
+  });
+
+  it('vale mesmo em outra filial e sem documento digitado', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({
+        cte: null,
+        nf: null,
+        filialId: 'curitiba',
+        hashesDosAnexos: [HASH],
+      }),
+      [
+        solicitacao({
+          filialId: 'joinville',
+          anexos: [{ nomeArquivo: 'nota.xml', sha256: HASH }],
+        }),
+      ],
+    );
+
+    expect(motivos).toHaveLength(1);
+  });
+
+  it('arquivo diferente ou anexo antigo sem hash não acusam', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: '999', hashesDosAnexos: [HASH] }),
+      [
+        solicitacao({
+          cte: '111',
+          anexos: [
+            { nomeArquivo: 'outro.pdf', sha256: 'b'.repeat(64) },
+            { nomeArquivo: 'antigo.pdf', sha256: null },
+          ],
+        }),
+      ],
+    );
+
+    expect(motivos).toHaveLength(0);
+  });
+
+  it('respeita a janela e ignora canceladas, como os documentos', () => {
+    const anexos = [{ nomeArquivo: 'cte.pdf', sha256: HASH }];
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: '999', hashesDosAnexos: [HASH] }),
+      [
+        solicitacao({ cte: '1', anexos, status: 'CANCELADO' }),
+        solicitacao({
+          cte: '2',
+          anexos,
+          criadoEm: new Date('2026-09-01T12:00:00Z'),
+        }),
+      ],
+    );
+
+    expect(motivos).toHaveLength(0);
+  });
+});
+
 describe('haDuplicidade', () => {
   it('resume o resultado em booleano', () => {
     expect(haDuplicidade(candidata(), [solicitacao()])).toBe(true);
