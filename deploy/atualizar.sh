@@ -3,7 +3,7 @@
 # (sigof-atualizar.timer).
 #
 # Antes dele, o próprio serviço já trouxe a configuração mais recente da
-# main (compose.yml, Caddyfile e este script). Aqui:
+# main (compose.yml, caddy/Caddyfile e este script). Aqui:
 # 1. baixa as imagens novas, se houver;
 # 2. recria só os contêineres que mudaram; os outros nem piscam.
 #
@@ -34,6 +34,16 @@ if [ "$api" != "$web" ]; then
 fi
 
 docker compose --env-file /opt/sigof/.env up -d --remove-orphans
+
+# O Caddy lê a configuração só quando inicia. Se o Caddyfile mudou desde a
+# última vez, manda recarregar (sem derrubar conexões). Sem isso, uma rota
+# nova ficaria valendo só depois de alguém reiniciar o Caddy à mão
+caddyfile=$(sha256sum caddy/Caddyfile | cut -d' ' -f1)
+if [ "$caddyfile" != "$(cat /opt/sigof/caddyfile.sha256 2>/dev/null)" ]; then
+  docker compose --env-file /opt/sigof/.env exec -T caddy     caddy reload --config /etc/caddy/Caddyfile --force
+  echo "$caddyfile" > /opt/sigof/caddyfile.sha256
+  echo "Caddy recarregado com o Caddyfile novo."
+fi
 
 # Imagens antigas ocupam disco à toa
 docker image prune -f > /dev/null

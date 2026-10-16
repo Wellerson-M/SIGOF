@@ -31,7 +31,10 @@ services:
     environment:
       DOMINIO_STAGING: ${DOMINIO_STAGING}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # A pasta inteira, e não o arquivo sozinho: o git troca o arquivo por
+      # outro ao atualizar, e um arquivo montado isolado continuaria
+      # mostrando a versão antiga dentro do contêiner
+      - ./caddy:/etc/caddy:ro
       - caddy-dados:/data
       - caddy-config:/config
     depends_on:
