@@ -23,6 +23,7 @@ import {
   type Status,
 } from '@/lib/solicitacoes';
 import { DialogoDeObservacao } from './DialogoDeObservacao';
+import { AlternarVisao } from './Lista';
 import { EtiquetaDePrioridade, IndicadorDeSla } from './Etiquetas';
 
 /** O quadro se atualiza sozinho: o que outra pessoa mover aparece aqui. */
@@ -138,14 +139,17 @@ export function Quadro() {
               : 'Acompanhe aqui as solicitações que você abriu.'}
           </p>
         </div>
-        {abre && (
-          <Link
-            href="/solicitacoes/nova"
-            className="inline-flex h-9 items-center rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria"
-          >
-            Nova solicitação
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <AlternarVisao atual="quadro" />
+          {abre && (
+            <Link
+              href="/solicitacoes/nova"
+              className="inline-flex h-9 items-center rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria"
+            >
+              Nova solicitação
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">

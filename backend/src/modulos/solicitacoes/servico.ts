@@ -136,6 +136,51 @@ export const STATUS_COM_OBSERVACAO: readonly Status[] = [
   'CANCELADO',
 ];
 
+export interface FiltrosDaLista {
+  pagina: number;
+  status?: Status[] | undefined;
+  prioridade?: Prioridade[] | undefined;
+  tipo?: TipoOcorrencia[] | undefined;
+  responsavelId?: string | undefined;
+  /** Só as que o usuário abriu ou que estão com ele. */
+  minhas?: boolean | undefined;
+  busca?: string | undefined;
+  /** Abertas a partir de / até (inclusive), "AAAA-MM-DD" no fuso da empresa. */
+  de?: string | undefined;
+  ate?: string | undefined;
+}
+
+export const ITENS_POR_PAGINA = 25;
+
+/**
+ * O instante em que começa o dia "AAAA-MM-DD" no fuso indicado: mede a
+ * diferença entre o relógio do fuso e o UTC naquele dia e a desconta.
+ */
+export function inicioDoDia(dia: string, fusoHorario: string): Date {
+  const meiaNoiteUtc = new Date(`${dia}T00:00:00Z`);
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: fusoHorario,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+      .formatToParts(meiaNoiteUtc)
+      .map((p) => [p.type, p.value]),
+  );
+  const relogioLocal = Date.UTC(
+    Number(partes.year),
+    Number(partes.month) - 1,
+    Number(partes.day),
+    Number(partes.hour),
+    Number(partes.minute),
+  );
+  return new Date(2 * meiaNoiteUtc.getTime() - relogioLocal);
+}
+
 /** Encerradas há mais que isso saem do quadro (continuam no detalhe). */
 export const DIAS_NO_QUADRO_DEPOIS_DE_ENCERRAR = 30;
 
@@ -367,6 +412,96 @@ export class ServicoDeSolicitacoes {
     return solicitacoes
       .sort(compararNaFila)
       .map((s) => this.resumir(s, usuario, expediente, agora));
+  }
+
+  /**
+   * A lista (RF04): todas as solicitações, inclusive as encerradas há muito
+   * tempo, com filtros e paginação. Ordem fixa (mais nova primeiro, com o id
+   * como desempate), para a mesma página sempre trazer os mesmos itens.
+   */
+  async pesquisar(
+    usuario: UsuarioAutenticado,
+    filtros: FiltrosDaLista,
+  ): Promise<{
+    itens: Resumo[];
+    total: number;
+    pagina: number;
+    porPagina: number;
+  }> {
+    const busca = filtros.busca?.trim();
+    const digitos = busca ? normalizarDocumento(busca) : null;
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: usuario.empresaId },
+    });
+    const fuso = empresa.fusoHorario;
+    const onde: Prisma.SolicitacaoWhereInput = {
+      AND: [
+        visiveisPara(usuario),
+        filtros.status ? { status: { in: filtros.status } } : {},
+        filtros.prioridade ? { prioridade: { in: filtros.prioridade } } : {},
+        filtros.tipo ? { tipo: { in: filtros.tipo } } : {},
+        filtros.responsavelId ? { responsavelId: filtros.responsavelId } : {},
+        filtros.minhas
+          ? {
+              OR: [
+                { solicitanteId: usuario.id },
+                { responsavelId: usuario.id },
+              ],
+            }
+          : {},
+        filtros.de || filtros.ate
+          ? {
+              criadoEm: {
+                ...(filtros.de ? { gte: inicioDoDia(filtros.de, fuso) } : {}),
+                // "Até" inclui o dia inteiro: vai até o começo do dia seguinte
+                ...(filtros.ate
+                  ? {
+                      lt: new Date(
+                        inicioDoDia(filtros.ate, fuso).getTime() + DIA,
+                      ),
+                    }
+                  : {}),
+              },
+            }
+          : {},
+        busca
+          ? {
+              OR: [
+                { protocolo: { contains: busca, mode: 'insensitive' } },
+                { descricao: { contains: busca, mode: 'insensitive' } },
+                ...(digitos
+                  ? [
+                      { cte: { contains: digitos } },
+                      { nf: { contains: digitos } },
+                    ]
+                  : []),
+              ],
+            }
+          : {},
+      ],
+    };
+
+    const [total, solicitacoes] = await Promise.all([
+      this.prisma.solicitacao.count({ where: onde }),
+      this.prisma.solicitacao.findMany({
+        where: onde,
+        include: incluirNoResumo,
+        orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+        skip: (filtros.pagina - 1) * ITENS_POR_PAGINA,
+        take: ITENS_POR_PAGINA,
+      }),
+    ]);
+
+    const expediente = expedienteDaEmpresa(empresa);
+    const agora = this.agora();
+    return {
+      itens: solicitacoes.map((s) =>
+        this.resumir(s, usuario, expediente, agora),
+      ),
+      total,
+      pagina: filtros.pagina,
+      porPagina: ITENS_POR_PAGINA,
+    };
   }
 
   async detalhar(usuario: UsuarioAutenticado, id: string): Promise<Detalhe> {

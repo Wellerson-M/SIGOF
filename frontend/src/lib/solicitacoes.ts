@@ -93,6 +93,39 @@ export interface Detalhe extends Resumo {
   };
 }
 
+export interface FiltrosDaLista {
+  pagina: number;
+  status?: Status[] | undefined;
+  prioridade?: Prioridade[] | undefined;
+  tipo?: Tipo[] | undefined;
+  minhas?: boolean | undefined;
+  busca?: string | undefined;
+  /** "AAAA-MM-DD" */
+  de?: string | undefined;
+  ate?: string | undefined;
+}
+
+export interface PaginaDaLista {
+  itens: Resumo[];
+  total: number;
+  pagina: number;
+  porPagina: number;
+}
+
+/** Os filtros na URL da API (listas viram "A,B"; vazios ficam de fora). */
+export function consultaDaLista(filtros: FiltrosDaLista): string {
+  const parametros = new URLSearchParams({ pagina: String(filtros.pagina) });
+  for (const campo of ['status', 'prioridade', 'tipo'] as const) {
+    const valores = filtros[campo];
+    if (valores?.length) parametros.set(campo, valores.join(','));
+  }
+  if (filtros.minhas) parametros.set('minhas', 'true');
+  if (filtros.busca) parametros.set('busca', filtros.busca);
+  if (filtros.de) parametros.set('de', filtros.de);
+  if (filtros.ate) parametros.set('ate', filtros.ate);
+  return parametros.toString();
+}
+
 export interface Duplicidade {
   id: string;
   protocolo: string;
@@ -119,6 +152,8 @@ export const api = {
     pedir<Resumo[]>(
       `/solicitacoes${busca ? `?busca=${encodeURIComponent(busca)}` : ''}`,
     ),
+  pesquisar: (filtros: FiltrosDaLista) =>
+    pedir<PaginaDaLista>(`/solicitacoes/lista?${consultaDaLista(filtros)}`),
   detalhar: (id: string) => pedir<Detalhe>(`/solicitacoes/${id}`),
   abrir: (dados: DadosDeAbertura) =>
     pedir<Resumo>('/solicitacoes', { method: 'POST', ...json(dados) }),
