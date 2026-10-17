@@ -160,6 +160,7 @@ model Empresa {
   filiais      Filial[]
   causas       CausaDeErro[]
   verificacoes ItemDeVerificacao[]
+  producao     ProducaoDoDigitador[]
   marcacoes    MarcacaoDeVerificacao[]
 
   @@map("empresas")
@@ -396,6 +397,26 @@ model MarcacaoDeVerificacao {
 
   @@unique([solicitacaoId, itemId])
   @@map("marcacoes_de_verificacao")
+}
+
+/// Quantos CTe cada digitador emitiu no mês: a base da taxa de erro do
+/// balanço mensal. Vem de planilha (exportada do sistema de emissão, à mão
+/// ou por um robô na máquina de quem tem acesso). Importar de novo o mesmo
+/// mês substitui os números.
+model ProducaoDoDigitador {
+  id          String   @id @default(uuid())
+  empresaId   String   @map("empresa_id")
+  /// "AAAA-MM"
+  mes         String
+  digitador   String
+  ctesEmitidos Int     @map("ctes_emitidos")
+  importadoPorId String @map("importado_por_id")
+  importadoEm DateTime @default(now()) @map("importado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  @@unique([empresaId, mes, digitador])
+  @@map("producao_dos_digitadores")
 }
 
 /// Contador de protocolo por empresa/ano/mês.

@@ -166,4 +166,91 @@ describe.skipIf(!temBanco)('indicadores (integração, banco real)', () => {
     expect(texto).toMatch(/;sim;;;\r\n/);
     expect(texto).not.toContain('De outra empresa');
   });
+
+  describe('balanço do mês por digitador', () => {
+    const put = async (perfil: Perfil, url: string, corpo: object) =>
+      request(app)
+        .put(url)
+        .set('Origin', FRONTEND)
+        .set('Cookie', await cookieDe(perfil))
+        .send(corpo);
+    const mesAtual = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+    })
+      .format(new Date())
+      .slice(0, 7);
+
+    it('importa a produção (soma nomes repetidos) e cruza com os erros do mês', async () => {
+      const causa = await prisma.causaDeErro.create({
+        data: {
+          empresaId: empresa.id,
+          nome: 'Erro de digitação',
+          rotuloDasOpcoes: 'Digitador',
+        },
+      });
+      const aberta = await post('SOLICITANTE', '/api/solicitacoes', {
+        tipo: 'REVERSAO',
+        cte: '31999',
+        descricao: 'Erro de digitação no CNPJ do remetente.',
+      });
+      await post('ANALISTA', `/api/solicitacoes/${aberta.body.id}/status`, {
+        status: 'EM_ANDAMENTO',
+      });
+      await post('ANALISTA', `/api/solicitacoes/${aberta.body.id}/status`, {
+        status: 'RESOLVIDO',
+        classificacao: { causaId: causa.id, detalhe: 'Bruno' },
+      });
+
+      const importada = await put('SUPERVISOR', '/api/indicadores/producao', {
+        mes: mesAtual,
+        linhas: [
+          { digitador: 'Bruno', ctesEmitidos: 30 },
+          { digitador: ' bruno ', ctesEmitidos: 20 },
+          { digitador: 'Ana', ctesEmitidos: 80 },
+        ],
+      });
+      expect(importada.body).toEqual({ mes: mesAtual, digitadores: 2 });
+
+      const balanco = await request(app)
+        .get(`/api/indicadores/digitadores?mes=${mesAtual}`)
+        .set('Cookie', await cookieDe('SUPERVISOR'));
+      expect(balanco.body.linhas).toEqual([
+        { digitador: 'Bruno', ctesEmitidos: 50, erros: 1, taxaDeErro: 2 },
+        { digitador: 'Ana', ctesEmitidos: 80, erros: 0, taxaDeErro: 0 },
+      ]);
+      expect(balanco.body.importadoEm).not.toBeNull();
+
+      // Importar de novo substitui
+      await put('SUPERVISOR', '/api/indicadores/producao', {
+        mes: mesAtual,
+        linhas: [{ digitador: 'Ana', ctesEmitidos: 10 }],
+      });
+      const depois = await request(app)
+        .get(`/api/indicadores/digitadores?mes=${mesAtual}`)
+        .set('Cookie', await cookieDe('SUPERVISOR'));
+      expect(
+        depois.body.linhas.find(
+          (l: { digitador: string }) => l.digitador === 'Bruno',
+        ),
+      ).toMatchObject({ ctesEmitidos: null, erros: 1 });
+    });
+
+    it('mês inválido e perfil sem acesso são recusados', async () => {
+      expect(
+        (
+          await request(app)
+            .get('/api/indicadores/digitadores?mes=2026-13')
+            .set('Cookie', await cookieDe('SUPERVISOR'))
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await put('ANALISTA', '/api/indicadores/producao', {
+            mes: mesAtual,
+            linhas: [{ digitador: 'X', ctesEmitidos: 1 }],
+          })
+        ).status,
+      ).toBe(403);
+    });
+  });
 });

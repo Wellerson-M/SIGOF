@@ -40,10 +40,61 @@ export interface Indicadores {
     detalhes: { detalhe: string; total: number }[];
   }[];
   resolvidasSemCausa?: number;
+  porFilial?: { filial: string; total: number }[];
+  porSolicitante?: { nome: string; total: number }[];
+  tempoAteResolverPorTipo?: {
+    tipo: Tipo;
+    minutos: number;
+    resolvidas: number;
+  }[];
+}
+
+export interface Balanco {
+  mes: string;
+  linhas: {
+    digitador: string;
+    ctesEmitidos: number | null;
+    erros: number;
+    /** Erros a cada 100 CTe; null sem produção importada. */
+    taxaDeErro: number | null;
+  }[];
+  importadoEm: string | null;
+}
+
+/**
+ * Lê a planilha de produção: uma linha por digitador, com o nome e a
+ * quantidade separados por ponto e vírgula, vírgula ou tabulação (o Excel
+ * em português salva com ";"). Cabeçalho e linhas sem número são ignorados.
+ */
+export function lerPlanilhaDeProducao(
+  texto: string,
+): { digitador: string; ctesEmitidos: number }[] {
+  return texto
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .flatMap((linha) => {
+      const [nome, quantidade] = linha
+        .split(/[;\t,]/)
+        .map((c) => c.trim().replace(/^"|"$/g, ''));
+      const numero = Number((quantidade ?? '').replace(/\./g, ''));
+      return nome && Number.isInteger(numero) && numero >= 0 && quantidade
+        ? [{ digitador: nome, ctesEmitidos: numero }]
+        : [];
+    });
 }
 
 export const indicadores = {
   calcular: (dias: Periodo) => pedir<Indicadores>(`/indicadores?dias=${dias}`),
+  balanco: (mes: string) =>
+    pedir<Balanco>(`/indicadores/digitadores?mes=${encodeURIComponent(mes)}`),
+  importarProducao: (
+    mes: string,
+    linhas: { digitador: string; ctesEmitidos: number }[],
+  ) =>
+    pedir<{ mes: string; digitadores: number }>('/indicadores/producao', {
+      method: 'PUT',
+      body: JSON.stringify({ mes, linhas }),
+    }),
   csv: (dias: Periodo) =>
     pedirArquivo(`/indicadores/solicitacoes.csv?dias=${dias}`),
 };

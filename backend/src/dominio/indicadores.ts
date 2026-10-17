@@ -30,6 +30,8 @@ export interface SolicitacaoParaIndicadores {
   slaMinutosPausados: number;
   responsavel: { id: string; nome: string } | null;
   abertaComAlertaDeDuplicidade: boolean;
+  filial?: string | null | undefined;
+  solicitante?: string | undefined;
   /** Já resolvida por fora: não conta no tempo até resolver. */
   registroRapido?: boolean | undefined;
   /** Causa do erro registrada ao resolver (controle interno). */
@@ -76,6 +78,71 @@ export interface Indicadores {
     detalhes: { detalhe: string; total: number }[];
   }[];
   resolvidasSemCausa: number;
+  /** Abertas no período por filial ("Sem filial" quando não informada). */
+  porFilial: { filial: string; total: number }[];
+  /** Quem mais abriu no período (os 8 primeiros). */
+  porSolicitante: { nome: string; total: number }[];
+  /** Tempo médio até resolver, por tipo, entre as resolvidas no período. */
+  tempoAteResolverPorTipo: {
+    tipo: Tipo;
+    minutos: number;
+    resolvidas: number;
+  }[];
+}
+
+/** Uma linha do balanço mensal: o que o digitador emitiu e quanto errou. */
+export interface LinhaDoBalanco {
+  digitador: string;
+  /** Null: a produção do mês ainda não foi importada para ele. */
+  ctesEmitidos: number | null;
+  erros: number;
+  /** Erros a cada 100 CTe emitidos; null sem produção. */
+  taxaDeErro: number | null;
+}
+
+/**
+ * Junta a produção importada com os erros registrados no mês. O nome é
+ * comparado sem diferença de maiúsculas e espaços ("ana " = "Ana").
+ */
+export function balancoDoMes(
+  producao: readonly { digitador: string; ctesEmitidos: number }[],
+  erros: readonly { digitador: string }[],
+): LinhaDoBalanco[] {
+  const chave = (nome: string) =>
+    nome.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+  const linhas = new Map<string, LinhaDoBalanco>();
+  for (const p of producao) {
+    linhas.set(chave(p.digitador), {
+      digitador: p.digitador.trim(),
+      ctesEmitidos: p.ctesEmitidos,
+      erros: 0,
+      taxaDeErro: null,
+    });
+  }
+  for (const e of erros) {
+    const linha = linhas.get(chave(e.digitador)) ?? {
+      digitador: e.digitador.trim(),
+      ctesEmitidos: null,
+      erros: 0,
+      taxaDeErro: null,
+    };
+    linha.erros += 1;
+    linhas.set(chave(e.digitador), linha);
+  }
+  return [...linhas.values()]
+    .map((l) => ({
+      ...l,
+      taxaDeErro:
+        l.ctesEmitidos && l.ctesEmitidos > 0
+          ? Math.round((l.erros / l.ctesEmitidos) * 10_000) / 100
+          : null,
+    }))
+    .sort(
+      (a, b) =>
+        (b.taxaDeErro ?? -1) - (a.taxaDeErro ?? -1) ||
+        b.erros - a.erros ||
+        a.digitador.localeCompare(b.digitador),
+    );
 }
 
 const MINUTO = 60_000;
@@ -241,6 +308,41 @@ export function calcularIndicadores(
         .map(({ nome: detalhe, total: n }) => ({ detalhe, total: n })),
     }));
 
+  const contar = (valores: string[]) => {
+    const totais = new Map<string, number>();
+    for (const v of valores) totais.set(v, (totais.get(v) ?? 0) + 1);
+    return [...totais.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    );
+  };
+  const porFilial = contar(
+    abertasNoPeriodo.map((s) => s.filial ?? 'Sem filial'),
+  ).map(([filial, total]) => ({ filial, total }));
+  const porSolicitante = contar(
+    abertasNoPeriodo.flatMap((s) => (s.solicitante ? [s.solicitante] : [])),
+  )
+    .slice(0, 8)
+    .map(([nome, total]) => ({ nome, total }));
+  const tempoAteResolverPorTipo = TIPOS.map((tipo) => {
+    const daqui = resolvidasNoPeriodo.filter(
+      (s) => s.tipo === tipo && !s.registroRapido,
+    );
+    return {
+      tipo,
+      resolvidas: daqui.length,
+      minutos:
+        media(
+          daqui.map(
+            (s) =>
+              ((s.resolvidoEm as Date).getTime() - s.criadoEm.getTime()) /
+              MINUTO,
+          ),
+        ) ?? 0,
+    };
+  })
+    .filter((t) => t.resolvidas > 0)
+    .sort((a, b) => b.minutos - a.minutos);
+
   return {
     periodo: { dias, de, ate: agora },
     agora: { abertas, porStatus, slaVencido, semResponsavel },
@@ -284,6 +386,9 @@ export function calcularIndicadores(
     porDia: [...porDia.entries()].map(([dia, n]) => ({ dia, ...n })),
     porCausa,
     resolvidasSemCausa,
+    porFilial,
+    porSolicitante,
+    tempoAteResolverPorTipo,
   };
 }
 
