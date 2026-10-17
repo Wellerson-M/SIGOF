@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { EVENTOS_DE_EMAIL } from './avisos.js';
 import {
   autenticar,
   exigirPerfil,
@@ -35,6 +36,7 @@ const esquemaConfiguracao = z
       .array(z.string().trim().email('E-mail inválido').max(254))
       .max(10, 'No máximo 10 caixas centrais')
       .optional(),
+    eventos: z.array(z.enum(EVENTOS_DE_EMAIL)).optional(),
   })
   .strict();
 

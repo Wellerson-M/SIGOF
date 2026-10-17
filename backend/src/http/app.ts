@@ -44,6 +44,8 @@ export interface ModulosDaApp {
   limiteDeLoginPorMinuto?: number;
   /** Troca o envio SMTP real por um dublê (testes). */
   remetenteDeEmail?: Remetente;
+  /** Janela de agrupamento dos e-mails (os testes usam 0). */
+  segundosParaAgruparEmails?: number;
   /** Troca o armazenamento S3 por outro (testes). */
   armazenamento?: Armazenamento;
 }
@@ -165,7 +167,10 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       }),
     );
 
-    const avisos = new ServicoDeAvisos({ urlDoSistema: env.FRONTEND_URL });
+    const avisos = new ServicoDeAvisos({
+      urlDoSistema: env.FRONTEND_URL,
+      segundosParaAgrupar: modulos.segundosParaAgruparEmails,
+    });
     app.use(
       '/api/solicitacoes/:id/anexos',
       rotasDeAnexos({

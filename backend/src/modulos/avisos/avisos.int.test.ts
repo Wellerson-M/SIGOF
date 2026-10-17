@@ -3,6 +3,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { criarApp } from '../../http/app.js';
+import { ArmazenamentoEmMemoria } from '../anexos/armazenamento.js';
 import { Cifra } from '../../seguranca/cifra.js';
 import {
   SENHA,
@@ -57,6 +58,9 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
       env: ENV,
       limiteDeLoginPorMinuto: 1000,
       remetenteDeEmail: smtp.enviar,
+      // Cada movimentação vira um e-mail na hora; o agrupamento tem
+      // testes próprios no fim do arquivo
+      segundosParaAgruparEmails: 0,
     });
     empresa = await criarEmpresaDeTeste(prisma);
     outra = await criarEmpresaDeTeste(prisma);
@@ -98,6 +102,7 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
         return pedido.set('Origin', FRONTEND).set('Cookie', cookie).send(corpo);
       };
     return {
+      cookie,
       get: (url: string) => request(app).get(url).set('Cookie', cookie),
       post: comCorpo('post'),
       patch: comCorpo('patch'),
@@ -174,6 +179,7 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
         temSenha: true,
         nomeDoRemetente: 'SIGOF Demo',
         caixasCentrais: ['ocorrencias@demo.test', 'gerente@demo.test'],
+        eventos: ['ABERTA', 'STATUS', 'MENSAGEM', 'ANEXO'],
       });
       expect(JSON.stringify(config)).not.toContain('abcd');
 
@@ -274,8 +280,9 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
         conteudo: 'Já estou vendo.',
       });
 
+      // Prioridade fica só no sino: por padrão não gera e-mail
       const emails = await emailsDa(id);
-      expect(emails).toHaveLength(4);
+      expect(emails).toHaveLength(3);
       const raiz = emails[0]?.messageId;
       for (const email of emails.slice(1)) {
         expect(email.respondendoA).toBe(raiz);
@@ -546,6 +553,103 @@ describe.skipIf(!temBanco)('avisos: e-mail e notificações (integração)', () 
 
     it('exige login', async () => {
       expect((await request(app).get('/api/notificacoes')).status).toBe(401);
+    });
+  });
+
+  describe('e-mails agrupados (janela de 60 s)', () => {
+    let agrupador: Express;
+    const PDF = Buffer.from('%PDF-1.7 1 0 obj << >> endobj %%EOF agrupar');
+
+    beforeAll(async () => {
+      agrupador = criarApp({
+        prisma,
+        env: ENV,
+        limiteDeLoginPorMinuto: 1000,
+        remetenteDeEmail: smtp.enviar,
+        armazenamento: new ArmazenamentoEmMemoria(),
+      });
+      await ligarEmail();
+    });
+
+    async function comCookie(perfil: Perfil) {
+      return (await como(perfil)).cookie;
+    }
+
+    it('abrir e anexar dois arquivos vira um e-mail só, com o link de cada arquivo', async () => {
+      const cookie = await comCookie('SOLICITANTE');
+      const aberta = await request(agrupador)
+        .post('/api/solicitacoes')
+        .set('Origin', ENV.FRONTEND_URL)
+        .set('Cookie', cookie)
+        .send({
+          tipo: 'REVERSAO',
+          cte: '99001',
+          descricao: 'Mercadoria recusada, emitir reversão.',
+        });
+      for (const nome of ['cte.pdf', 'nf.pdf']) {
+        const anexo = await request(agrupador)
+          .post(`/api/solicitacoes/${aberta.body.id}/anexos`)
+          .set('Origin', ENV.FRONTEND_URL)
+          .set('Cookie', cookie)
+          .field('etapa', 'ABERTURA')
+          .attach('arquivo', Buffer.concat([PDF, Buffer.from(nome)]), nome);
+        expect(anexo.status).toBe(201);
+      }
+
+      const emails = await emailsDa(aberta.body.id);
+      expect(emails).toHaveLength(1);
+      const [email] = emails;
+      expect(email!.messageId).toBe(`<sigof.${aberta.body.id}@localhost>`);
+      expect(email!.tentarEm.getTime()).toBeGreaterThan(Date.now() + 30_000);
+      expect(email!.texto).toContain('Solicitação aberta por');
+      expect(email!.texto).toContain('anexou 2 arquivos');
+      expect(email!.html).toMatch(
+        new RegExp(`/anexos/${aberta.body.id}/[0-9a-f-]{36}`),
+      );
+    });
+
+    it('depois que o e-mail saiu para envio, o próximo acontecimento vira outro e-mail', async () => {
+      const cookie = await comCookie('SOLICITANTE');
+      const aberta = await request(agrupador)
+        .post('/api/solicitacoes')
+        .set('Origin', ENV.FRONTEND_URL)
+        .set('Cookie', cookie)
+        .send({
+          tipo: 'REVERSAO',
+          cte: '99002',
+          descricao: 'Mercadoria recusada, emitir reversão.',
+        });
+      // O carteiro reservou o e-mail: a janela fecha
+      await prisma.emailSaida.updateMany({
+        where: { solicitacaoId: aberta.body.id },
+        data: { agruparAte: null },
+      });
+      await request(agrupador)
+        .post(`/api/solicitacoes/${aberta.body.id}/mensagens`)
+        .set('Origin', ENV.FRONTEND_URL)
+        .set('Cookie', cookie)
+        .send({ conteudo: 'Segue mais uma informação.' });
+
+      const emails = await emailsDa(aberta.body.id);
+      expect(emails).toHaveLength(2);
+      expect(emails[1]!.respondendoA).toBe(emails[0]!.messageId);
+    });
+
+    it('a empresa escolhe quais acontecimentos geram e-mail', async () => {
+      const admin = await como('ADMIN');
+      await admin.patch('/api/admin/email', { eventos: ['ABERTA'] });
+      const config = (await admin.get('/api/admin/email')).body;
+      expect(config.eventos).toEqual(['ABERTA']);
+
+      const { id } = await abrir();
+      await (
+        await como('ANALISTA')
+      ).post(`/api/solicitacoes/${id}/mensagens`, { conteudo: 'Vendo.' });
+      expect(await emailsDa(id)).toHaveLength(1);
+
+      await admin.patch('/api/admin/email', {
+        eventos: ['ABERTA', 'STATUS', 'MENSAGEM', 'ANEXO'],
+      });
     });
   });
 });

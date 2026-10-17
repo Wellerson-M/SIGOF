@@ -962,6 +962,7 @@ export class ServicoDeSolicitacoes {
         tipo: 'MENSAGEM',
         conteudo: criada.conteudo,
         interna,
+        mensagemId: criada.id,
       });
       return criada;
     });

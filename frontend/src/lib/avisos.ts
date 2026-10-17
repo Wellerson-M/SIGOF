@@ -27,7 +27,21 @@ export interface ConfiguracaoDeEmail {
   nomeDoRemetente: string | null;
   /** Recebem cópia de tudo (registro e backup). */
   caixasCentrais: string[];
+  /** Acontecimentos que geram e-mail (os outros ficam só no sino). */
+  eventos: EventoDeEmail[];
 }
+
+export type EventoDeEmail =
+  'ABERTA' | 'STATUS' | 'MENSAGEM' | 'ANEXO' | 'PRIORIDADE' | 'RESPONSAVEL';
+
+export const EVENTOS_DE_EMAIL: { valor: EventoDeEmail; rotulo: string }[] = [
+  { valor: 'ABERTA', rotulo: 'Solicitação aberta' },
+  { valor: 'STATUS', rotulo: 'Mudança de status (inclui resolvida)' },
+  { valor: 'MENSAGEM', rotulo: 'Mensagem na conversa' },
+  { valor: 'ANEXO', rotulo: 'Arquivo anexado' },
+  { valor: 'PRIORIDADE', rotulo: 'Prioridade alterada' },
+  { valor: 'RESPONSAVEL', rotulo: 'Responsável alterado' },
+];
 
 export interface AlteracaoDeEmail {
   ativo?: boolean;
@@ -38,6 +52,7 @@ export interface AlteracaoDeEmail {
   senha?: string;
   nomeDoRemetente?: string | null;
   caixasCentrais?: string[];
+  eventos?: EventoDeEmail[];
 }
 
 export type SituacaoDoEmail = 'PENDENTE' | 'ENVIADO' | 'FALHOU';
