@@ -67,6 +67,16 @@ enum AcaoDeAuditoria {
   CADASTRO_ALTERADO
 }
 
+/// Em que momento o arquivo entrou: o detalhe mostra cada grupo separado.
+enum EtapaDoAnexo {
+  /// Junto com a abertura (o que o solicitante mandou de início)
+  ABERTURA
+  /// Durante o atendimento, inclusive pela conversa
+  ANDAMENTO
+  /// Ao resolver (o documento final)
+  RESOLUCAO
+}
+
 enum SituacaoDoEmail {
   PENDENTE
   ENVIADO
@@ -356,6 +366,7 @@ model Mensagem {
   empresa     Empresa     @relation(fields: [empresaId], references: [id])
   solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
   autor       Usuario     @relation(fields: [autorId], references: [id])
+  anexos      Anexo[]
 
   @@index([empresaId, solicitacaoId])
   @@map("mensagens")
@@ -374,11 +385,15 @@ model Anexo {
   /// SHA-256 do conteúdo: o mesmo arquivo enviado em outra solicitação
   /// (com outro CTe digitado, por exemplo) também gera alerta de duplicidade.
   sha256        String?
+  etapa         EtapaDoAnexo @default(ANDAMENTO)
+  /// Enviado junto com uma mensagem da conversa (aparece nela, com link).
+  mensagemId    String?      @map("mensagem_id")
   criadoEm      DateTime @default(now()) @map("criado_em")
 
   empresa     Empresa     @relation(fields: [empresaId], references: [id])
   solicitacao Solicitacao @relation(fields: [solicitacaoId], references: [id])
   enviadoPor  Usuario     @relation(fields: [enviadoPorId], references: [id])
+  mensagem    Mensagem?   @relation(fields: [mensagemId], references: [id])
 
   @@index([empresaId, solicitacaoId])
   @@index([empresaId, sha256])

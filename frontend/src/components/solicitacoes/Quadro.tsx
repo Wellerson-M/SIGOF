@@ -108,7 +108,9 @@ export function Quadro() {
     // O documento final vai antes de resolver: depois de resolvida, a
     // solicitação não recebe mais anexos
     if (extras && extras.arquivos.length > 0) {
-      const erros = await enviarAnexos(item.id, extras.arquivos);
+      const erros = await enviarAnexos(item.id, extras.arquivos, {
+        etapa: 'RESOLUCAO',
+      });
       if (erros.length > 0) {
         setAviso(`${item.protocolo}: ${erros.join('; ')}`);
         return;

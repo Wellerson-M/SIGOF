@@ -14,15 +14,28 @@ import type { ServicoDeAvisos } from '../avisos/avisos.js';
 import { visiveisPara } from '../solicitacoes/servico.js';
 import type { Armazenamento } from './armazenamento.js';
 
-/** Limites da issue #29: até 5 MB por arquivo e 10 por solicitação. */
+/**
+ * Até 5 MB por arquivo (issue #29). Com anexos também na conversa, o
+ * limite por solicitação subiu de 10 para 30.
+ */
 export const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
-export const ANEXOS_POR_SOLICITACAO = 10;
+export const ANEXOS_POR_SOLICITACAO = 30;
+
+export type EtapaDoAnexo = 'ABERTURA' | 'ANDAMENTO' | 'RESOLUCAO';
+
+export interface OpcoesDoAnexo {
+  etapa?: EtapaDoAnexo | undefined;
+  /** Mensagem da conversa a que o arquivo pertence (do próprio autor). */
+  mensagemId?: string | undefined;
+}
 
 export interface AnexoResumido {
   id: string;
   nomeArquivo: string;
   tipoMime: string;
   tamanhoBytes: number;
+  etapa: EtapaDoAnexo;
+  mensagemId: string | null;
   enviadoPor: { id: string; nome: string };
   criadoEm: Date;
 }
@@ -53,6 +66,7 @@ export class ServicoDeAnexos {
     usuario: UsuarioAutenticado,
     solicitacaoId: string,
     arquivo: { nome: string; conteudo: Buffer },
+    opcoes: OpcoesDoAnexo = {},
   ): Promise<AnexoResumido> {
     const solicitacao = await this.prisma.solicitacao.findFirst({
       where: { id: solicitacaoId, ...visiveisPara(usuario) },
@@ -81,6 +95,25 @@ export class ServicoDeAnexos {
     }
     if (arquivo.conteudo.length === 0) {
       throw new ErroDeRegraDeNegocio('O arquivo está vazio');
+    }
+    if (opcoes.etapa === 'RESOLUCAO' && usuario.perfil === 'SOLICITANTE') {
+      throw new ErroDeRegraDeNegocio(
+        'Só a equipe anexa o documento da resolução',
+      );
+    }
+    if (opcoes.mensagemId) {
+      // Só na própria mensagem, e da mesma solicitação
+      const mensagem = await this.prisma.mensagem.findFirst({
+        where: {
+          id: opcoes.mensagemId,
+          solicitacaoId: solicitacao.id,
+          autorId: usuario.id,
+        },
+        select: { id: true },
+      });
+      if (!mensagem) {
+        throw new ErroNaoEncontrado('Mensagem não encontrada');
+      }
     }
 
     // O tipo vem do conteúdo, nunca do nome nem do que o navegador diz
@@ -114,6 +147,10 @@ export class ServicoDeAnexos {
           tipoMime: aceito.mime,
           tamanhoBytes: arquivo.conteudo.length,
           sha256: createHash('sha256').update(arquivo.conteudo).digest('hex'),
+          etapa: opcoes.mensagemId
+            ? 'ANDAMENTO'
+            : (opcoes.etapa ?? 'ANDAMENTO'),
+          mensagemId: opcoes.mensagemId ?? null,
         },
         include: { enviadoPor: { select: { id: true, nome: true } } },
       });
@@ -164,6 +201,8 @@ export class ServicoDeAnexos {
     nomeArquivo: string;
     tipoMime: string;
     tamanhoBytes: number;
+    etapa: EtapaDoAnexo;
+    mensagemId: string | null;
     enviadoPor: { id: string; nome: string };
     criadoEm: Date;
   }): AnexoResumido {
@@ -172,6 +211,8 @@ export class ServicoDeAnexos {
       nomeArquivo: anexo.nomeArquivo,
       tipoMime: anexo.tipoMime,
       tamanhoBytes: anexo.tamanhoBytes,
+      etapa: anexo.etapa,
+      mensagemId: anexo.mensagemId,
       enviadoPor: anexo.enviadoPor,
       criadoEm: anexo.criadoEm,
     };

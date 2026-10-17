@@ -52,6 +52,8 @@ describe('FormularioDeAbertura', () => {
       nomeArquivo: 'nota.pdf',
       tipoMime: 'application/pdf',
       tamanhoBytes: 10,
+      etapa: 'ANDAMENTO',
+      mensagemId: null,
       enviadoPor: { id: 'u', nome: 'U' },
       criadoEm: '2026-10-16T10:00:00Z',
     });
@@ -69,7 +71,9 @@ describe('FormularioDeAbertura', () => {
     );
 
     expect(await screen.findByText(/SOL-2026-10-0042/)).toBeInTheDocument();
-    expect(anexar).toHaveBeenCalledWith('nova', expect.any(File));
+    expect(anexar).toHaveBeenCalledWith('nova', expect.any(File), {
+      etapa: 'ABERTURA',
+    });
     expect(anexar).toHaveBeenCalledTimes(1);
     expect(
       screen.getByText('programa.exe: envie PDF, PNG, JPG, WEBP ou XML'),

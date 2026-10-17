@@ -9,6 +9,8 @@ import {
   problemaNoArquivo,
   tamanhoLegivel,
   type Anexo,
+  type EtapaDoAnexo,
+  type OpcoesDoAnexo,
 } from '@/lib/solicitacoes';
 
 /** Tipos que o navegador mostra numa aba nova; o resto é baixado. */
@@ -26,6 +28,7 @@ const EXIBIVEIS = new Set([
 export async function enviarAnexos(
   solicitacaoId: string,
   arquivos: File[],
+  opcoes: OpcoesDoAnexo = {},
 ): Promise<string[]> {
   const erros: string[] = [];
   for (const arquivo of arquivos) {
@@ -35,7 +38,7 @@ export async function enviarAnexos(
       continue;
     }
     try {
-      await api.anexar(solicitacaoId, arquivo);
+      await api.anexar(solicitacaoId, arquivo, opcoes);
     } catch (falha) {
       erros.push(`${arquivo.name}: ${mensagemDoErro(falha)}`);
     }
@@ -43,7 +46,42 @@ export async function enviarAnexos(
   return erros;
 }
 
-/** Anexos da solicitação: lista, abrir/baixar e anexar mais. */
+/**
+ * Abre o anexo numa aba (PDF e imagem) ou baixa (XML). A aba abre já no
+ * clique (senão o navegador a bloqueia como pop-up) e recebe o arquivo
+ * quando ele chegar. Rejeita com o erro da API.
+ */
+export async function abrirAnexo(
+  solicitacaoId: string,
+  anexo: { id: string; nomeArquivo: string; tipoMime: string },
+): Promise<void> {
+  const exibir = EXIBIVEIS.has(anexo.tipoMime);
+  const aba = exibir ? window.open('', '_blank') : null;
+  try {
+    const conteudo = await api.baixarAnexo(solicitacaoId, anexo.id);
+    const endereco = URL.createObjectURL(conteudo);
+    if (aba) {
+      aba.location.href = endereco;
+    } else {
+      const link = document.createElement('a');
+      link.href = endereco;
+      link.download = anexo.nomeArquivo;
+      link.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(endereco), 60_000);
+  } catch (falha) {
+    aba?.close();
+    throw falha;
+  }
+}
+
+const GRUPOS: { etapa: EtapaDoAnexo; titulo: string }[] = [
+  { etapa: 'ABERTURA', titulo: 'Enviados na abertura' },
+  { etapa: 'ANDAMENTO', titulo: 'Durante o atendimento' },
+  { etapa: 'RESOLUCAO', titulo: 'Enviados ao resolver' },
+];
+
+/** Anexos da solicitação: lista por etapa, abrir/baixar e anexar mais. */
 export function Anexos({
   solicitacaoId,
   anexos,
@@ -82,27 +120,18 @@ export function Anexos({
 
   async function abrir(anexo: Anexo) {
     setErros([]);
-    // A aba abre já no clique (senão o navegador a bloqueia como pop-up)
-    // e recebe o arquivo quando ele chegar
-    const exibir = EXIBIVEIS.has(anexo.tipoMime);
-    const aba = exibir ? window.open('', '_blank') : null;
     try {
-      const conteudo = await api.baixarAnexo(solicitacaoId, anexo.id);
-      const endereco = URL.createObjectURL(conteudo);
-      if (aba) {
-        aba.location.href = endereco;
-      } else {
-        const link = document.createElement('a');
-        link.href = endereco;
-        link.download = anexo.nomeArquivo;
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(endereco), 60_000);
+      await abrirAnexo(solicitacaoId, anexo);
     } catch (falha) {
-      aba?.close();
       setErros([mensagemDoErro(falha)]);
     }
   }
+
+  // Só mostra os títulos dos grupos quando há mais de um
+  const grupos = GRUPOS.map((g) => ({
+    ...g,
+    itens: anexos.filter((a) => (a.etapa ?? 'ANDAMENTO') === g.etapa),
+  })).filter((g) => g.itens.length > 0);
 
   return (
     <section className="rounded-lg border border-borda bg-superficie p-4">
@@ -139,31 +168,41 @@ export function Anexos({
           {podeAnexar && 'PDF, imagem ou XML da nota, até 5 MB cada.'}
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-borda">
-          {anexos.map((anexo) => (
-            <li
-              key={anexo.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
-            >
-              <button
-                type="button"
-                onClick={() => void abrir(anexo)}
-                className="min-w-0 truncate text-left font-medium text-primaria underline"
-                title={
-                  EXIBIVEIS.has(anexo.tipoMime)
-                    ? 'Abrir em outra aba'
-                    : 'Baixar'
-                }
-              >
-                {anexo.nomeArquivo}
-              </button>
-              <span className="text-xs text-texto-suave">
-                {tamanhoLegivel(anexo.tamanhoBytes)} · {anexo.enviadoPor.nome} ·{' '}
-                {dataCurta(anexo.criadoEm)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        grupos.map((grupo) => (
+          <div key={grupo.etapa} className="mb-2 last:mb-0">
+            {grupos.length > 1 && (
+              <h3 className="mt-1 text-xs font-semibold text-texto-suave">
+                {grupo.titulo}
+              </h3>
+            )}
+            <ul className="flex flex-col divide-y divide-borda">
+              {grupo.itens.map((anexo) => (
+                <li
+                  key={anexo.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void abrir(anexo)}
+                    className="min-w-0 truncate text-left font-medium text-primaria underline"
+                    title={
+                      EXIBIVEIS.has(anexo.tipoMime)
+                        ? 'Abrir em outra aba'
+                        : 'Baixar'
+                    }
+                  >
+                    {anexo.nomeArquivo}
+                  </button>
+                  <span className="text-xs text-texto-suave">
+                    {tamanhoLegivel(anexo.tamanhoBytes)} ·{' '}
+                    {anexo.enviadoPor.nome} · {dataCurta(anexo.criadoEm)}
+                    {anexo.mensagemId && ' · na conversa'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
       )}
 
       {erros.length > 0 && (

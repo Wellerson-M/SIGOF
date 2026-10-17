@@ -45,11 +45,17 @@ export interface Resumo {
   totais: { anexos: number; mensagens: number };
 }
 
+/** Quando o arquivo entrou: abertura, atendimento (e conversa) ou resolução. */
+export type EtapaDoAnexo = 'ABERTURA' | 'ANDAMENTO' | 'RESOLUCAO';
+
 export interface Anexo {
   id: string;
   nomeArquivo: string;
   tipoMime: string;
   tamanhoBytes: number;
+  etapa: EtapaDoAnexo;
+  /** Enviado junto com uma mensagem da conversa. */
+  mensagemId: string | null;
   enviadoPor: Pessoa;
   criadoEm: string;
 }
@@ -60,6 +66,12 @@ export interface Mensagem {
   interna: boolean;
   autor: Pessoa;
   criadoEm: string;
+  anexos: { id: string; nomeArquivo: string; tipoMime: string }[];
+}
+
+export interface OpcoesDoAnexo {
+  etapa?: EtapaDoAnexo;
+  mensagemId?: string;
 }
 
 export interface Evento {
@@ -207,14 +219,22 @@ export const api = {
       method: 'POST',
       ...json({ responsavelId }),
     }),
-  comentar: (id: string, conteudo: string, interna: boolean) =>
+  comentar: (
+    id: string,
+    conteudo: string,
+    interna: boolean,
+    comAnexos = false,
+  ) =>
     pedir<Mensagem>(`/solicitacoes/${id}/mensagens`, {
       method: 'POST',
-      ...json({ conteudo, interna }),
+      ...json({ conteudo, interna, ...(comAnexos ? { comAnexos } : {}) }),
     }),
   responsaveis: () => pedir<Pessoa[]>('/solicitacoes/responsaveis'),
-  anexar: (id: string, arquivo: File) => {
+  anexar: (id: string, arquivo: File, opcoes: OpcoesDoAnexo = {}) => {
     const formulario = new FormData();
+    // Os campos vão antes do arquivo: o servidor lê o formulário em ordem
+    if (opcoes.etapa) formulario.append('etapa', opcoes.etapa);
+    if (opcoes.mensagemId) formulario.append('mensagemId', opcoes.mensagemId);
     formulario.append('arquivo', arquivo);
     return pedir<Anexo>(`/solicitacoes/${id}/anexos`, {
       method: 'POST',
@@ -228,7 +248,7 @@ export const api = {
 /** Mesmos limites da API: conferir antes poupa o envio de um arquivo recusado. */
 export const ANEXO = {
   tamanhoMaximo: 5 * 1024 * 1024,
-  porSolicitacao: 10,
+  porSolicitacao: 30,
   aceitos: '.pdf,.png,.jpg,.jpeg,.webp,.xml',
   extensoes: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'xml'],
 };

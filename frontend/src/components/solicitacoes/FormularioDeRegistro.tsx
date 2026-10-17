@@ -119,7 +119,9 @@ export function FormularioDeRegistro() {
         },
       });
       const errosDosAnexos =
-        anexaveis.length > 0 ? await enviarAnexos(nova.id, anexaveis) : [];
+        anexaveis.length > 0
+          ? await enviarAnexos(nova.id, anexaveis, { etapa: 'RESOLUCAO' })
+          : [];
       setRegistradas((antes) => [nova, ...antes].slice(0, 10));
       setDuplicidades(null);
       // Pronto para o próximo: tipo e filial ficam
