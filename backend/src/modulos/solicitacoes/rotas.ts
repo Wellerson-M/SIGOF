@@ -41,7 +41,7 @@ const esquemaAbertura = z
     confirmarDuplicidade: z.boolean().optional(),
     registro: z
       .object({
-        acaoTomada: z.string().trim().min(3, 'Diga o que foi feito').max(2000),
+        acaoTomada: z.string().trim().max(2000).optional(),
         classificacao: z
           .object({
             causaId: z.string().uuid('Causa inválida'),

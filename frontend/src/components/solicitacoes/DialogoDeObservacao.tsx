@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { CampoDoQual, temQual } from './CampoDoQual';
 import { cadastros, type CausaDeErro } from '@/lib/cadastros';
 import { ANEXO, type Classificacao } from '@/lib/solicitacoes';
 
@@ -27,6 +28,7 @@ export function DialogoDeObservacao({
   pergunta,
   resolucao = false,
   exigirCausa = false,
+  observacaoObrigatoria = true,
   aoConfirmar,
   aoFechar,
 }: {
@@ -35,6 +37,8 @@ export function DialogoDeObservacao({
   /** Mostra a causa do erro e os anexos (movimento para Resolvido). */
   resolucao?: boolean;
   exigirCausa?: boolean;
+  /** Resolver não exige texto; os outros movimentos pedem o motivo. */
+  observacaoObrigatoria?: boolean;
   aoConfirmar: (observacao: string, extras: ExtrasDaResolucao) => void;
   aoFechar: () => void;
 }) {
@@ -74,7 +78,7 @@ export function DialogoDeObservacao({
 
   function enviar(evento: FormEvent) {
     evento.preventDefault();
-    if (!texto.trim() || faltaCausa) return;
+    if ((observacaoObrigatoria && !texto.trim()) || faltaCausa) return;
     aoConfirmar(texto.trim(), {
       arquivos: arquivos.slice(0, ANEXO.porSolicitacao),
       ...(causa
@@ -114,7 +118,7 @@ export function DialogoDeObservacao({
               onChange={(evento) => setTexto(evento.target.value)}
               rows={4}
               maxLength={2000}
-              required
+              required={observacaoObrigatoria}
               className="rounded-md border border-borda bg-fundo px-3 py-2 text-sm text-texto"
             />
           </label>
@@ -143,22 +147,13 @@ export function DialogoDeObservacao({
                   ))}
                 </select>
               </label>
-              {causa && causa.opcoes.length > 0 && (
-                <label className="flex flex-col gap-1 text-sm text-texto">
-                  {causa.rotuloDasOpcoes ?? 'Qual'}
-                  <select
-                    value={detalhe}
-                    onChange={(evento) => setDetalhe(evento.target.value)}
-                    className={CAMPO}
-                  >
-                    <option value="">Escolha</option>
-                    {causa.opcoes.map((opcao) => (
-                      <option key={opcao} value={opcao}>
-                        {opcao}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {temQual(causa) && (
+                <CampoDoQual
+                  causa={causa!}
+                  valor={detalhe}
+                  aoMudar={setDetalhe}
+                  className={CAMPO}
+                />
               )}
               {causa && (
                 <label className="flex flex-col gap-1 text-sm text-texto">
@@ -202,7 +197,7 @@ export function DialogoDeObservacao({
             </button>
             <button
               type="submit"
-              disabled={!texto.trim() || faltaCausa}
+              disabled={(observacaoObrigatoria && !texto.trim()) || faltaCausa}
               className="h-9 rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria disabled:opacity-50"
             >
               Confirmar

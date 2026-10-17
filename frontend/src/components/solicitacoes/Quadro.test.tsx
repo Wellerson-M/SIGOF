@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
 import { api, type Resumo } from '@/lib/solicitacoes';
-import { Quadro } from './Quadro';
+import { Quadro, itensDaColuna } from './Quadro';
 
 vi.mock('@/lib/sessao', () => ({
   useSessao: () => ({
@@ -205,5 +205,38 @@ describe('Quadro', () => {
     expect(
       screen.getByRole('button', { name: 'Tentar de novo' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('ordem das colunas', () => {
+  it('encerradas: a mais recente em cima; em aberto: a ordem da fila', () => {
+    const velha = solicitacao({
+      id: 'v',
+      status: 'RESOLVIDO',
+      atualizadoEm: '2026-10-10T12:00:00Z',
+    });
+    const nova = solicitacao({
+      id: 'n',
+      status: 'RESOLVIDO',
+      atualizadoEm: '2026-10-16T12:00:00Z',
+    });
+    const fila = [
+      solicitacao({
+        id: 'a',
+        status: 'NOVO',
+        atualizadoEm: '2026-10-01T00:00:00Z',
+      }),
+      solicitacao({
+        id: 'b',
+        status: 'NOVO',
+        atualizadoEm: '2026-10-16T00:00:00Z',
+      }),
+    ];
+
+    expect(itensDaColuna([velha, nova], 'RESOLVIDO').map((i) => i.id)).toEqual([
+      'n',
+      'v',
+    ]);
+    expect(itensDaColuna(fila, 'NOVO').map((i) => i.id)).toEqual(['a', 'b']);
   });
 });

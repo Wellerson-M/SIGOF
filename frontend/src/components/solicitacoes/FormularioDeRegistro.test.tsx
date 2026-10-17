@@ -44,7 +44,7 @@ describe('FormularioDeRegistro', () => {
       await screen.findByLabelText('De quem foi o erro'),
       'dig',
     );
-    await usuario.selectOptions(screen.getByLabelText('Digitador'), 'Ana');
+    await usuario.type(screen.getByLabelText(/^Digitador/), 'Ana');
     await usuario.click(
       screen.getByRole('button', { name: 'Registrar como concluída' }),
     );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import { CampoDoQual, temQual } from './CampoDoQual';
 import { cadastros, type CausaDeErro } from '@/lib/cadastros';
 import type { CausaRegistrada, Classificacao } from '@/lib/solicitacoes';
 
@@ -82,22 +83,13 @@ export function CausaDoErro({
               ))}
             </select>
           </label>
-          {escolhida && escolhida.opcoes.length > 0 && (
-            <label className="flex flex-col gap-1 text-sm text-texto">
-              {escolhida.rotuloDasOpcoes ?? 'Qual'}
-              <select
-                value={detalhe}
-                onChange={(evento) => setDetalhe(evento.target.value)}
-                className={CAMPO}
-              >
-                <option value="">Escolha</option>
-                {escolhida.opcoes.map((opcao) => (
-                  <option key={opcao} value={opcao}>
-                    {opcao}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {temQual(escolhida) && (
+            <CampoDoQual
+              causa={escolhida!}
+              valor={detalhe}
+              aoMudar={setDetalhe}
+              className={CAMPO}
+            />
           )}
           <label className="flex flex-col gap-1 text-sm text-texto">
             Comentário

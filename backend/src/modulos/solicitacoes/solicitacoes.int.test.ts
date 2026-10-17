@@ -341,22 +341,16 @@ describe.skipIf(!temBanco)('solicitações (integração, banco real)', () => {
       );
     });
 
-    it('resolver exige a descrição da ação; depois disso, está encerrada', async () => {
+    it('resolver não exige a descrição da ação; depois disso, está encerrada', async () => {
       const criada = await abrir();
       const analista = await como('ANALISTA');
       await analista.post(`/api/solicitacoes/${criada.id}/status`, {
         status: 'EM_ANDAMENTO',
       });
 
-      const semDescricao = await analista.post(
-        `/api/solicitacoes/${criada.id}/status`,
-        { status: 'RESOLVIDO' },
-      );
-      expect(semDescricao.status).toBe(422);
-
       const resolvida = await analista.post(
         `/api/solicitacoes/${criada.id}/status`,
-        { status: 'RESOLVIDO', observacao: 'CTe substituto emitido' },
+        { status: 'RESOLVIDO' },
       );
       expect(resolvida.body).toMatchObject({
         status: 'RESOLVIDO',

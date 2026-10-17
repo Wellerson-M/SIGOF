@@ -164,12 +164,14 @@ describe.skipIf(!temBanco)('registro rápido (integração, banco real)', () => 
     expect(repetida.status).toBe(409);
   });
 
-  it('solicitante não faz registro rápido; ação tomada vazia é recusada', async () => {
+  it('solicitante não faz registro rápido; "o que foi feito" é opcional', async () => {
     expect((await registrar('SOLICITANTE', base())).status).toBe(403);
-    expect(
-      (await registrar('ANALISTA', base({ registro: { acaoTomada: ' ' } })))
-        .status,
-    ).toBe(400);
+    const semAcao = await registrar('ANALISTA', base({ registro: {} }));
+    expect(semAcao.status).toBe(201);
+    const historico = await prisma.statusHistorico.findFirst({
+      where: { solicitacaoId: semAcao.body.id, statusNovo: 'RESOLVIDO' },
+    });
+    expect(historico?.observacao).toBeNull();
   });
 
   it('fica fora do tempo médio de resolução e é contado à parte', async () => {
@@ -177,7 +179,7 @@ describe.skipIf(!temBanco)('registro rápido (integração, banco real)', () => 
       .get('/api/indicadores?dias=7')
       .set('Cookie', await cookieDe('SUPERVISOR'));
 
-    expect(indicadores.body.noPeriodo.registrosRapidos).toBe(5);
+    expect(indicadores.body.noPeriodo.registrosRapidos).toBe(6);
     expect(indicadores.body.noPeriodo.minutosMedioAteResolver).toBeNull();
   });
 });
