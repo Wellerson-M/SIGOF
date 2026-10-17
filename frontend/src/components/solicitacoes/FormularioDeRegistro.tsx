@@ -22,6 +22,7 @@ import {
   type Tipo,
 } from '@/lib/solicitacoes';
 import { enviarAnexos } from './Anexos';
+import { CampoDoQual, temQual } from './CampoDoQual';
 
 const CAMPO =
   'h-10 rounded-md border border-borda bg-superficie px-3 text-sm text-texto';
@@ -106,7 +107,7 @@ export function FormularioDeRegistro() {
         hashesDosAnexos: hashes.length > 0 ? hashes : undefined,
         confirmarDuplicidade,
         registro: {
-          acaoTomada: oQueFoiFeito,
+          ...(oQueFoiFeito.trim() ? { acaoTomada: oQueFoiFeito } : {}),
           ...(causa
             ? {
                 classificacao: {
@@ -261,22 +262,14 @@ export function FormularioDeRegistro() {
               </select>
             </label>
           )}
-          {causa && causa.opcoes.length > 0 && (
-            <label className={ROTULO}>
-              {causa.rotuloDasOpcoes ?? 'Qual'}
-              <select
-                value={detalhe}
-                onChange={(evento) => setDetalhe(evento.target.value)}
-                className={CAMPO}
-              >
-                <option value="">Escolha</option>
-                {causa.opcoes.map((opcao) => (
-                  <option key={opcao} value={opcao}>
-                    {opcao}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {temQual(causa) && (
+            <CampoDoQual
+              causa={causa!}
+              valor={detalhe}
+              aoMudar={setDetalhe}
+              className={CAMPO}
+              classeDoRotulo={ROTULO}
+            />
           )}
           <label className={`${ROTULO} sm:col-span-2`}>
             Anexos
@@ -347,7 +340,7 @@ export function FormularioDeRegistro() {
           <div>
             <button
               type="submit"
-              disabled={enviando || !oQueEra.trim() || !oQueFoiFeito.trim()}
+              disabled={enviando || !oQueEra.trim()}
               className="h-10 rounded-md bg-primaria px-5 text-sm font-semibold text-sobre-primaria disabled:opacity-50"
             >
               {enviando ? 'Registrando…' : 'Registrar como concluída'}

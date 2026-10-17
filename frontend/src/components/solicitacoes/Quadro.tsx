@@ -41,6 +41,18 @@ export const SEGUNDOS_ENTRE_ATUALIZACOES = 30;
  * permitidas para aquele cartão e aquele perfil aceitam o cartão; a API
  * confere de novo antes de gravar.
  */
+/**
+ * Em aberto, a ordem é a da fila (prioridade e prazo, como vem da API).
+ * Encerradas não têm prazo: a mais recente fica em cima.
+ */
+export function itensDaColuna(itens: Resumo[], coluna: Status): Resumo[] {
+  const daColuna = itens.filter((i) => i.status === coluna);
+  if (coluna !== 'RESOLVIDO' && coluna !== 'CANCELADO') return daColuna;
+  return daColuna.sort(
+    (a, b) => Date.parse(b.atualizadoEm) - Date.parse(a.atualizadoEm),
+  );
+}
+
 export function Quadro() {
   const { usuario } = useSessao();
   const [itens, setItens] = useState<Resumo[] | null>(null);
@@ -238,7 +250,7 @@ export function Quadro() {
             <Coluna
               key={coluna}
               status={coluna}
-              itens={visiveis.filter((i) => i.status === coluna)}
+              itens={itensDaColuna(visiveis, coluna)}
               arrastando={arrastando}
               obterArrastado={() => arrastado.current}
               aoComecar={(item) => {
@@ -261,6 +273,7 @@ export function Quadro() {
           pergunta={PEDE_OBSERVACAO[pendente.para] ?? ''}
           resolucao={pendente.para === 'RESOLVIDO'}
           exigirCausa={usuario.empresa.exigirCausaAoResolver ?? false}
+          observacaoObrigatoria={pendente.para !== 'RESOLVIDO'}
           aoFechar={() => setPendente(null)}
           aoConfirmar={(observacao, extras) => {
             const { item, para } = pendente;

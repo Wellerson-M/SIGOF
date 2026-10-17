@@ -397,6 +397,7 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
           pergunta={PEDE_OBSERVACAO[pendente] ?? ''}
           resolucao={pendente === 'RESOLVIDO'}
           exigirCausa={usuario.empresa.exigirCausaAoResolver ?? false}
+          observacaoObrigatoria={pendente !== 'RESOLVIDO'}
           aoFechar={() => setPendente(null)}
           aoConfirmar={(observacao, extras) => {
             const para = pendente;
