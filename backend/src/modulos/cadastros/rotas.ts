@@ -29,6 +29,19 @@ const esquemaAlteracaoDeCausa = esquemaNovaCausa
   .extend({ ativa: z.boolean().optional() })
   .strict();
 
+const TIPOS = ['REVERSAO', 'TROCA_PAGADOR', 'AJUSTE_FISCAL', 'OUTRO'] as const;
+const esquemaNovaVerificacao = z.object({
+  texto: z.string().trim().min(3, 'Escreva o que deve ser marcado').max(200),
+  tipos: z.array(z.enum(TIPOS)).max(4).optional(),
+  quemMarca: z.enum(['SOLICITANTE', 'EQUIPE', 'QUALQUER']).optional(),
+  obrigatorioParaResolver: z.boolean().optional(),
+  ordem: z.number().int().min(0).max(1000).optional(),
+});
+const esquemaAlteracaoDeVerificacao = esquemaNovaVerificacao
+  .partial()
+  .extend({ ativo: z.boolean().optional() })
+  .strict();
+
 const esquemaListagem = z.object({
   todas: z
     .enum(['0', '1'])
@@ -102,6 +115,33 @@ export function rotasDeCadastros(opcoes: {
     const alteracao = validar(esquemaAlteracaoDeCausa, req.body);
     res.json(
       await servico.alterarCausa(usuarioDa(req), idDa(req), alteracao, req.ip),
+    );
+  });
+
+  rotas.get('/verificacoes', async (req, res) => {
+    const usuario = usuarioDa(req);
+    const { todas } = validar(esquemaListagem, req.query);
+    res.json(
+      await servico.verificacoes(usuario, todas && usuario.perfil === 'ADMIN'),
+    );
+  });
+
+  rotas.post('/verificacoes', soAdmin, async (req, res) => {
+    const dados = validar(esquemaNovaVerificacao, req.body);
+    res
+      .status(201)
+      .json(await servico.criarVerificacao(usuarioDa(req), dados, req.ip));
+  });
+
+  rotas.patch('/verificacoes/:id', soAdmin, async (req, res) => {
+    const alteracao = validar(esquemaAlteracaoDeVerificacao, req.body);
+    res.json(
+      await servico.alterarVerificacao(
+        usuarioDa(req),
+        idDa(req),
+        alteracao,
+        req.ip,
+      ),
     );
   });
 

@@ -23,6 +23,8 @@ import {
   type Tipo,
 } from '@/lib/solicitacoes';
 import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
+import { MarcacoesDaAbertura, useItensDaAbertura } from './Verificacoes';
+import { useSessao } from '@/lib/sessao';
 import { enviarAnexos } from './Anexos';
 import { CampoDoQual, temQual } from './CampoDoQual';
 
@@ -52,6 +54,9 @@ export function FormularioDeRegistro() {
   const [cte, setCte] = useState('');
   const [nf, setNf] = useState('');
   const [fatura, setFatura] = useState('');
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const { usuario } = useSessao();
+  const itensDaAbertura = useItensDaAbertura(tipo, usuario.perfil);
   const [pagadorCorreto, setPagadorCorreto] = useState('');
   const [oQueEra, setOQueEra] = useState('');
   const [oQueFoiFeito, setOQueFoiFeito] = useState('');
@@ -100,6 +105,12 @@ export function FormularioDeRegistro() {
       const nova = await api.abrir({
         tipo,
         ...documentosDoFormulario(cte, nf, fatura),
+        ...(marcadosValidos(marcados, itensDaAbertura).length > 0
+          ? { verificacoes: marcadosValidos(marcados, itensDaAbertura) }
+          : {}),
+        ...(marcadosValidos(marcados, itensDaAbertura).length > 0
+          ? { verificacoes: marcadosValidos(marcados, itensDaAbertura) }
+          : {}),
         pagadorCorreto:
           tipo === 'TROCA_PAGADOR'
             ? pagadorCorreto.trim() || undefined
@@ -131,6 +142,7 @@ export function FormularioDeRegistro() {
       setCte('');
       setNf('');
       setFatura('');
+      setMarcados([]);
       setPagadorCorreto('');
       setOQueEra('');
       setOQueFoiFeito('');
@@ -291,6 +303,13 @@ export function FormularioDeRegistro() {
               classeDoRotulo={ROTULO}
             />
           )}
+          <div className="sm:col-span-2">
+            <MarcacoesDaAbertura
+              itens={itensDaAbertura}
+              marcados={marcados}
+              aoMudar={setMarcados}
+            />
+          </div>
           <label className={`${ROTULO} sm:col-span-2`}>
             Anexos
             <input
@@ -395,4 +414,12 @@ export function FormularioDeRegistro() {
       )}
     </div>
   );
+}
+
+/** Só os marcados que ainda valem (mudar o tipo pode tirar um item). */
+function marcadosValidos(
+  marcados: string[],
+  itens: { id: string }[],
+): string[] {
+  return marcados.filter((id) => itens.some((item) => item.id === id));
 }

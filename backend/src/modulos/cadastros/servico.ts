@@ -41,6 +41,43 @@ const camposDaCausa = {
   ativa: true,
 } as const;
 
+export type TipoOcorrencia =
+  'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+export type QuemMarca = 'SOLICITANTE' | 'EQUIPE' | 'QUALQUER';
+
+export interface ItemDeVerificacao {
+  id: string;
+  texto: string;
+  /** Tipos de ocorrência em que aparece; vazio = em todos. */
+  tipos: TipoOcorrencia[];
+  quemMarca: QuemMarca;
+  obrigatorioParaResolver: boolean;
+  ordem: number;
+  ativo: boolean;
+}
+
+export interface DadosDaVerificacao {
+  texto: string;
+  tipos?: TipoOcorrencia[] | undefined;
+  quemMarca?: QuemMarca | undefined;
+  obrigatorioParaResolver?: boolean | undefined;
+  ordem?: number | undefined;
+}
+
+export type AlteracaoDaVerificacao = {
+  [Campo in keyof DadosDaVerificacao]?: DadosDaVerificacao[Campo] | undefined;
+} & { ativo?: boolean | undefined };
+
+const camposDaVerificacao = {
+  id: true,
+  texto: true,
+  tipos: true,
+  quemMarca: true,
+  obrigatorioParaResolver: true,
+  ordem: true,
+  ativo: true,
+} as const;
+
 /**
  * Lista com que toda empresa nova começa (a migração deu a mesma às que já
  * existiam). Cada administrador renomeia, desativa e acrescenta as suas.
@@ -265,6 +302,103 @@ export class ServicoDeCadastros {
         return causa;
       }),
     );
+  }
+
+  async verificacoes(
+    usuario: UsuarioAutenticado,
+    incluirInativas = false,
+  ): Promise<ItemDeVerificacao[]> {
+    return this.prisma.itemDeVerificacao.findMany({
+      where: {
+        empresaId: usuario.empresaId,
+        ...(incluirInativas ? {} : { ativo: true }),
+      },
+      select: camposDaVerificacao,
+      orderBy: [{ ativo: 'desc' }, { ordem: 'asc' }, { criadoEm: 'asc' }],
+    });
+  }
+
+  async criarVerificacao(
+    admin: UsuarioAutenticado,
+    dados: DadosDaVerificacao,
+    ip?: string,
+  ): Promise<ItemDeVerificacao> {
+    return this.prisma.$transaction(async (tx) => {
+      const ultima = await tx.itemDeVerificacao.aggregate({
+        where: { empresaId: admin.empresaId },
+        _max: { ordem: true },
+      });
+      const item = await tx.itemDeVerificacao.create({
+        data: {
+          empresaId: admin.empresaId,
+          texto: dados.texto.trim(),
+          tipos: [...new Set(dados.tipos ?? [])],
+          quemMarca: dados.quemMarca ?? 'QUALQUER',
+          obrigatorioParaResolver: dados.obrigatorioParaResolver ?? false,
+          ordem: dados.ordem ?? (ultima._max.ordem ?? 0) + 1,
+        },
+        select: camposDaVerificacao,
+      });
+      await registrar(tx, {
+        empresaId: admin.empresaId,
+        acao: 'CADASTRO_ALTERADO',
+        autorId: admin.id,
+        detalhes: { cadastro: 'verificação', criada: item.texto },
+        ip,
+      });
+      return item;
+    });
+  }
+
+  async alterarVerificacao(
+    admin: UsuarioAutenticado,
+    id: string,
+    alteracao: AlteracaoDaVerificacao,
+    ip?: string,
+  ): Promise<ItemDeVerificacao> {
+    const atual = await this.prisma.itemDeVerificacao.findFirst({
+      where: { id, empresaId: admin.empresaId },
+      select: camposDaVerificacao,
+    });
+    if (!atual) {
+      throw new ErroNaoEncontrado('Verificação não encontrada');
+    }
+    const novos = {
+      texto: alteracao.texto?.trim(),
+      tipos:
+        alteracao.tipos === undefined
+          ? undefined
+          : [...new Set(alteracao.tipos)],
+      quemMarca: alteracao.quemMarca,
+      obrigatorioParaResolver: alteracao.obrigatorioParaResolver,
+      ordem: alteracao.ordem,
+      ativo: alteracao.ativo,
+    };
+    const mudou = diferencas(atual, novos);
+    if (Object.keys(mudou).length === 0) {
+      return atual;
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const item = await tx.itemDeVerificacao.update({
+        where: { id: atual.id },
+        data: Object.fromEntries(
+          Object.entries(novos).filter(([, valor]) => valor !== undefined),
+        ) as Prisma.ItemDeVerificacaoUpdateInput,
+        select: camposDaVerificacao,
+      });
+      await registrar(tx, {
+        empresaId: admin.empresaId,
+        acao: 'CADASTRO_ALTERADO',
+        autorId: admin.id,
+        detalhes: {
+          cadastro: 'verificação',
+          verificacao: atual.texto,
+          ...mudou,
+        } as Prisma.InputJsonValue,
+        ip,
+      });
+      return item;
+    });
   }
 
   private async semNomeRepetido<T>(trabalho: () => Promise<T>): Promise<T> {
