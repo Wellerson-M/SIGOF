@@ -52,7 +52,7 @@ describe('FormularioDeRegistro', () => {
     expect(abrir).toHaveBeenCalledWith(
       expect.objectContaining({
         tipo: 'REVERSAO',
-        cte: '50001',
+        ctes: ['50001'],
         filialId: 'cwb',
         descricao: 'Reversão no zap',
         registro: {

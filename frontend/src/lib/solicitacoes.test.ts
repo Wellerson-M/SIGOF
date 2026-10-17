@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from './api';
-import { api, documentos, mensagemDoErro, textoDoSla } from './solicitacoes';
+import {
+  api,
+  documentos,
+  mensagemDoErro,
+  separarDocumentos,
+  textoDoSla,
+} from './solicitacoes';
 
 describe('textoDoSla', () => {
   it('escreve o tempo útil restante em horas e minutos', () => {
@@ -99,5 +105,34 @@ describe('chamadas à API', () => {
       status: 'RESOLVIDO',
       observacao: 'feito',
     });
+  });
+});
+
+describe('vários documentos', () => {
+  it('separa por linha, vírgula, ponto e vírgula e espaço', () => {
+    expect(separarDocumentos('100\n101, 102;103  104\n\n')).toEqual([
+      '100',
+      '101',
+      '102',
+      '103',
+      '104',
+    ]);
+  });
+
+  it('não quebra a chave de acesso escrita em blocos de 4 dígitos', () => {
+    const chave = '4226 0912 3456 7800 0199 5700 1000 0123 4510 0000 0010';
+    expect(separarDocumentos(chave)).toEqual([chave]);
+  });
+
+  it('mostra o primeiro e quantos mais', () => {
+    expect(
+      documentos({
+        cte: '100',
+        nf: null,
+        ctes: ['100', '101', '102'],
+        nfs: [],
+        fatura: 'F-9',
+      }),
+    ).toBe('Fatura F-9 · CTe 100 +2');
   });
 });

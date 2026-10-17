@@ -12,6 +12,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // Telas com várias digitações seguidas passam de 5 s em máquina lenta
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

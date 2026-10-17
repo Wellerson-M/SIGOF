@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ErroDaApi } from '@/lib/api';
 import { cadastros, hashDoArquivo, type Filial } from '@/lib/cadastros';
+import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
 import { enviarAnexos } from './Anexos';
 import {
   NOME_DA_PRIORIDADE,
@@ -34,12 +35,14 @@ const CAMPO =
 
 function descreverMotivo(d: Duplicidade): string {
   if (d.documento === 'ANEXO') return `mesmo arquivo (${d.valor})`;
+  if (d.documento === 'FATURA') return `fatura ${d.valor}`;
   return `${d.documento === 'CTE' ? 'CTe' : 'NF'} ${d.valor}`;
 }
 export function FormularioDeAbertura() {
   const [tipo, setTipo] = useState<Tipo>('REVERSAO');
   const [cte, setCte] = useState('');
   const [nf, setNf] = useState('');
+  const [fatura, setFatura] = useState('');
   const [pagadorCorreto, setPagadorCorreto] = useState('');
   const [prioridade, setPrioridade] = useState<Prioridade>('MEDIA');
   const [descricao, setDescricao] = useState('');
@@ -78,8 +81,7 @@ export function FormularioDeAbertura() {
     );
     const dados: DadosDeAbertura = {
       tipo,
-      cte: cte.trim() || undefined,
-      nf: nf.trim() || undefined,
+      ...documentosDoFormulario(cte, nf, fatura),
       pagadorCorreto:
         tipo === 'TROCA_PAGADOR'
           ? pagadorCorreto.trim() || undefined
@@ -121,6 +123,7 @@ export function FormularioDeAbertura() {
   function recomecar() {
     setCte('');
     setNf('');
+    setFatura('');
     setPagadorCorreto('');
     setDescricao('');
     setPrioridade('MEDIA');
@@ -230,23 +233,35 @@ export function FormularioDeAbertura() {
         )}
         <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
           Número do CTe
-          <input
+          <textarea
             value={cte}
             onChange={(evento) => setCte(evento.target.value)}
-            inputMode="numeric"
-            maxLength={60}
-            placeholder="Número ou chave de acesso"
-            className={CAMPO}
+            rows={1}
+            maxLength={20000}
+            placeholder="Número ou chave; vários, um por linha"
+            className={`${CAMPO} min-h-10 resize-y py-2`}
           />
+          <Contagem valor={cte} nome="CTe" />
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
           Número da NF
-          <input
+          <textarea
             value={nf}
             onChange={(evento) => setNf(evento.target.value)}
-            inputMode="numeric"
-            maxLength={60}
-            placeholder="Número ou chave de acesso"
+            rows={1}
+            maxLength={20000}
+            placeholder="Número ou chave; vários, um por linha"
+            className={`${CAMPO} min-h-10 resize-y py-2`}
+          />
+          <Contagem valor={nf} nome="NF" />
+        </label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+          Fatura
+          <input
+            value={fatura}
+            onChange={(evento) => setFatura(evento.target.value)}
+            maxLength={40}
+            placeholder="Quando é a fatura inteira"
             className={CAMPO}
           />
         </label>
@@ -264,7 +279,8 @@ export function FormularioDeAbertura() {
         )}
       </div>
       <p className="-mt-2 text-xs text-texto-suave">
-        Informe o CTe, a NF ou os dois (só “Outro” pode ficar sem documento).
+        Informe o CTe, a NF ou a fatura (só “Outro” pode ficar sem documento).
+        Fatura inteira? Cole os CTe, um por linha.
       </p>
 
       <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">

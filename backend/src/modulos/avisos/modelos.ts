@@ -50,6 +50,9 @@ export interface Retrato {
   tipo: Tipo;
   cte: string | null;
   nf: string | null;
+  ctes?: string[] | undefined;
+  nfs?: string[] | undefined;
+  fatura?: string | null | undefined;
   descricao: string;
   status: Status;
   prioridade: Prioridade;
@@ -148,8 +151,11 @@ function complemento(ocorrido: Ocorrido): string | null {
  */
 export function assuntoDe(retrato: Retrato): string {
   let documento = '';
-  if (retrato.cte) documento = ` — CTe ${retrato.cte}`;
+  const outrosCtes = Math.max(0, (retrato.ctes?.length ?? 0) - 1);
+  if (retrato.cte)
+    documento = ` — CTe ${retrato.cte}${outrosCtes > 0 ? ` +${outrosCtes}` : ''}`;
   else if (retrato.nf) documento = ` — NF ${retrato.nf}`;
+  else if (retrato.fatura) documento = ` — Fatura ${retrato.fatura}`;
   return `[SIGOF ${retrato.protocolo}] ${NOME_DO_TIPO[retrato.tipo]}${documento}`;
 }
 
@@ -159,6 +165,20 @@ function dataDoPrazo(data: Date, fusoHorario: string): string {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(data);
+}
+
+/** "123, 124, 125 e mais 7": a lista inteira não cabe num e-mail. */
+function listaDeDocumentos(
+  principal: string | null,
+  lista: string[] | undefined,
+): string {
+  const todos =
+    lista && lista.length > 0 ? lista : principal ? [principal] : [];
+  if (todos.length === 0) return '—';
+  const mostrados = todos.slice(0, 10).join(', ');
+  return todos.length > 10
+    ? `${mostrados} e mais ${todos.length - 10}`
+    : mostrados;
 }
 
 /** Tudo que vem do usuário passa por aqui antes de entrar no HTML. */
@@ -271,8 +291,9 @@ export function montarEmailDeItens(dados: {
   const linhas: [string, string][] = [
     ['Protocolo', retrato.protocolo],
     ['Tipo', NOME_DO_TIPO[retrato.tipo]],
-    ['CTe', retrato.cte ?? '—'],
-    ['NF', retrato.nf ?? '—'],
+    ['CTe', listaDeDocumentos(retrato.cte, retrato.ctes)],
+    ['NF', listaDeDocumentos(retrato.nf, retrato.nfs)],
+    ...(retrato.fatura ? [['Fatura', retrato.fatura] as [string, string]] : []),
     ['Status', NOME_DO_STATUS[retrato.status]],
     ['Prioridade', NOME_DA_PRIORIDADE[retrato.prioridade]],
     ['Solicitante', retrato.solicitante],

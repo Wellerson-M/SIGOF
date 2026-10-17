@@ -30,6 +30,15 @@ const esquemaAbertura = z
     tipo: z.enum(TIPOS, { message: 'Escolha o tipo de ocorrência' }),
     cte: opcional(60),
     nf: opcional(60),
+    ctes: z
+      .array(z.string().trim().max(60))
+      .max(300, 'No máximo 300 CTe por solicitação')
+      .optional(),
+    nfs: z
+      .array(z.string().trim().max(60))
+      .max(300, 'No máximo 300 NF por solicitação')
+      .optional(),
+    fatura: opcional(40),
     pagadorCorreto: opcional(200),
     descricao: z.string().trim().min(3, 'Diga o que era').max(5000),
     prioridade: z.enum(PRIORIDADES).optional(),
