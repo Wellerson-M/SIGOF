@@ -140,6 +140,7 @@ const CONFIG: ConfiguracaoDeEmail = {
   temSenha: false,
   nomeDoRemetente: null,
   caixasCentrais: [],
+  eventos: ['ABERTA', 'STATUS', 'MENSAGEM', 'ANEXO'],
 };
 
 describe('aba E-mail da administração', () => {
@@ -193,6 +194,7 @@ describe('aba E-mail da administração', () => {
       usuario: 'avisos@gmail.com',
       senha: 'abcd efgh ijkl mnop',
       nomeDoRemetente: '',
+      eventos: ['ABERTA', 'STATUS', 'MENSAGEM', 'ANEXO'],
       caixasCentrais: ['central@demo.test', 'gerente@demo.test'],
     });
     expect(

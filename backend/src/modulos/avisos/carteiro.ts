@@ -185,6 +185,8 @@ export class Carteiro {
         where: { id, situacao: 'PENDENTE', tentarEm: { lte: agora } },
         data: {
           tentarEm: new Date(agora.getTime() + MINUTOS_DE_RESERVA * MINUTO),
+          // Reservado para envio: nada mais entra neste e-mail
+          agruparAte: null,
         },
       });
       if (reserva.count === 1 && (await this.entregar(id))) {

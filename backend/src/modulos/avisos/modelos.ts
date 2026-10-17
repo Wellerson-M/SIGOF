@@ -21,8 +21,27 @@ export type Ocorrido =
   | { tipo: 'STATUS'; de: Status; para: Status; observacao: string | null }
   | { tipo: 'PRIORIDADE'; de: Prioridade; para: Prioridade }
   | { tipo: 'RESPONSAVEL'; nome: string }
-  | { tipo: 'MENSAGEM'; conteudo: string; interna: boolean }
-  | { tipo: 'ANEXO'; nomeArquivo: string };
+  | {
+      tipo: 'MENSAGEM';
+      conteudo: string;
+      interna: boolean;
+      mensagemId?: string | undefined;
+    }
+  | {
+      tipo: 'ANEXO';
+      nomeArquivo: string;
+      anexoId?: string | undefined;
+      /** Veio pela conversa: aparece junto da mensagem no e-mail. */
+      mensagemId?: string | undefined;
+    };
+
+export type TipoDeOcorrido = Ocorrido['tipo'];
+
+/** Um acontecimento dentro de um e-mail (vários podem ir juntos). */
+export interface ItemDoEmail {
+  ocorrido: Ocorrido;
+  autor: string;
+}
 
 /** O retrato da solicitação que vai no corpo do e-mail. */
 export interface Retrato {
@@ -107,7 +126,9 @@ function manchete(ocorrido: Ocorrido, autor: string): string {
     case 'RESPONSAVEL':
       return `Responsável agora é ${ocorrido.nome} (alterado por ${autor})`;
     case 'MENSAGEM':
-      return `Nova mensagem de ${autor}`;
+      return ocorrido.conteudo
+        ? `Nova mensagem de ${autor}`
+        : `${autor} enviou arquivos pela conversa`;
     case 'ANEXO':
       return `${autor} anexou o arquivo ${ocorrido.nomeArquivo}`;
   }
@@ -158,10 +179,94 @@ export function montarEmail(dados: {
   fusoHorario: string;
   /** Endereço do detalhe da solicitação no SIGOF. */
   link: string;
+  linkDoAnexo?: ((anexoId: string) => string) | undefined;
 }): Email {
-  const { ocorrido, retrato, autor, empresa, fusoHorario, link } = dados;
-  const titulo = manchete(ocorrido, autor);
-  const extra = complemento(ocorrido);
+  const { ocorrido, autor, ...resto } = dados;
+  return montarEmailDeItens({ ...resto, itens: [{ ocorrido, autor }] });
+}
+
+/** Um bloco do e-mail: o título, o texto e os arquivos com link. */
+interface Bloco {
+  titulo: string;
+  extra: string | null;
+  arquivos: { nome: string; link: string | null }[];
+}
+
+/**
+ * Junta os acontecimentos em blocos: o arquivo enviado pela conversa entra
+ * no bloco da mensagem dele; os outros arquivos seguidos viram um bloco só
+ * ("anexou 3 arquivos").
+ */
+function blocosDe(
+  itens: readonly ItemDoEmail[],
+  linkDoAnexo: ((anexoId: string) => string) | undefined,
+): Bloco[] {
+  const blocos: Bloco[] = [];
+  const daMensagem = new Map<string, Bloco>();
+  let arquivosSoltos: { bloco: Bloco; autor: string } | null = null;
+
+  for (const { ocorrido, autor } of itens) {
+    if (ocorrido.tipo === 'ANEXO') {
+      const arquivo = {
+        nome: ocorrido.nomeArquivo,
+        link:
+          ocorrido.anexoId && linkDoAnexo
+            ? linkDoAnexo(ocorrido.anexoId)
+            : null,
+      };
+      const daConversa = ocorrido.mensagemId
+        ? daMensagem.get(ocorrido.mensagemId)
+        : undefined;
+      if (daConversa) {
+        daConversa.arquivos.push(arquivo);
+        continue;
+      }
+      if (arquivosSoltos && arquivosSoltos.autor === autor) {
+        arquivosSoltos.bloco.arquivos.push(arquivo);
+        const n = arquivosSoltos.bloco.arquivos.length;
+        arquivosSoltos.bloco.titulo = `${autor} anexou ${n} arquivos`;
+        continue;
+      }
+      const bloco: Bloco = {
+        titulo: manchete(ocorrido, autor),
+        extra: null,
+        arquivos: [arquivo],
+      };
+      blocos.push(bloco);
+      arquivosSoltos = { bloco, autor };
+      continue;
+    }
+    arquivosSoltos = null;
+    const bloco: Bloco = {
+      titulo: manchete(ocorrido, autor),
+      extra: complemento(ocorrido) || null,
+      arquivos: [],
+    };
+    if (ocorrido.tipo === 'MENSAGEM' && ocorrido.mensagemId) {
+      daMensagem.set(ocorrido.mensagemId, bloco);
+    }
+    blocos.push(bloco);
+  }
+  return blocos;
+}
+
+/**
+ * O e-mail de uma ou mais movimentações seguidas. Abrir a solicitação e
+ * mandar três arquivos logo em seguida vira um e-mail só, com os arquivos
+ * listados e o link de cada um.
+ */
+export function montarEmailDeItens(dados: {
+  itens: readonly ItemDoEmail[];
+  retrato: Retrato;
+  empresa: string;
+  fusoHorario: string;
+  link: string;
+  linkDoAnexo?: ((anexoId: string) => string) | undefined;
+}): Email {
+  const { itens, retrato, empresa, fusoHorario, link } = dados;
+  const blocos = blocosDe(itens, dados.linkDoAnexo);
+  const titulo =
+    blocos.length === 1 ? blocos[0]!.titulo : `${blocos.length} atualizações`;
 
   const linhas: [string, string][] = [
     ['Protocolo', retrato.protocolo],
@@ -179,10 +284,16 @@ export function montarEmail(dados: {
     linhas.push(['Prazo (SLA)', dataDoPrazo(retrato.slaVenceEm, fusoHorario)]);
   }
 
-  const texto = [
-    titulo,
-    ...(extra ? ['', extra] : []),
+  const textoDosBlocos = blocos.flatMap((b) => [
+    ...(blocos.length > 1 ? [`• ${b.titulo}`] : [b.titulo]),
+    ...(b.extra ? ['', b.extra] : []),
+    ...b.arquivos.map((a) => `  - ${a.nome}${a.link ? `: ${a.link}` : ''}`),
     '',
+  ]);
+
+  const texto = [
+    ...(blocos.length > 1 ? [titulo, ''] : []),
+    ...textoDosBlocos,
     ...linhas.map(([nome, valor]) => `${nome}: ${valor}`),
     '',
     'Descrição:',
@@ -196,6 +307,23 @@ export function montarEmail(dados: {
   ].join('\n');
 
   const celula = 'padding:4px 12px 4px 0;vertical-align:top;';
+  const htmlDoBloco = (b: Bloco, comTitulo: boolean) =>
+    `${comTitulo ? `<p style="margin:0 0 6px;font-size:14px;font-weight:bold;">${escaparHtml(b.titulo)}</p>` : ''}${
+      b.extra
+        ? `<div style="margin:0 0 10px;padding:12px;background:#f4f6fa;border-left:3px solid #0e9f8e;white-space:pre-wrap;font-size:14px;">${escaparHtml(b.extra)}</div>`
+        : ''
+    }${
+      b.arquivos.length > 0
+        ? `<ul style="margin:0 0 12px;padding-left:18px;font-size:14px;">${b.arquivos
+            .map((a) =>
+              a.link
+                ? `<li><a href="${escaparHtml(a.link)}" style="color:#0b3a6e;">${escaparHtml(a.nome)}</a></li>`
+                : `<li>${escaparHtml(a.nome)}</li>`,
+            )
+            .join('')}</ul>`
+        : ''
+    }`;
+
   const html = `<!doctype html>
 <html lang="pt-BR"><body style="margin:0;padding:24px;background:#f4f6fa;font-family:Arial,Helvetica,sans-serif;color:#142033;">
 <div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #d9e0ea;border-radius:8px;overflow:hidden;">
@@ -203,11 +331,7 @@ export function montarEmail(dados: {
 <div style="padding:20px;">
 <p style="margin:0 0 4px;font-size:12px;color:#56637a;">${escaparHtml(retrato.protocolo)}</p>
 <h1 style="margin:0 0 16px;font-size:18px;">${escaparHtml(titulo)}</h1>
-${
-  extra
-    ? `<div style="margin:0 0 16px;padding:12px;background:#f4f6fa;border-left:3px solid #0e9f8e;white-space:pre-wrap;font-size:14px;">${escaparHtml(extra)}</div>`
-    : ''
-}
+${blocos.map((b) => htmlDoBloco(b, blocos.length > 1)).join('\n')}
 <table style="border-collapse:collapse;font-size:14px;margin-bottom:16px;">
 ${linhas
   .map(

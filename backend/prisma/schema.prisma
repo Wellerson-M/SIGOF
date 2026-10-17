@@ -137,6 +137,8 @@ model Empresa {
   smtpSenhaCifrada    String? @map("smtp_senha_cifrada")
   /// Nome que aparece como remetente ("SIGOF — Transportadora Demo").
   emailRemetenteNome  String? @map("email_remetente_nome")
+  /// Quais acontecimentos geram e-mail (os outros ficam só no sino).
+  emailEventos        String[] @default(["ABERTA", "STATUS", "MENSAGEM", "ANEXO"]) @map("email_eventos")
 
   usuarios     Usuario[]
   solicitacoes Solicitacao[]
@@ -487,6 +489,11 @@ model EmailSaida {
   /// o e-mail para enviar empurra este horário para a frente.
   tentarEm      DateTime        @default(now()) @map("tentar_em")
   ultimoErro    String?         @map("ultimo_erro")
+  /// Os acontecimentos que este e-mail conta (vários seguidos viram um só).
+  itens         Json?
+  /// Até quando um acontecimento novo da mesma solicitação entra neste
+  /// e-mail em vez de gerar outro. Nulo: já saiu para envio.
+  agruparAte    DateTime?       @map("agrupar_ate")
   enviadoEm     DateTime?       @map("enviado_em")
   criadoEm      DateTime        @default(now()) @map("criado_em")
 

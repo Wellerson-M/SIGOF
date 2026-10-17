@@ -23,6 +23,8 @@ export interface ConfiguracaoDeEmail {
   nomeDoRemetente: string | null;
   /** Recebem cópia de tudo (registro e backup). */
   caixasCentrais: string[];
+  /** Acontecimentos que geram e-mail. */
+  eventos: string[];
 }
 
 export interface AlteracaoDeEmail {
@@ -35,6 +37,7 @@ export interface AlteracaoDeEmail {
   senha?: string | undefined;
   nomeDoRemetente?: string | null | undefined;
   caixasCentrais?: string[] | undefined;
+  eventos?: string[] | undefined;
 }
 
 export interface EnvioRegistrado {
@@ -77,6 +80,7 @@ export class ServicoDeConfiguracaoDeEmail {
       temSenha: e.smtpSenhaCifrada !== null,
       nomeDoRemetente: e.emailRemetenteNome,
       caixasCentrais: e.emailsCaixaCentral,
+      eventos: e.emailEventos,
     };
   }
 
@@ -106,6 +110,10 @@ export class ServicoDeConfiguracaoDeEmail {
                   .filter(Boolean),
               ),
             ],
+      eventos:
+        alteracao.eventos === undefined
+          ? undefined
+          : [...new Set(alteracao.eventos)],
     };
     const senhaNova = alteracao.senha?.trim() ? alteracao.senha.trim() : null;
 
@@ -139,6 +147,7 @@ export class ServicoDeConfiguracaoDeEmail {
       dados.emailRemetenteNome = novos.nomeDoRemetente;
     if (novos.caixasCentrais !== undefined)
       dados.emailsCaixaCentral = novos.caixasCentrais;
+    if (novos.eventos !== undefined) dados.emailEventos = novos.eventos;
     if (senhaNova !== null)
       dados.smtpSenhaCifrada = this.cifra.cifrar(senhaNova);
 
