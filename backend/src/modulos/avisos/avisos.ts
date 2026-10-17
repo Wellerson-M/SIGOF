@@ -1,14 +1,37 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
-import { linhaDaNotificacao, montarEmail, type Ocorrido } from './modelos.js';
+import {
+  linhaDaNotificacao,
+  montarEmailDeItens,
+  type ItemDoEmail,
+  type Ocorrido,
+} from './modelos.js';
 
 type Transacao = Prisma.TransactionClient;
 
 export interface ConfigDosAvisos {
   /** Endereço das telas, para o link "Abrir no SIGOF" (FRONTEND_URL). */
   urlDoSistema: string;
+  /**
+   * Por quanto tempo o e-mail espera acontecimentos seguidos da mesma
+   * solicitação antes de sair (abrir e anexar três arquivos = um e-mail).
+   */
+  segundosParaAgrupar?: number | undefined;
+  agora?: (() => Date) | undefined;
 }
+
+export const SEGUNDOS_PARA_AGRUPAR_PADRAO = 60;
+
+/** Os acontecimentos que podem gerar e-mail, para a tela de configuração. */
+export const EVENTOS_DE_EMAIL = [
+  'ABERTA',
+  'STATUS',
+  'MENSAGEM',
+  'ANEXO',
+  'PRIORIDADE',
+  'RESPONSAVEL',
+] as const;
 
 /** Quem recebe e-mail: a empresa configurou e ligou o envio. */
 export function emailConfigurado(empresa: {
@@ -43,9 +66,14 @@ export function raizDaConversa(solicitacaoId: string, dominio: string): string {
  */
 export class ServicoDeAvisos {
   private readonly dominio: string;
+  private readonly segundosParaAgrupar: number;
+  private readonly agora: () => Date;
 
   constructor(private readonly config: ConfigDosAvisos) {
     this.dominio = new URL(config.urlDoSistema).hostname;
+    this.segundosParaAgrupar =
+      config.segundosParaAgrupar ?? SEGUNDOS_PARA_AGRUPAR_PADRAO;
+    this.agora = config.agora ?? (() => new Date());
   }
 
   async registrar(
@@ -88,7 +116,12 @@ export class ServicoDeAvisos {
     // Nota interna é só da equipe: não sai por e-mail, que também vai para
     // o solicitante
     const ehNotaInterna = ocorrido.tipo === 'MENSAGEM' && ocorrido.interna;
-    if (ehNotaInterna || !emailConfigurado(s.empresa)) {
+    if (
+      ehNotaInterna ||
+      !emailConfigurado(s.empresa) ||
+      // A empresa escolhe o que vale um e-mail; o resto fica só no sino
+      !s.empresa.emailEventos.includes(ocorrido.tipo)
+    ) {
       return;
     }
 
@@ -107,16 +140,32 @@ export class ServicoDeAvisos {
         ? null
         : quemFez.email,
     );
-    if (para.length === 0) {
+    const agora = this.agora();
+    const item: ItemDoEmail = { ocorrido, autor: quemFez.nome };
+    // E-mail desta solicitação que ainda está esperando para sair: o
+    // acontecimento novo entra nele, em vez de virar outro e-mail
+    const aberto = await tx.emailSaida.findFirst({
+      where: {
+        solicitacaoId: s.id,
+        situacao: 'PENDENTE',
+        tentativas: 0,
+        agruparAte: { gt: agora },
+      },
+      orderBy: { criadoEm: 'desc' },
+    });
+    const itens = [...((aberto?.itens as ItemDoEmail[] | null) ?? []), item];
+    const enviarPara = this.enderecos([...(aberto?.para ?? []), ...para], null);
+    if (enviarPara.length === 0) {
       return;
     }
 
-    const email = montarEmail({
-      ocorrido,
-      autor: quemFez.nome,
+    const email = montarEmailDeItens({
+      itens,
       empresa: s.empresa.razaoSocial,
       fusoHorario: s.empresa.fusoHorario,
       link: new URL(`/solicitacoes/${s.id}`, this.config.urlDoSistema).href,
+      linkDoAnexo: (anexoId) =>
+        new URL(`/anexos/${s.id}/${anexoId}`, this.config.urlDoSistema).href,
       retrato: {
         id: s.id,
         protocolo: s.protocolo,
@@ -132,14 +181,34 @@ export class ServicoDeAvisos {
       },
     });
 
+    if (aberto) {
+      await tx.emailSaida.update({
+        where: { id: aberto.id },
+        data: {
+          para: enviarPara,
+          ...email,
+          itens: itens as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return;
+    }
+
     const raiz = raizDaConversa(s.id, this.dominio);
-    const primeiro = ocorrido.tipo === 'ABERTA';
+    // O primeiro e-mail do protocolo abre a conversa no Gmail/Outlook
+    const primeiro = !(await tx.emailSaida.findFirst({
+      where: { solicitacaoId: s.id, messageId: raiz },
+      select: { id: true },
+    }));
+    const saiEm = new Date(agora.getTime() + this.segundosParaAgrupar * 1000);
     await tx.emailSaida.create({
       data: {
         empresaId: s.empresaId,
         solicitacaoId: s.id,
-        para,
+        para: enviarPara,
         ...email,
+        itens: itens as unknown as Prisma.InputJsonValue,
+        tentarEm: saiEm,
+        agruparAte: this.segundosParaAgrupar > 0 ? saiEm : null,
         messageId: primeiro
           ? raiz
           : `<sigof.${s.id}.${randomUUID()}@${this.dominio}>`,

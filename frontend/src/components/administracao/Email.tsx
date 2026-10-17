@@ -13,8 +13,10 @@ import {
   COR_DA_SITUACAO,
   GMAIL,
   NOME_DA_SITUACAO,
+  EVENTOS_DE_EMAIL,
   email,
   type ConfiguracaoDeEmail,
+  type EventoDeEmail,
   type EnvioRegistrado,
 } from '@/lib/avisos';
 import { dataCurta, mensagemDoErro } from '@/lib/solicitacoes';
@@ -29,6 +31,7 @@ interface Formulario {
   nomeDoRemetente: string;
   /** Um endereço por linha. */
   caixasCentrais: string;
+  eventos: EventoDeEmail[];
 }
 
 function paraFormulario(c: ConfiguracaoDeEmail): Formulario {
@@ -41,6 +44,7 @@ function paraFormulario(c: ConfiguracaoDeEmail): Formulario {
     senha: '',
     nomeDoRemetente: c.nomeDoRemetente ?? '',
     caixasCentrais: c.caixasCentrais.join('\n'),
+    eventos: c.eventos ?? [],
   };
 }
 
@@ -122,6 +126,7 @@ export function Email() {
         usuario: formulario.usuario,
         ...(formulario.senha ? { senha: formulario.senha } : {}),
         nomeDoRemetente: formulario.nomeDoRemetente,
+        eventos: formulario.eventos,
         caixasCentrais: formulario.caixasCentrais
           .split(/[\n,;]/)
           .map((linha) => linha.trim())
@@ -168,6 +173,36 @@ export function Email() {
               saem por e-mail.
             </span>
           </label>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2 rounded-lg border border-borda bg-superficie p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+            O que gera e-mail
+          </legend>
+          <p className="text-sm text-texto-suave">
+            Acontecimentos seguidos da mesma solicitação (abrir e anexar os
+            arquivos, por exemplo) saem num e-mail só, um minuto depois. O que
+            ficar desmarcado aparece só no sino do sistema.
+          </p>
+          {EVENTOS_DE_EMAIL.map((evento) => (
+            <label
+              key={evento.valor}
+              className="flex items-center gap-2 text-sm text-texto"
+            >
+              <input
+                type="checkbox"
+                checked={formulario.eventos.includes(evento.valor)}
+                onChange={(e) =>
+                  mudar({
+                    eventos: e.target.checked
+                      ? [...formulario.eventos, evento.valor]
+                      : formulario.eventos.filter((v) => v !== evento.valor),
+                  })
+                }
+              />
+              {evento.rotulo}
+            </label>
+          ))}
         </fieldset>
 
         <fieldset className="flex flex-col gap-3 rounded-lg border border-borda bg-superficie p-4">

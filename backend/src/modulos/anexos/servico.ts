@@ -101,6 +101,7 @@ export class ServicoDeAnexos {
         'Só a equipe anexa o documento da resolução',
       );
     }
+    let daNotaInterna = false;
     if (opcoes.mensagemId) {
       // Só na própria mensagem, e da mesma solicitação
       const mensagem = await this.prisma.mensagem.findFirst({
@@ -109,11 +110,12 @@ export class ServicoDeAnexos {
           solicitacaoId: solicitacao.id,
           autorId: usuario.id,
         },
-        select: { id: true },
+        select: { id: true, interna: true },
       });
       if (!mensagem) {
         throw new ErroNaoEncontrado('Mensagem não encontrada');
       }
+      daNotaInterna = mensagem.interna;
     }
 
     // O tipo vem do conteúdo, nunca do nome nem do que o navegador diz
@@ -154,11 +156,15 @@ export class ServicoDeAnexos {
         },
         include: { enviadoPor: { select: { id: true, nome: true } } },
       });
-      // Registro rápido é só para constar: não gera aviso
-      if (!solicitacao.registroRapido) {
+      // Registro rápido é só para constar, e o arquivo de uma nota interna
+      // é da equipe: nenhum dos dois gera aviso. O arquivo da conversa já
+      // foi avisado junto com a mensagem; o aviso aqui só acrescenta o link.
+      if (!solicitacao.registroRapido && !daNotaInterna) {
         await this.avisos?.registrar(tx, usuario, solicitacao.id, {
           tipo: 'ANEXO',
           nomeArquivo: nome,
+          anexoId: anexo.id,
+          mensagemId: opcoes.mensagemId,
         });
       }
       return this.resumir(anexo);
