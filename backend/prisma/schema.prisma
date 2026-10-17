@@ -586,3 +586,46 @@ model EmailSaida {
   @@index([empresaId, solicitacaoId])
   @@map("emails_saida")
 }
+
+// ---------------------------------------------------------- Plataforma
+// Quem opera o SIGOF como serviço (cadastra transportadoras, acompanha o
+// uso). Fica fora das empresas de propósito: não tem empresaId, entra por
+// outra tela e outro cookie, e o token dele não abre nenhuma rota de
+// empresa (nem o contrário). Vê cadastro e números das transportadoras,
+// não o conteúdo das solicitações (LGPD: minimização).
+
+model AdministradorDaPlataforma {
+  id             String    @id @default(uuid())
+  nome           String
+  email          String    @unique
+  senhaHash      String    @map("senha_hash")
+  ativo          Boolean   @default(true)
+  trocarSenha    Boolean   @default(true) @map("trocar_senha")
+  falhasDeLogin  Int       @default(0) @map("falhas_de_login")
+  bloqueadoAte   DateTime? @map("bloqueado_ate")
+  ultimoAcessoEm DateTime? @map("ultimo_acesso_em")
+  criadoEm       DateTime  @default(now()) @map("criado_em")
+
+  eventos EventoDaPlataforma[]
+
+  @@map("administradores_da_plataforma")
+}
+
+/// Trilha da plataforma: só recebe inserções (o banco recusa UPDATE).
+model EventoDaPlataforma {
+  id              String   @id @default(uuid())
+  administradorId String?  @map("administrador_id")
+  /// ENTROU, ENTRADA_RECUSADA, SAIU, SENHA_ALTERADA, EMPRESA_CRIADA,
+  /// EMPRESA_ALTERADA, ADMIN_DA_EMPRESA_CRIADO
+  acao            String
+  empresaId       String?  @map("empresa_id")
+  detalhes        Json?
+  ip              String?
+  criadoEm        DateTime @default(now()) @map("criado_em")
+
+  administrador AdministradorDaPlataforma? @relation(fields: [administradorId], references: [id])
+
+  @@index([criadoEm])
+  @@map("eventos_da_plataforma")
+}
+
