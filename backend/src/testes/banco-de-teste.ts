@@ -77,6 +77,7 @@ export async function apagarEmpresaDeTeste(
   await prisma.solicitacao.deleteMany(onde);
   await prisma.itemDeVerificacao.deleteMany(onde);
   await prisma.filial.deleteMany(onde);
+  await prisma.producaoDoDigitador.deleteMany(onde);
   await prisma.causaDeErro.deleteMany(onde);
   await prisma.sequenciaProtocolo.deleteMany(onde);
   await prisma.usuario.deleteMany(onde);

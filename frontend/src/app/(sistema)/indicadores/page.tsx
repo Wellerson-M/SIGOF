@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { BalancoDoMes } from '@/components/indicadores/BalancoDoMes';
 import { Barras, GraficoPorDia } from '@/components/indicadores/Graficos';
 import { Alerta, BOTAO_SECUNDARIO } from '@/components/Janela';
 import {
@@ -191,6 +192,41 @@ export default function PaginaDeIndicadores() {
               />
             </Cartao>
           </div>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Cartao>
+              <Barras
+                titulo="Abertas no período, por filial"
+                itens={(dados.porFilial ?? []).map((f) => ({
+                  nome: f.filial,
+                  valor: f.total,
+                }))}
+              />
+            </Cartao>
+            <Cartao>
+              <Barras
+                titulo="Quem mais abriu no período"
+                itens={(dados.porSolicitante ?? []).map((s) => ({
+                  nome: s.nome,
+                  valor: s.total,
+                }))}
+              />
+            </Cartao>
+          </div>
+
+          <Cartao>
+            <Barras
+              titulo="Tempo médio até resolver, por tipo"
+              itens={(dados.tempoAteResolverPorTipo ?? []).map((t) => ({
+                nome: NOME_DO_TIPO[t.tipo],
+                valor: t.minutos,
+              }))}
+              formatar={duracao}
+              vazio="Nenhuma resolvida no período."
+            />
+          </Cartao>
+
+          <BalancoDoMes />
 
           <Cartao>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">

@@ -249,7 +249,15 @@ function Legenda({ cor, nome }: Readonly<{ cor: string; nome: string }>) {
 export function Barras({
   titulo,
   itens,
-}: Readonly<{ titulo: string; itens: { nome: string; valor: number }[] }>) {
+  formatar = String,
+  vazio = 'Nada no período.',
+}: Readonly<{
+  titulo: string;
+  itens: { nome: string; valor: number }[];
+  /** Como escrever o valor na ponta (ex.: "2h 15min"). */
+  formatar?: (valor: number) => string;
+  vazio?: string;
+}>) {
   const maior = Math.max(1, ...itens.map((i) => i.valor));
   return (
     <figure className="flex flex-col gap-2">
@@ -257,14 +265,14 @@ export function Barras({
         {titulo}
       </figcaption>
       {itens.length === 0 ? (
-        <p className="text-sm text-texto-suave">Nada no período.</p>
+        <p className="text-sm text-texto-suave">{vazio}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {itens.map((item) => (
             <li
               key={item.nome}
               className="grid grid-cols-[9rem_1fr] items-center gap-3 text-sm"
-              title={`${item.nome}: ${item.valor}`}
+              title={`${item.nome}: ${formatar(item.valor)}`}
             >
               <span className="truncate text-texto">{item.nome}</span>
               <span className="flex items-center gap-2">
@@ -275,7 +283,9 @@ export function Barras({
                   }}
                   aria-hidden="true"
                 />
-                <span className="tabular-nums text-texto">{item.valor}</span>
+                <span className="tabular-nums text-texto">
+                  {formatar(item.valor)}
+                </span>
               </span>
             </li>
           ))}

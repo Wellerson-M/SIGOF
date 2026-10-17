@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  balancoDoMes,
   calcularIndicadores,
   celulaCsv,
   diaLocal,
@@ -272,5 +273,74 @@ describe('CSV', () => {
     expect(
       diaLocal(new Date('2026-10-17T01:00:00Z'), 'America/Sao_Paulo'),
     ).toBe('2026-10-16');
+  });
+});
+
+describe('balanço do mês por digitador', () => {
+  it('cruza a produção com os erros e calcula a taxa a cada 100 CTe', () => {
+    const linhas = balancoDoMes(
+      [
+        { digitador: 'Ana', ctesEmitidos: 400 },
+        { digitador: 'Bruno', ctesEmitidos: 100 },
+        { digitador: 'Carla', ctesEmitidos: 50 },
+      ],
+      [
+        { digitador: 'ana ' },
+        { digitador: 'Ana' },
+        { digitador: 'Bruno' },
+        { digitador: 'Bruno' },
+        { digitador: 'Bruno' },
+        { digitador: 'Zé' },
+      ],
+    );
+
+    expect(linhas).toEqual([
+      { digitador: 'Bruno', ctesEmitidos: 100, erros: 3, taxaDeErro: 3 },
+      { digitador: 'Ana', ctesEmitidos: 400, erros: 2, taxaDeErro: 0.5 },
+      { digitador: 'Carla', ctesEmitidos: 50, erros: 0, taxaDeErro: 0 },
+      // Errou, mas a produção dele não veio na planilha
+      { digitador: 'Zé', ctesEmitidos: null, erros: 1, taxaDeErro: null },
+    ]);
+  });
+});
+
+describe('painel: filial, quem abre e tempo por tipo', () => {
+  it('agrupa as abertas por filial e por solicitante; tempo médio por tipo sem registro rápido', () => {
+    const resultado = calcularIndicadores(
+      [
+        s({ filial: 'Curitiba', solicitante: 'Sofia' }),
+        s({ filial: 'Curitiba', solicitante: 'Sofia' }),
+        s({ filial: null, solicitante: 'Pedro' }),
+        s({
+          status: 'RESOLVIDO',
+          tipo: 'AJUSTE_FISCAL',
+          criadoEm: antes(3 * HORA),
+          resolvidoEm: antes(HORA),
+          solicitante: 'Pedro',
+        }),
+        s({
+          status: 'RESOLVIDO',
+          tipo: 'AJUSTE_FISCAL',
+          criadoEm: antes(HORA),
+          resolvidoEm: antes(HORA),
+          registroRapido: true,
+        }),
+      ],
+      AGORA,
+      7,
+      EXPEDIENTE_PADRAO,
+    );
+
+    expect(resultado.porFilial).toEqual([
+      { filial: 'Sem filial', total: 3 },
+      { filial: 'Curitiba', total: 2 },
+    ]);
+    expect(resultado.porSolicitante).toEqual([
+      { nome: 'Pedro', total: 2 },
+      { nome: 'Sofia', total: 2 },
+    ]);
+    expect(resultado.tempoAteResolverPorTipo).toEqual([
+      { tipo: 'AJUSTE_FISCAL', resolvidas: 1, minutos: 120 },
+    ]);
   });
 });
