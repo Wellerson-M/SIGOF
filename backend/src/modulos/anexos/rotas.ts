@@ -13,7 +13,14 @@ import {
   ErroDeValidacao,
   ErroNaoEncontrado,
 } from '../../http/erros.js';
+import { validar } from '../../http/validacao.js';
 import { TAMANHO_MAXIMO_BYTES, type ServicoDeAnexos } from './servico.js';
+
+/** Campos que vão junto do arquivo no formulário. */
+const esquemaDoEnvio = z.object({
+  etapa: z.enum(['ABERTURA', 'ANDAMENTO', 'RESOLUCAO']).optional(),
+  mensagemId: z.string().uuid('Mensagem inválida').optional(),
+});
 
 /** 413 — o arquivo passou do limite. */
 class ErroArquivoGrandeDemais extends ErroDeAplicacao {
@@ -30,7 +37,7 @@ class ErroArquivoGrandeDemais extends ErroDeAplicacao {
 // para conferir o tipo antes de ir para o armazenamento
 const receber = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: TAMANHO_MAXIMO_BYTES, files: 1, fields: 0 },
+  limits: { fileSize: TAMANHO_MAXIMO_BYTES, files: 1, fields: 2 },
 }).single('arquivo');
 
 function receberArquivo(req: Request, res: Response, next: NextFunction) {
@@ -81,12 +88,17 @@ export function rotasDeAnexos(opcoes: {
     // O navegador manda o nome em UTF-8, mas o leitor de formulário o lê
     // como latin1: sem isto, "Canhoto São Paulo.pdf" viraria "SÃ£o"
     const nome = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
-    res.status(201).json(
-      await servico.anexar(usuarioDa(req), id, {
-        nome,
-        conteudo: req.file.buffer,
-      }),
-    );
+    const opcoes = validar(esquemaDoEnvio, req.body ?? {});
+    res
+      .status(201)
+      .json(
+        await servico.anexar(
+          usuarioDa(req),
+          id,
+          { nome, conteudo: req.file.buffer },
+          opcoes,
+        ),
+      );
   });
 
   rotas.get('/:anexoId', async (req, res) => {

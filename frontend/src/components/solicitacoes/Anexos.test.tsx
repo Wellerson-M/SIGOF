@@ -18,6 +18,8 @@ const ANEXO: Anexo = {
   nomeArquivo: 'canhoto.pdf',
   tipoMime: 'application/pdf',
   tamanhoBytes: 1_572_864,
+  etapa: 'ANDAMENTO',
+  mensagemId: null,
   enviadoPor: { id: 'u1', nome: 'Sofia' },
   criadoEm: '2026-10-16T10:00:00Z',
 };
@@ -133,7 +135,7 @@ describe('Anexos (detalhe)', () => {
   it('anexa os escolhidos, respeitando o limite, e recarrega', async () => {
     const anexar = vi.spyOn(api, 'anexar').mockResolvedValue(ANEXO);
     const aoMudar = vi.fn().mockResolvedValue(undefined);
-    const nove = Array.from({ length: 9 }, (_, i) => ({
+    const nove = Array.from({ length: 29 }, (_, i) => ({
       ...ANEXO,
       id: `a${i}`,
     }));
@@ -163,5 +165,27 @@ describe('Anexos (detalhe)', () => {
     );
     expect(screen.getByText('Nenhum arquivo.')).toBeInTheDocument();
     expect(screen.queryByText('Anexar arquivo')).toBeNull();
+  });
+
+  it('separa os grupos por etapa quando há mais de um', () => {
+    render(
+      <Anexos
+        solicitacaoId="s1"
+        anexos={[
+          { ...ANEXO, id: 'a', nomeArquivo: 'pedido.pdf', etapa: 'ABERTURA' },
+          {
+            ...ANEXO,
+            id: 'b',
+            nomeArquivo: 'cte-final.pdf',
+            etapa: 'RESOLUCAO',
+          },
+        ]}
+        podeAnexar={false}
+        aoMudar={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Enviados na abertura')).toBeInTheDocument();
+    expect(screen.getByText('Enviados ao resolver')).toBeInTheDocument();
+    expect(screen.queryByText('Durante o atendimento')).toBeNull();
   });
 });

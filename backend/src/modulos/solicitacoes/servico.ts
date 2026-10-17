@@ -103,6 +103,8 @@ export interface AnexoDaSolicitacao {
   nomeArquivo: string;
   tipoMime: string;
   tamanhoBytes: number;
+  etapa: 'ABERTURA' | 'ANDAMENTO' | 'RESOLUCAO';
+  mensagemId: string | null;
   enviadoPor: Pessoa;
   criadoEm: Date;
 }
@@ -122,6 +124,8 @@ export interface MensagemDaConversa {
   interna: boolean;
   autor: Pessoa;
   criadoEm: Date;
+  /** Arquivos enviados junto com a mensagem. */
+  anexos: { id: string; nomeArquivo: string; tipoMime: string }[];
 }
 
 /** Registro de cada e-mail enviado sobre a solicitação (só a equipe vê). */
@@ -613,7 +617,13 @@ export class ServicoDeSolicitacoes {
         mensagens: {
           // Comentário interno é só entre a equipe (RFC seção 2.4)
           where: ehInterno(usuario.perfil) ? {} : { interna: false },
-          include: { autor: pessoa },
+          include: {
+            autor: pessoa,
+            anexos: {
+              select: { id: true, nomeArquivo: true, tipoMime: true },
+              orderBy: { criadoEm: 'asc' },
+            },
+          },
           orderBy: { criadoEm: 'asc' },
         },
         anexos: {
@@ -672,6 +682,7 @@ export class ServicoDeSolicitacoes {
         interna: m.interna,
         autor: m.autor,
         criadoEm: m.criadoEm,
+        anexos: m.anexos,
       })),
       emails: solicitacao.emails,
       anexos: solicitacao.anexos.map((a) => ({
@@ -679,6 +690,8 @@ export class ServicoDeSolicitacoes {
         nomeArquivo: a.nomeArquivo,
         tipoMime: a.tipoMime,
         tamanhoBytes: a.tamanhoBytes,
+        etapa: a.etapa,
+        mensagemId: a.mensagemId,
         enviadoPor: a.enviadoPor,
         criadoEm: a.criadoEm,
       })),
@@ -959,6 +972,7 @@ export class ServicoDeSolicitacoes {
       interna: mensagem.interna,
       autor: mensagem.autor,
       criadoEm: mensagem.criadoEm,
+      anexos: [],
     };
   }
 

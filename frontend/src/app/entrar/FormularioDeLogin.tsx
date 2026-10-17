@@ -48,7 +48,7 @@ export function FormularioDeLogin() {
       } catch {
         // Sem armazenamento local (modo privado): só não lembra a empresa
       }
-      router.replace('/inicio');
+      router.replace(destinoDepoisDeEntrar(window.location.search));
     } catch (falha) {
       setErro(
         falha instanceof ErroDaApi
@@ -148,4 +148,17 @@ function Campo({
       )}
     </div>
   );
+}
+
+/**
+ * Para onde ir depois do login: o "voltar" da URL, se for um caminho deste
+ * site. Endereço de fora (ou "//outro-site") seria um redirecionamento
+ * aberto, que um golpista usaria para levar a pessoa a uma página falsa.
+ */
+export function destinoDepoisDeEntrar(busca: string): string {
+  const voltar = new URLSearchParams(busca).get('voltar');
+  if (voltar && /^\/(?![/\\])/.test(voltar)) {
+    return voltar;
+  }
+  return '/inicio';
 }
