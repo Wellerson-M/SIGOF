@@ -167,7 +167,7 @@ export interface DadosDeAbertura {
   hashesDosAnexos?: string[];
   confirmarDuplicidade?: boolean;
   /** Registro rápido: já foi resolvido; a solicitação nasce resolvida. */
-  registro?: { acaoTomada: string; classificacao?: Classificacao };
+  registro?: { acaoTomada?: string; classificacao?: Classificacao };
 }
 
 const json = (corpo: unknown) => ({ body: JSON.stringify(corpo) });
@@ -289,7 +289,7 @@ export const ACAO_PARA: Record<Status, string> = {
 export const PEDE_OBSERVACAO: Partial<Record<Status, string>> = {
   AGUARDANDO_DOC: 'Qual documento está faltando?',
   ESCALADO: 'Por que está escalando?',
-  RESOLVIDO: 'O que foi feito para resolver?',
+  RESOLVIDO: 'O que foi feito para resolver? (se quiser registrar)',
   CANCELADO: 'Por que está cancelando?',
 };
 

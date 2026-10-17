@@ -205,27 +205,50 @@ describe.skipIf(!temBanco)('causas do erro (integração, banco real)', () => {
       expect(avisos.map((a) => a.mensagem).join(' ')).not.toContain('Bruno');
     });
 
-    it('"qual" fora da lista é recusado; em causa sem opções, é ignorado', async () => {
+    it('"qual" novo entra na lista na hora; "ana" usa a grafia já cadastrada; causa sem "qual" ignora', async () => {
       const analista = await como('ANALISTA');
       const id = await abertaEmAndamento();
-      const fora = await analista.post(`/api/solicitacoes/${id}/status`, {
+      const novo = await analista.post(`/api/solicitacoes/${id}/status`, {
         status: 'RESOLVIDO',
-        observacao: 'Feito.',
-        classificacao: { causaId: digitacao, detalhe: 'Zé' },
+        classificacao: { causaId: digitacao, detalhe: '  Zé   Novo ' },
       });
-      expect(fora.status).toBe(422);
-      expect(fora.body.erro).toBe('Escolha digitador da lista');
+      expect(novo.status).toBe(200);
+      const causa = await prisma.causaDeErro.findUniqueOrThrow({
+        where: { id: digitacao },
+      });
+      expect(causa.opcoes).toEqual(['Ana', 'Bruno', 'Carla', 'Zé Novo']);
+      expect(
+        (await prisma.solicitacao.findUniqueOrThrow({ where: { id } }))
+          .causaDetalhe,
+      ).toBe('Zé Novo');
+      const evento = await prisma.eventoAuditoria.findFirst({
+        where: { empresaId: empresa.id, acao: 'CADASTRO_ALTERADO' },
+        orderBy: { criadoEm: 'desc' },
+      });
+      expect(evento).toMatchObject({
+        autorId: empresa.usuarios.ANALISTA.id,
+        detalhes: { incluidoAoFinalizar: 'Zé Novo' },
+      });
 
-      const semOpcoes = await analista.post(`/api/solicitacoes/${id}/status`, {
+      const outra = await abertaEmAndamento();
+      await analista.post(`/api/solicitacoes/${outra}/status`, {
         status: 'RESOLVIDO',
-        observacao: 'Feito.',
+        classificacao: { causaId: digitacao, detalhe: 'ana' },
+      });
+      expect(
+        (await prisma.solicitacao.findUniqueOrThrow({ where: { id: outra } }))
+          .causaDetalhe,
+      ).toBe('Ana');
+
+      const semQual = await abertaEmAndamento();
+      await analista.post(`/api/solicitacoes/${semQual}/status`, {
+        status: 'RESOLVIDO',
         classificacao: { causaId: cliente, detalhe: 'qualquer coisa' },
       });
-      expect(semOpcoes.status).toBe(200);
-      const gravada = await prisma.solicitacao.findUniqueOrThrow({
-        where: { id },
-      });
-      expect(gravada.causaDetalhe).toBeNull();
+      expect(
+        (await prisma.solicitacao.findUniqueOrThrow({ where: { id: semQual } }))
+          .causaDetalhe,
+      ).toBeNull();
     });
 
     it('causa de outra empresa é recusada', async () => {
@@ -321,10 +344,11 @@ describe.skipIf(!temBanco)('causas do erro (integração, banco real)', () => {
     );
     expect(digitacaoNoPainel).toEqual({
       causa: 'Erro de digitação',
-      total: 2,
+      total: 4,
       detalhes: [
-        { detalhe: 'Ana', total: 1 },
+        { detalhe: 'Ana', total: 2 },
         { detalhe: 'Bruno', total: 1 },
+        { detalhe: 'Zé Novo', total: 1 },
       ],
     });
     expect(indicadores.body.resolvidasSemCausa).toBe(1);

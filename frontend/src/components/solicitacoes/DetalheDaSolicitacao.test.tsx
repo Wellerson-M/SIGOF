@@ -225,17 +225,18 @@ describe('DetalheDaSolicitacao', () => {
     );
     const dialogo = screen.getByRole('dialog');
     await usuario.type(
-      within(dialogo).getByLabelText('O que foi feito para resolver?'),
+      within(dialogo).getByLabelText(/O que foi feito para resolver/),
       'CTe corrigido',
     );
     await usuario.selectOptions(
       await within(dialogo).findByLabelText('De quem foi o erro'),
       'dig',
     );
-    await usuario.selectOptions(
-      within(dialogo).getByLabelText('Digitador'),
-      'Bruno',
-    );
+    // Digitador que ainda não está na lista: digita e segue
+    await usuario.type(within(dialogo).getByLabelText(/^Digitador/), 'Carla');
+    expect(
+      within(dialogo).getByText('Novo: “Carla” será cadastrado ao salvar.'),
+    ).toBeInTheDocument();
     await usuario.type(
       within(dialogo).getByLabelText('Comentário'),
       'CNPJ trocado',
@@ -250,7 +251,7 @@ describe('DetalheDaSolicitacao', () => {
     await vi.waitFor(() => expect(mover).toHaveBeenCalled());
     expect(mover).toHaveBeenCalledWith('s1', 'RESOLVIDO', 'CTe corrigido', {
       causaId: 'dig',
-      detalhe: 'Bruno',
+      detalhe: 'Carla',
       comentario: 'CNPJ trocado',
     });
     expect(ordem).toEqual(['anexar', 'mover']);

@@ -32,6 +32,7 @@ import {
   ErroDeRegraDeNegocio,
   ErroNaoEncontrado,
 } from '../../http/erros.js';
+import { registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
 import type { ServicoDeAvisos } from '../avisos/avisos.js';
 import type { Ocorrido } from '../avisos/modelos.js';
@@ -62,7 +63,7 @@ export interface DadosDeAbertura {
    */
   registro?:
     | {
-        acaoTomada: string;
+        acaoTomada?: string | undefined;
         classificacao?: Classificacao | undefined;
       }
     | undefined;
@@ -171,7 +172,6 @@ export interface Detalhe extends Resumo {
 export const STATUS_COM_OBSERVACAO: readonly Status[] = [
   'AGUARDANDO_DOC',
   'ESCALADO',
-  'RESOLVIDO',
   'CANCELADO',
 ];
 
@@ -322,10 +322,7 @@ export class ServicoDeSolicitacoes {
         'Só analista e supervisor fazem registro rápido',
       );
     }
-    const acaoTomada = registro?.acaoTomada.trim() ?? '';
-    if (registro && acaoTomada === '') {
-      throw new ErroDeRegraDeNegocio('Diga o que foi feito');
-    }
+    const acaoTomada = registro?.acaoTomada?.trim() || null;
 
     const cte = normalizarDocumento(dados.cte ?? null);
     const nf = normalizarDocumento(dados.nf ?? null);
@@ -382,7 +379,7 @@ export class ServicoDeSolicitacoes {
       const causa = registro
         ? await this.conferirClassificacao(
             tx,
-            usuario.empresaId,
+            usuario,
             registro.classificacao,
             empresa.exigirCausaAoResolver,
           )
@@ -710,11 +707,7 @@ export class ServicoDeSolicitacoes {
   ): Promise<Resumo> {
     const texto = observacao?.trim() || null;
     if (STATUS_COM_OBSERVACAO.includes(para) && texto === null) {
-      throw new ErroDeRegraDeNegocio(
-        para === 'RESOLVIDO'
-          ? 'Descreva a ação tomada para resolver'
-          : 'Informe o motivo da mudança',
-      );
+      throw new ErroDeRegraDeNegocio('Informe o motivo da mudança');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -730,7 +723,7 @@ export class ServicoDeSolicitacoes {
         para === 'RESOLVIDO'
           ? await this.conferirClassificacao(
               tx,
-              usuario.empresaId,
+              usuario,
               classificacao,
               atual.empresa.exigirCausaAoResolver,
             )
@@ -804,7 +797,7 @@ export class ServicoDeSolicitacoes {
       }
       const dados = await this.conferirClassificacao(
         tx,
-        usuario.empresaId,
+        usuario,
         classificacao,
         true,
       );
@@ -1132,12 +1125,15 @@ export class ServicoDeSolicitacoes {
   }
 
   /**
-   * A causa precisa ser da empresa e estar ativa; o "qual", uma das opções
-   * dela (sem opções, não há "qual"). Devolve os campos para gravar.
+   * A causa precisa ser da empresa e estar ativa. O "qual" (ex.: o
+   * digitador) vale para causas que têm opções ou um nome de "qual": se o
+   * nome digitado ainda não está na lista, ele entra nela na hora, para não
+   * travar quem está finalizando (digitador novo que ninguém cadastrou).
+   * Devolve os campos para gravar.
    */
   private async conferirClassificacao(
     tx: Transacao,
-    empresaId: string,
+    usuario: UsuarioAutenticado,
     classificacao: Classificacao | undefined,
     obrigatoria: boolean,
   ): Promise<{
@@ -1153,26 +1149,48 @@ export class ServicoDeSolicitacoes {
     }
 
     const causa = await tx.causaDeErro.findFirst({
-      where: { id: classificacao.causaId, empresaId, ativa: true },
-      select: { id: true, opcoes: true, rotuloDasOpcoes: true },
+      where: {
+        id: classificacao.causaId,
+        empresaId: usuario.empresaId,
+        ativa: true,
+      },
+      select: { id: true, nome: true, opcoes: true, rotuloDasOpcoes: true },
     });
     if (!causa) {
       throw new ErroDeRegraDeNegocio('Escolha uma causa ativa da empresa');
     }
 
-    const detalhe = classificacao.detalhe?.trim() || null;
-    if (
-      detalhe !== null &&
-      causa.opcoes.length > 0 &&
-      !causa.opcoes.includes(detalhe)
-    ) {
-      const qual = causa.rotuloDasOpcoes?.toLowerCase() ?? 'uma opção';
-      throw new ErroDeRegraDeNegocio(`Escolha ${qual} da lista`);
+    const temQual = causa.rotuloDasOpcoes !== null || causa.opcoes.length > 0;
+    const digitado = classificacao.detalhe?.trim().replace(/\s+/g, ' ') || null;
+    let detalhe: string | null = null;
+    if (temQual && digitado !== null) {
+      // "ana" e "Ana" são a mesma pessoa: fica a grafia já cadastrada
+      const existente = causa.opcoes.find(
+        (o) =>
+          o.toLocaleLowerCase('pt-BR') === digitado.toLocaleLowerCase('pt-BR'),
+      );
+      detalhe = existente ?? digitado;
+      if (!existente) {
+        await tx.causaDeErro.update({
+          where: { id: causa.id },
+          data: { opcoes: { push: digitado } },
+        });
+        await registrar(tx, {
+          empresaId: usuario.empresaId,
+          acao: 'CADASTRO_ALTERADO',
+          autorId: usuario.id,
+          detalhes: {
+            cadastro: 'causa de erro',
+            causa: causa.nome,
+            incluidoAoFinalizar: digitado,
+          },
+        });
+      }
     }
 
     return {
       causaId: causa.id,
-      causaDetalhe: causa.opcoes.length > 0 ? detalhe : null,
+      causaDetalhe: detalhe,
       causaComentario: classificacao.comentario?.trim() || null,
     };
   }
