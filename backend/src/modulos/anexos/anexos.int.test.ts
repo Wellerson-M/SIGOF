@@ -280,4 +280,89 @@ describe.skipIf(!temBanco)('anexos (integração, banco real)', () => {
       .attach('arquivo', PDF, 'a.pdf');
     expect(resposta.status).toBe(503);
   });
+
+  describe('etapa e conversa', () => {
+    function enviarCom(
+      perfil: Perfil,
+      solicitacaoId: string,
+      campos: Record<string, string>,
+      conteudo: Buffer = PDF,
+    ) {
+      return cookieDe(perfil).then((cookie) => {
+        let pedido = request(app)
+          .post(`/api/solicitacoes/${solicitacaoId}/anexos`)
+          .set('Origin', FRONTEND)
+          .set('Cookie', cookie);
+        for (const [campo, valor] of Object.entries(campos)) {
+          pedido = pedido.field(campo, valor);
+        }
+        return pedido.attach('arquivo', conteudo, 'doc.pdf');
+      });
+    }
+
+    it('guarda a etapa; o solicitante não anexa como resolução', async () => {
+      const id = await abrir();
+      const abertura = await enviarCom('SOLICITANTE', id, {
+        etapa: 'ABERTURA',
+      });
+      expect(abertura.body.etapa).toBe('ABERTURA');
+
+      const resolucao = await enviarCom('SOLICITANTE', id, {
+        etapa: 'RESOLUCAO',
+      });
+      expect(resolucao.status).toBe(422);
+
+      const daEquipe = await enviarCom('ANALISTA', id, { etapa: 'RESOLUCAO' });
+      expect(daEquipe.body.etapa).toBe('RESOLUCAO');
+
+      const invalida = await enviarCom('ANALISTA', id, { etapa: 'QUALQUER' });
+      expect(invalida.status).toBe(400);
+    });
+
+    it('arquivo na conversa: fica ligado à mensagem e aparece nela', async () => {
+      const id = await abrir();
+      const mensagem = await request(app)
+        .post(`/api/solicitacoes/${id}/mensagens`)
+        .set('Origin', FRONTEND)
+        .set('Cookie', await cookieDe('SOLICITANTE'))
+        .send({ conteudo: '', comAnexos: true });
+      expect(mensagem.status).toBe(201);
+
+      const anexo = await enviarCom('SOLICITANTE', id, {
+        mensagemId: mensagem.body.id,
+      });
+      expect(anexo.status).toBe(201);
+      expect(anexo.body).toMatchObject({
+        mensagemId: mensagem.body.id,
+        etapa: 'ANDAMENTO',
+      });
+
+      const detalhe = await request(app)
+        .get(`/api/solicitacoes/${id}`)
+        .set('Cookie', await cookieDe('ANALISTA'));
+      expect(detalhe.body.mensagens[0].anexos).toEqual([
+        {
+          id: anexo.body.id,
+          nomeArquivo: 'doc.pdf',
+          tipoMime: 'application/pdf',
+        },
+      ]);
+
+      // Mensagem de outra pessoa não recebe arquivo meu
+      const alheia = await enviarCom('ANALISTA', id, {
+        mensagemId: mensagem.body.id,
+      });
+      expect(alheia.status).toBe(404);
+    });
+
+    it('mensagem vazia sem arquivo é recusada', async () => {
+      const id = await abrir();
+      const vazia = await request(app)
+        .post(`/api/solicitacoes/${id}/mensagens`)
+        .set('Origin', FRONTEND)
+        .set('Cookie', await cookieDe('SOLICITANTE'))
+        .send({ conteudo: '  ' });
+      expect(vazia.status).toBe(400);
+    });
+  });
 });

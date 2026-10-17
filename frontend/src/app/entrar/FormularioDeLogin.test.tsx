@@ -2,7 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
-import { CHAVE_EMPRESA, FormularioDeLogin } from './FormularioDeLogin';
+import {
+  CHAVE_EMPRESA,
+  FormularioDeLogin,
+  destinoDepoisDeEntrar,
+} from './FormularioDeLogin';
 
 const replace = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
@@ -79,5 +83,17 @@ describe('FormularioDeLogin', () => {
     render(<FormularioDeLogin />);
 
     expect(screen.getByLabelText('Empresa')).toHaveValue('transportadora-demo');
+  });
+});
+
+describe('destino depois de entrar', () => {
+  it('volta para o caminho do site; endereço de fora vai para o início', () => {
+    expect(destinoDepoisDeEntrar('?voltar=%2Fanexos%2Fs1%2Fa1')).toBe(
+      '/anexos/s1/a1',
+    );
+    expect(destinoDepoisDeEntrar('')).toBe('/inicio');
+    expect(destinoDepoisDeEntrar('?voltar=https://golpe.test')).toBe('/inicio');
+    expect(destinoDepoisDeEntrar('?voltar=//golpe.test')).toBe('/inicio');
+    expect(destinoDepoisDeEntrar('?voltar=/%5Cgolpe.test')).toBe('/inicio');
   });
 });

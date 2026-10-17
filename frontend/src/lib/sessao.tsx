@@ -51,7 +51,14 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
       .catch((erro: unknown) => {
         if (cancelado) return;
         if (erro instanceof ErroDaApi && erro.semSessao) {
-          router.replace('/entrar');
+          // Depois de entrar, volta para onde estava (ex.: link de anexo
+          // recebido por e-mail)
+          const aqui = window.location.pathname + window.location.search;
+          router.replace(
+            aqui === '/' || aqui.startsWith('/inicio')
+              ? '/entrar'
+              : `/entrar?voltar=${encodeURIComponent(aqui)}`,
+          );
           return;
         }
         setEstado({

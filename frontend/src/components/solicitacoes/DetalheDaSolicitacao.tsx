@@ -8,6 +8,7 @@ import { useSessao } from '@/lib/sessao';
 import { COR_DA_SITUACAO, NOME_DA_SITUACAO, notificacoes } from '@/lib/avisos';
 import {
   ACAO_PARA,
+  ANEXO,
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
   NOME_DO_TIPO,
@@ -22,7 +23,7 @@ import {
   type Prioridade,
   type Status,
 } from '@/lib/solicitacoes';
-import { Anexos, enviarAnexos } from './Anexos';
+import { Anexos, abrirAnexo, enviarAnexos } from './Anexos';
 import { CausaDoErro } from './CausaDoErro';
 import {
   DialogoDeObservacao,
@@ -119,7 +120,9 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
     extras: ExtrasDaResolucao,
   ) {
     if (extras.arquivos.length > 0) {
-      const erros = await enviarAnexos(id, extras.arquivos);
+      const erros = await enviarAnexos(id, extras.arquivos, {
+        etapa: 'RESOLUCAO',
+      });
       if (erros.length > 0) {
         throw new ErroDaApi(422, 'ANEXO', erros.join('; '));
       }
@@ -298,9 +301,25 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
 
           <Conversa
             detalhe={detalhe}
-            aoEnviar={(conteudo, interna) =>
-              executar(() => api.comentar(id, conteudo, interna))
+            aoEnviar={(conteudo, interna, arquivos) =>
+              executar(async () => {
+                const mensagem = await api.comentar(
+                  id,
+                  conteudo,
+                  interna,
+                  arquivos.length > 0,
+                );
+                if (arquivos.length > 0) {
+                  const erros = await enviarAnexos(id, arquivos, {
+                    mensagemId: mensagem.id,
+                  });
+                  if (erros.length > 0) {
+                    throw new ErroDaApi(422, 'ANEXO', erros.join('; '));
+                  }
+                }
+              })
             }
+            aoAbrirAnexo={(anexo) => abrirAnexo(id, anexo)}
           />
         </div>
 
@@ -429,22 +448,40 @@ function Dado({ nome, children }: { nome: string; children: React.ReactNode }) {
 function Conversa({
   detalhe,
   aoEnviar,
+  aoAbrirAnexo,
 }: {
   detalhe: Detalhe;
-  aoEnviar: (conteudo: string, interna: boolean) => Promise<boolean>;
+  aoEnviar: (
+    conteudo: string,
+    interna: boolean,
+    arquivos: File[],
+  ) => Promise<boolean>;
+  aoAbrirAnexo: (anexo: {
+    id: string;
+    nomeArquivo: string;
+    tipoMime: string;
+  }) => Promise<void>;
 }) {
   const [texto, setTexto] = useState('');
   const [interna, setInterna] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [chaveDoArquivo, setChaveDoArquivo] = useState(0);
+  const [erroAoAbrir, setErroAoAbrir] = useState<string | null>(null);
+  const podeEnviar = texto.trim() !== '' || arquivos.length > 0;
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
-    if (!texto.trim()) return;
+    if (!podeEnviar) return;
     setEnviando(true);
-    const enviada = await aoEnviar(texto, interna);
+    const enviada = await aoEnviar(texto, interna, arquivos);
     setEnviando(false);
     // Se falhou, o texto fica para a pessoa tentar de novo
-    if (enviada) setTexto('');
+    if (enviada) {
+      setTexto('');
+      setArquivos([]);
+      setChaveDoArquivo((n) => n + 1);
+    }
   }
 
   return (
@@ -470,7 +507,29 @@ function Conversa({
                 · {dataCurta(m.criadoEm)}
                 {m.interna && ' · interna (só a equipe vê)'}
               </p>
-              <p className="whitespace-pre-wrap text-texto">{m.conteudo}</p>
+              {m.conteudo && (
+                <p className="whitespace-pre-wrap text-texto">{m.conteudo}</p>
+              )}
+              {m.anexos.length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {m.anexos.map((anexo) => (
+                    <li key={anexo.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setErroAoAbrir(null);
+                          aoAbrirAnexo(anexo).catch((falha: unknown) =>
+                            setErroAoAbrir(mensagemDoErro(falha)),
+                          );
+                        }}
+                        className="rounded-md border border-borda bg-superficie px-2 py-1 text-xs font-medium text-primaria underline"
+                      >
+                        📎 {anexo.nomeArquivo}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ol>
@@ -491,6 +550,20 @@ function Conversa({
           placeholder="Escreva uma mensagem"
           className="rounded-md border border-borda bg-fundo px-3 py-2 text-sm text-texto"
         />
+        <input
+          key={chaveDoArquivo}
+          type="file"
+          multiple
+          accept={ANEXO.aceitos}
+          aria-label="Anexar arquivos à mensagem"
+          onChange={(evento) => setArquivos([...(evento.target.files ?? [])])}
+          className="text-sm text-texto file:mr-3 file:h-8 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
+        />
+        {erroAoAbrir && (
+          <p role="alert" className="text-sm text-critico">
+            {erroAoAbrir}
+          </p>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-2">
           {detalhe.pode.comentarInterno ? (
             <label className="flex items-center gap-2 text-sm text-texto">
@@ -506,7 +579,7 @@ function Conversa({
           )}
           <button
             type="submit"
-            disabled={enviando || !texto.trim()}
+            disabled={enviando || !podeEnviar}
             className="h-9 rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria disabled:opacity-50"
           >
             {enviando ? 'Enviando…' : 'Enviar'}

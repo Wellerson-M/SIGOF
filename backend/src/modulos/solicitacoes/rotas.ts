@@ -84,10 +84,18 @@ const esquemaAtribuicao = z.object({
   responsavelId: z.string().uuid('Responsável inválido'),
 });
 
-const esquemaMensagem = z.object({
-  conteudo: z.string().trim().min(1, 'Escreva a mensagem').max(5000),
-  interna: z.boolean().optional(),
-});
+const esquemaMensagem = z
+  .object({
+    conteudo: z.string().trim().max(5000).default(''),
+    interna: z.boolean().optional(),
+    /** Os arquivos vão logo depois, ligados a esta mensagem. */
+    comAnexos: z.boolean().optional(),
+  })
+  // Só arquivo, sem texto, também vale
+  .refine((m) => m.conteudo !== '' || m.comAnexos, {
+    path: ['conteudo'],
+    message: 'Escreva a mensagem',
+  });
 
 const esquemaBusca = z.object({ busca: z.string().max(100).optional() });
 

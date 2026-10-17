@@ -95,7 +95,9 @@ export function FormularioDeAbertura() {
       // Os arquivos vão depois que a solicitação existe; se algum for
       // recusado, a solicitação continua aberta e o motivo aparece
       setErrosDosAnexos(
-        anexaveis.length > 0 ? await enviarAnexos(nova.id, anexaveis) : [],
+        anexaveis.length > 0
+          ? await enviarAnexos(nova.id, anexaveis, { etapa: 'ABERTURA' })
+          : [],
       );
       setCriada(nova);
       setDuplicidades(null);

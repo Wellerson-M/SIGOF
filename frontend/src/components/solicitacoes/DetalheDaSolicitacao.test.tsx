@@ -72,6 +72,7 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
         id: 'm1',
         conteudo: 'Conferir com o fiscal',
         interna: true,
+        anexos: [],
         autor: { id: 'ana', nome: 'André Analista' },
         criadoEm: '2026-10-15T12:30:00Z',
       },
@@ -209,6 +210,8 @@ describe('DetalheDaSolicitacao', () => {
         nomeArquivo: 'cte.pdf',
         tipoMime: 'application/pdf',
         tamanhoBytes: 4,
+        etapa: 'ANDAMENTO',
+        mensagemId: null,
         enviadoPor: { id: 'ana', nome: 'André' },
         criadoEm: '2026-10-16T10:00:00Z',
       };
@@ -365,6 +368,7 @@ describe('DetalheDaSolicitacao', () => {
       id: 'm2',
       conteudo: 'x',
       interna: true,
+      anexos: [],
       autor: { id: 'ana', nome: 'André' },
       criadoEm: '2026-10-15T13:00:00Z',
     });
@@ -378,7 +382,12 @@ describe('DetalheDaSolicitacao', () => {
     );
     await usuario.click(screen.getByRole('button', { name: 'Enviar' }));
 
-    expect(comentar).toHaveBeenCalledWith('s1', 'Pedi a NF ao cliente', true);
+    expect(comentar).toHaveBeenCalledWith(
+      's1',
+      'Pedi a NF ao cliente',
+      true,
+      false,
+    );
     expect(campo).toHaveValue('');
   });
 
@@ -450,5 +459,68 @@ describe('DetalheDaSolicitacao', () => {
     render(<DetalheDaSolicitacao id="s1" />);
 
     expect(await screen.findByText(/Algo deu errado/)).toBeInTheDocument();
+  });
+
+  it('mensagem com arquivo: cria a mensagem e anexa ligado a ela', async () => {
+    vi.spyOn(api, 'detalhar').mockResolvedValue(detalhe());
+    vi.spyOn(api, 'responsaveis').mockResolvedValue([]);
+    const comentar = vi.spyOn(api, 'comentar').mockResolvedValue({
+      id: 'm9',
+      conteudo: '',
+      interna: false,
+      autor: { id: 'ana', nome: 'André' },
+      criadoEm: '2026-10-17T10:00:00Z',
+      anexos: [],
+    });
+    const anexar = vi.spyOn(api, 'anexar').mockResolvedValue({
+      id: 'x',
+      nomeArquivo: 'nf.pdf',
+      tipoMime: 'application/pdf',
+      tamanhoBytes: 4,
+      etapa: 'ANDAMENTO',
+      mensagemId: 'm9',
+      enviadoPor: { id: 'ana', nome: 'André' },
+      criadoEm: '2026-10-17T10:00:00Z',
+    });
+    render(<DetalheDaSolicitacao id="s1" />);
+    const usuario = userEvent.setup();
+
+    await usuario.upload(
+      await screen.findByLabelText('Anexar arquivos à mensagem'),
+      [new File(['%PDF'], 'nf.pdf', { type: 'application/pdf' })],
+    );
+    await usuario.click(screen.getByRole('button', { name: 'Enviar' }));
+
+    await vi.waitFor(() => expect(anexar).toHaveBeenCalled());
+    expect(comentar).toHaveBeenCalledWith('s1', '', false, true);
+    expect(anexar).toHaveBeenCalledWith('s1', expect.any(File), {
+      mensagemId: 'm9',
+    });
+  });
+
+  it('o arquivo aparece dentro da mensagem e abre pelo clique', async () => {
+    const base = detalhe();
+    vi.spyOn(api, 'detalhar').mockResolvedValue({
+      ...base,
+      mensagens: [
+        {
+          ...base.mensagens[0]!,
+          anexos: [
+            { id: 'x', nomeArquivo: 'nf.xml', tipoMime: 'application/xml' },
+          ],
+        },
+      ],
+    });
+    vi.spyOn(api, 'responsaveis').mockResolvedValue([]);
+    const baixar = vi
+      .spyOn(api, 'baixarAnexo')
+      .mockResolvedValue(new Blob(['<x/>']));
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<DetalheDaSolicitacao id="s1" />);
+
+    await userEvent.click(await screen.findByText('📎 nf.xml'));
+    expect(baixar).toHaveBeenCalledWith('s1', 'x');
   });
 });
