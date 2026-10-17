@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Testes de integração que sobem dezenas de anexos passam de 5 s
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

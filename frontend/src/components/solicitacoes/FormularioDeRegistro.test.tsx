@@ -6,6 +6,19 @@ import { cadastros } from '@/lib/cadastros';
 import { api, type Resumo } from '@/lib/solicitacoes';
 import { FormularioDeRegistro } from './FormularioDeRegistro';
 
+vi.mock('@/lib/sessao', () => ({
+  useSessao: () => ({
+    usuario: {
+      id: 'u1',
+      nome: 'Quem usa',
+      email: 'u1@demo.test',
+      perfil: 'ANALISTA',
+      area: null,
+      empresa: { razaoSocial: 'Transportadora Demo Ltda.', slug: 'demo' },
+    },
+  }),
+}));
+
 function registrada(n: number): Resumo {
   return {
     id: `r${n}`,

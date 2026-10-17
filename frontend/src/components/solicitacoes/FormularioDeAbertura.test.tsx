@@ -6,6 +6,19 @@ import { cadastros } from '@/lib/cadastros';
 import { api, type Resumo } from '@/lib/solicitacoes';
 import { FormularioDeAbertura } from './FormularioDeAbertura';
 
+vi.mock('@/lib/sessao', () => ({
+  useSessao: () => ({
+    usuario: {
+      id: 'u1',
+      nome: 'Quem usa',
+      email: 'u1@demo.test',
+      perfil: 'SOLICITANTE',
+      area: null,
+      empresa: { razaoSocial: 'Transportadora Demo Ltda.', slug: 'demo' },
+    },
+  }),
+}));
+
 const criada = {
   id: 'nova',
   protocolo: 'SOL-2026-10-0042',
@@ -233,6 +246,45 @@ describe('FormularioDeAbertura', () => {
 
     expect(abrir).toHaveBeenCalledWith(
       expect.objectContaining({ ctes: ['100', '101', '102'], fatura: 'F-9' }),
+    );
+  });
+
+  it('marca já na abertura os itens do tipo que são de quem abre', async () => {
+    vi.spyOn(cadastros, 'verificacoes').mockResolvedValue([
+      {
+        id: 'desacordo',
+        texto: 'Desacordo fiscal do CTe realizado',
+        tipos: ['REVERSAO'],
+        quemMarca: 'SOLICITANTE',
+        obrigatorioParaResolver: false,
+        ordem: 1,
+        ativo: true,
+      },
+      {
+        id: 'equipe',
+        texto: 'Conferido pela equipe',
+        tipos: [],
+        quemMarca: 'EQUIPE',
+        obrigatorioParaResolver: true,
+        ordem: 2,
+        ativo: true,
+      },
+    ]);
+    const abrir = vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+    render(<FormularioDeAbertura />);
+    const usuario = await preencher();
+
+    // O item da equipe não aparece para quem abre
+    expect(screen.queryByText('Conferido pela equipe')).toBeNull();
+    await usuario.click(
+      await screen.findByLabelText('Desacordo fiscal do CTe realizado'),
+    );
+    await usuario.click(
+      screen.getByRole('button', { name: 'Abrir solicitação' }),
+    );
+
+    expect(abrir).toHaveBeenCalledWith(
+      expect.objectContaining({ verificacoes: ['desacordo'] }),
     );
   });
 });

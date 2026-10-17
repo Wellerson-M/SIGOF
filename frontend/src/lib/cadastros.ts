@@ -29,6 +29,44 @@ export interface DadosDaCausa {
   ativa?: boolean;
 }
 
+export type TipoDeOcorrencia =
+  'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+export type QuemMarca = 'SOLICITANTE' | 'EQUIPE' | 'QUALQUER';
+
+/** Item que a empresa pede para marcar (ex.: "Desacordo fiscal feito"). */
+export interface ItemDeVerificacao {
+  id: string;
+  texto: string;
+  /** Vazio: vale para todos os tipos. */
+  tipos: TipoDeOcorrencia[];
+  quemMarca: QuemMarca;
+  obrigatorioParaResolver: boolean;
+  ordem: number;
+  ativo: boolean;
+}
+
+export type DadosDaVerificacao = Partial<Omit<ItemDeVerificacao, 'id'>>;
+
+export const NOME_DE_QUEM_MARCA: Record<QuemMarca, string> = {
+  SOLICITANTE: 'Quem abriu',
+  EQUIPE: 'A equipe',
+  QUALQUER: 'Qualquer um',
+};
+
+/** O item aparece para este tipo e este perfil pode marcá-lo. */
+export function marcaNaAbertura(
+  item: ItemDeVerificacao,
+  tipo: TipoDeOcorrencia,
+  perfil: 'SOLICITANTE' | 'ANALISTA' | 'SUPERVISOR' | 'ADMIN',
+): boolean {
+  const doTipo = item.tipos.length === 0 || item.tipos.includes(tipo);
+  const doPerfil =
+    perfil !== 'ADMIN' &&
+    (item.quemMarca === 'QUALQUER' ||
+      (item.quemMarca === 'SOLICITANTE') === (perfil === 'SOLICITANTE'));
+  return item.ativo && doTipo && doPerfil;
+}
+
 const json = (corpo: unknown) => ({ body: JSON.stringify(corpo) });
 
 export const cadastros = {
@@ -38,6 +76,20 @@ export const cadastros = {
     pedir<Filial>('/cadastros/filiais', { method: 'POST', ...json({ nome }) }),
   alterarFilial: (id: string, alteracao: { nome?: string; ativa?: boolean }) =>
     pedir<Filial>(`/cadastros/filiais/${id}`, {
+      method: 'PATCH',
+      ...json(alteracao),
+    }),
+  verificacoes: (todas = false) =>
+    pedir<ItemDeVerificacao[]>(
+      `/cadastros/verificacoes${todas ? '?todas=1' : ''}`,
+    ),
+  criarVerificacao: (dados: DadosDaVerificacao & { texto: string }) =>
+    pedir<ItemDeVerificacao>('/cadastros/verificacoes', {
+      method: 'POST',
+      ...json(dados),
+    }),
+  alterarVerificacao: (id: string, alteracao: DadosDaVerificacao) =>
+    pedir<ItemDeVerificacao>(`/cadastros/verificacoes/${id}`, {
       method: 'PATCH',
       ...json(alteracao),
     }),

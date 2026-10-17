@@ -8,6 +8,7 @@ import { Filiais } from '@/components/administracao/Filiais';
 import { ParametrosDaEmpresa } from '@/components/administracao/ParametrosDaEmpresa';
 import { Sistema } from '@/components/administracao/Sistema';
 import { Usuarios } from '@/components/administracao/Usuarios';
+import { Verificacoes } from '@/components/administracao/Verificacoes';
 import { useSessao } from '@/lib/sessao';
 
 const ABAS = [
@@ -15,6 +16,7 @@ const ABAS = [
   { id: 'empresa', rotulo: 'Empresa e expediente' },
   { id: 'filiais', rotulo: 'Filiais' },
   { id: 'causas', rotulo: 'Causas de erro' },
+  { id: 'verificacoes', rotulo: 'Verificações' },
   { id: 'email', rotulo: 'E-mail' },
   { id: 'auditoria', rotulo: 'Auditoria' },
   { id: 'sistema', rotulo: 'Sistema' },
@@ -68,6 +70,7 @@ export default function PaginaDeAdministracao() {
         {aba === 'empresa' && <ParametrosDaEmpresa />}
         {aba === 'filiais' && <Filiais />}
         {aba === 'causas' && <Causas />}
+        {aba === 'verificacoes' && <Verificacoes />}
         {aba === 'email' && <Email />}
         {aba === 'auditoria' && <Auditoria />}
         {aba === 'sistema' && <Sistema />}

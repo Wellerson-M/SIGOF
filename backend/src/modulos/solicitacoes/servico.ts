@@ -62,6 +62,8 @@ export interface DadosDeAbertura {
   hashesDosAnexos?: string[] | undefined;
   /** O usuário viu o alerta de duplicidade e decidiu abrir mesmo assim. */
   confirmarDuplicidade?: boolean | undefined;
+  /** Itens de verificação já marcados ao abrir. */
+  verificacoes?: string[] | undefined;
   /**
    * Registro rápido (analista e supervisor): já foi resolvido por fora e
    * só entra para ter o registro. A solicitação nasce resolvida.
@@ -162,11 +164,24 @@ export interface CausaRegistrada {
   comentario: string | null;
 }
 
+/** Um item de verificação como aparece na solicitação. */
+export interface VerificacaoDaSolicitacao {
+  itemId: string;
+  texto: string;
+  marcada: boolean;
+  marcadaPor: Pessoa | null;
+  marcadaEm: Date | null;
+  obrigatorioParaResolver: boolean;
+  /** Este usuário pode marcar ou desmarcar agora. */
+  podeMarcar: boolean;
+}
+
 export interface Detalhe extends Resumo {
   pagadorCorreto: string | null;
   resolvidoEm: Date | null;
   /** Só para a equipe interna; o solicitante recebe sempre null. */
   causa: CausaRegistrada | null;
+  verificacoes: VerificacaoDaSolicitacao[];
   historico: EventoDoHistorico[];
   mensagens: MensagemDaConversa[];
   emails: EmailDaSolicitacao[];
@@ -278,6 +293,18 @@ type Transacao = Prisma.TransactionClient;
 
 function ehInterno(perfil: Perfil): boolean {
   return perfil !== 'SOLICITANTE';
+}
+
+/** Quem marca: o solicitante, a equipe (analista e supervisor) ou ambos. */
+function marcaEsteItem(
+  perfil: Perfil,
+  quemMarca: 'SOLICITANTE' | 'EQUIPE' | 'QUALQUER',
+): boolean {
+  if (perfil === 'ADMIN') return false;
+  if (quemMarca === 'QUALQUER') return true;
+  return quemMarca === 'SOLICITANTE'
+    ? perfil === 'SOLICITANTE'
+    : perfil !== 'SOLICITANTE';
 }
 
 /** Solicitante só enxerga o que ele mesmo abriu; os internos, a empresa toda. */
@@ -465,6 +492,25 @@ export class ServicoDeSolicitacoes {
         await this.avisar(tx, usuario, solicitacao.id, { tipo: 'ABERTA' });
       }
 
+      // Itens que quem abriu já marcou (ex.: "desacordo feito")
+      for (const itemId of new Set(dados.verificacoes ?? [])) {
+        const item = await this.itemQueOUsuarioMarca(
+          tx,
+          usuario,
+          itemId,
+          dados.tipo,
+        );
+        await tx.marcacaoDeVerificacao.create({
+          data: {
+            empresaId: usuario.empresaId,
+            solicitacaoId: solicitacao.id,
+            itemId: item.id,
+            marcadoPorId: usuario.id,
+            marcadoEm: agora,
+          },
+        });
+      }
+
       return { solicitacao, expediente: expedienteDaEmpresa(empresa) };
     });
 
@@ -631,6 +677,9 @@ export class ServicoDeSolicitacoes {
         ...incluirNoResumo,
         empresa: true,
         causa: { select: { id: true, nome: true } },
+        marcacoes: {
+          include: { marcadoPor: pessoa },
+        },
         historicos: {
           include: { autor: pessoa },
           orderBy: { criadoEm: 'asc' },
@@ -706,6 +755,12 @@ export class ServicoDeSolicitacoes {
         anexos: m.anexos,
       })),
       emails: solicitacao.emails,
+      verificacoes: await this.verificacoesDa(
+        usuario,
+        solicitacao.tipo,
+        ehTerminal(solicitacao.status),
+        solicitacao.marcacoes,
+      ),
       anexos: solicitacao.anexos.map((a) => ({
         id: a.id,
         nomeArquivo: a.nomeArquivo,
@@ -753,6 +808,9 @@ export class ServicoDeSolicitacoes {
       const agora = this.agora();
       const expediente = expedienteDaEmpresa(atual.empresa);
       const sla = this.slaDepoisDaMudanca(atual, de, para, agora, expediente);
+      if (para === 'RESOLVIDO') {
+        await this.barrarSemVerificacoesObrigatorias(tx, atual);
+      }
       const causa =
         para === 'RESOLVIDO'
           ? await this.conferirClassificacao(
@@ -851,6 +909,64 @@ export class ServicoDeSolicitacoes {
         comentario: salva.causaComentario,
       };
     });
+  }
+
+  /** Marca ou desmarca um item de verificação. Fica no histórico. */
+  async marcarVerificacao(
+    usuario: UsuarioAutenticado,
+    id: string,
+    itemId: string,
+    marcada: boolean,
+  ): Promise<VerificacaoDaSolicitacao[]> {
+    await this.prisma.$transaction(async (tx) => {
+      const atual = await this.carregar(tx, usuario, id);
+      this.barrarSeEncerrada(atual.status);
+      const item = await this.itemQueOUsuarioMarca(
+        tx,
+        usuario,
+        itemId,
+        atual.tipo,
+      );
+      const existente = await tx.marcacaoDeVerificacao.findUnique({
+        where: { solicitacaoId_itemId: { solicitacaoId: atual.id, itemId } },
+      });
+      if (marcada === Boolean(existente)) return;
+
+      if (marcada) {
+        await tx.marcacaoDeVerificacao.create({
+          data: {
+            empresaId: usuario.empresaId,
+            solicitacaoId: atual.id,
+            itemId: item.id,
+            marcadoPorId: usuario.id,
+            marcadoEm: this.agora(),
+          },
+        });
+      } else {
+        await tx.marcacaoDeVerificacao.delete({ where: { id: existente!.id } });
+      }
+      await this.registrarMovimentacao(
+        tx,
+        usuario,
+        atual,
+        `${marcada ? 'Marcou' : 'Desmarcou'}: ${item.texto}`,
+      );
+    });
+
+    const solicitacao = await this.prisma.solicitacao.findFirstOrThrow({
+      where: { id, ...visiveisPara(usuario) },
+      select: {
+        tipo: true,
+        status: true,
+        marcacoes: { include: { marcadoPor: pessoa } },
+      },
+    });
+    return this.verificacoesDa(
+      usuario,
+      solicitacao.tipo,
+      ehTerminal(solicitacao.status),
+      solicitacao.marcacoes,
+    );
   }
 
   async mudarPrioridade(
@@ -1242,6 +1358,89 @@ export class ServicoDeSolicitacoes {
       causaDetalhe: detalhe,
       causaComentario: classificacao.comentario?.trim() || null,
     };
+  }
+
+  /** O item existe, está ativo, vale para o tipo e este perfil o marca. */
+  private async itemQueOUsuarioMarca(
+    tx: Transacao,
+    usuario: UsuarioAutenticado,
+    itemId: string,
+    tipo: TipoOcorrencia,
+  ) {
+    const item = await tx.itemDeVerificacao.findFirst({
+      where: { id: itemId, empresaId: usuario.empresaId, ativo: true },
+    });
+    if (!item || (item.tipos.length > 0 && !item.tipos.includes(tipo))) {
+      throw new ErroDeRegraDeNegocio('Item de verificação inválido');
+    }
+    if (!marcaEsteItem(usuario.perfil, item.quemMarca)) {
+      throw new ErroAcessoNegado('Seu perfil não marca este item');
+    }
+    return item;
+  }
+
+  /** Resolver exige os itens obrigatórios marcados. */
+  private async barrarSemVerificacoesObrigatorias(
+    tx: Transacao,
+    atual: { id: string; empresaId: string; tipo: TipoOcorrencia },
+  ): Promise<void> {
+    const faltando = await tx.itemDeVerificacao.findMany({
+      where: {
+        empresaId: atual.empresaId,
+        ativo: true,
+        obrigatorioParaResolver: true,
+        OR: [{ tipos: { isEmpty: true } }, { tipos: { has: atual.tipo } }],
+        marcacoes: { none: { solicitacaoId: atual.id } },
+      },
+      select: { texto: true },
+      orderBy: { ordem: 'asc' },
+    });
+    if (faltando.length > 0) {
+      throw new ErroDeRegraDeNegocio(
+        `Antes de resolver, marque: ${faltando.map((f) => f.texto).join('; ')}`,
+      );
+    }
+  }
+
+  /**
+   * Os itens que valem para a solicitação (os ativos do tipo dela) e os que
+   * já foram marcados, mesmo que depois desativados.
+   */
+  private async verificacoesDa(
+    usuario: UsuarioAutenticado,
+    tipo: TipoOcorrencia,
+    encerrada: boolean,
+    marcacoes: { itemId: string; marcadoEm: Date; marcadoPor: Pessoa }[],
+  ): Promise<VerificacaoDaSolicitacao[]> {
+    const marcadas = new Map(marcacoes.map((m) => [m.itemId, m]));
+    const itens = await this.prisma.itemDeVerificacao.findMany({
+      where: {
+        empresaId: usuario.empresaId,
+        OR: [
+          {
+            ativo: true,
+            OR: [{ tipos: { isEmpty: true } }, { tipos: { has: tipo } }],
+          },
+          { id: { in: [...marcadas.keys()] } },
+        ],
+      },
+      orderBy: [{ ordem: 'asc' }, { criadoEm: 'asc' }],
+    });
+    return itens.map((item) => {
+      const marcacao = marcadas.get(item.id);
+      return {
+        itemId: item.id,
+        texto: item.texto,
+        marcada: Boolean(marcacao),
+        marcadaPor: marcacao?.marcadoPor ?? null,
+        marcadaEm: marcacao?.marcadoEm ?? null,
+        obrigatorioParaResolver: item.obrigatorioParaResolver,
+        podeMarcar:
+          !encerrada &&
+          item.ativo &&
+          marcaEsteItem(usuario.perfil, item.quemMarca),
+      };
+    });
   }
 
   /** 403 quando o perfil não pode; 422 quando o movimento não existe. */

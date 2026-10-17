@@ -25,6 +25,7 @@ import {
 } from '@/lib/solicitacoes';
 import { Anexos, abrirAnexo, enviarAnexos } from './Anexos';
 import { CausaDoErro } from './CausaDoErro';
+import { VerificacoesDaSolicitacao } from './Verificacoes';
 import {
   DialogoDeObservacao,
   type ExtrasDaResolucao,
@@ -360,6 +361,14 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
               )}
             </dl>
           </section>
+
+          <VerificacoesDaSolicitacao
+            key={detalhe.atualizadoEm}
+            verificacoes={detalhe.verificacoes ?? []}
+            aoMarcar={(itemId, marcada) =>
+              api.marcarVerificacao(id, itemId, marcada)
+            }
+          />
 
           {(detalhe.causa || detalhe.pode.classificar) && (
             <CausaDoErro

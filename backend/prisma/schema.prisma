@@ -77,6 +77,13 @@ enum EtapaDoAnexo {
   RESOLUCAO
 }
 
+/// Quem pode marcar um item de verificação na solicitação.
+enum QuemMarca {
+  SOLICITANTE
+  EQUIPE
+  QUALQUER
+}
+
 enum SituacaoDoEmail {
   PENDENTE
   ENVIADO
@@ -152,6 +159,8 @@ model Empresa {
   emails       EmailSaida[]
   filiais      Filial[]
   causas       CausaDeErro[]
+  verificacoes ItemDeVerificacao[]
+  marcacoes    MarcacaoDeVerificacao[]
 
   @@map("empresas")
 }
@@ -189,6 +198,7 @@ model Usuario {
   sessoes                Sessao[]
   auditoriaFeita         EventoAuditoria[] @relation("AuditoriaAutor")
   auditoriaSofrida       EventoAuditoria[] @relation("AuditoriaAlvo")
+  marcacoes              MarcacaoDeVerificacao[]
 
   // O e-mail é único dentro da empresa, não globalmente: em um cenário
   // multi-tenant, a mesma pessoa pode existir em duas transportadoras.
@@ -294,6 +304,7 @@ model Solicitacao {
   historicos   StatusHistorico[]
   notificacoes Notificacao[]
   emails       EmailSaida[]
+  marcacoes    MarcacaoDeVerificacao[]
 
   @@unique([empresaId, protocolo])
   // Índices que sustentam a detecção de duplicidade (RF09): a busca é
@@ -344,6 +355,47 @@ model CausaDeErro {
 
   @@unique([empresaId, nome])
   @@map("causas_de_erro")
+}
+
+/// Item de verificação que a empresa pede nas solicitações (ex.: "O
+/// desacordo fiscal do CTe foi feito?"). Cada empresa monta os seus.
+model ItemDeVerificacao {
+  id        String   @id @default(uuid())
+  empresaId String   @map("empresa_id")
+  texto     String
+  /// Tipos de ocorrência em que aparece; vazio = em todos.
+  tipos     TipoOcorrencia[] @default([])
+  quemMarca QuemMarca @default(QUALQUER) @map("quem_marca")
+  /// Sem ele marcado, a solicitação não pode ser resolvida.
+  obrigatorioParaResolver Boolean @default(false) @map("obrigatorio_para_resolver")
+  ordem     Int      @default(0)
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  empresa   Empresa                 @relation(fields: [empresaId], references: [id])
+  marcacoes MarcacaoDeVerificacao[]
+
+  @@index([empresaId])
+  @@map("itens_de_verificacao")
+}
+
+/// Um item marcado numa solicitação: quem marcou e quando. Desmarcar apaga
+/// a marcação; as duas ações ficam no histórico da solicitação.
+model MarcacaoDeVerificacao {
+  id            String   @id @default(uuid())
+  empresaId     String   @map("empresa_id")
+  solicitacaoId String   @map("solicitacao_id")
+  itemId        String   @map("item_id")
+  marcadoPorId  String   @map("marcado_por_id")
+  marcadoEm     DateTime @default(now()) @map("marcado_em")
+
+  empresa     Empresa           @relation(fields: [empresaId], references: [id])
+  solicitacao Solicitacao       @relation(fields: [solicitacaoId], references: [id])
+  item        ItemDeVerificacao @relation(fields: [itemId], references: [id])
+  marcadoPor  Usuario           @relation(fields: [marcadoPorId], references: [id])
+
+  @@unique([solicitacaoId, itemId])
+  @@map("marcacoes_de_verificacao")
 }
 
 /// Contador de protocolo por empresa/ano/mês.
