@@ -20,6 +20,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx src/banco/seed.ts",
     "db:seed:se-vazio": "tsx src/banco/seed.ts --se-vazio",
+    "plataforma:criar-admin": "tsx src/banco/criar-admin-da-plataforma.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "postinstall": "prisma generate"
   },

@@ -25,6 +25,8 @@ import { rotasDeAnexos } from '../modulos/anexos/rotas.js';
 import { ServicoDeAnexos } from '../modulos/anexos/servico.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { rotasDeCadastros } from '../modulos/cadastros/rotas.js';
+import { rotasDaPlataforma } from '../modulos/plataforma/rotas.js';
+import { ServicoDaPlataforma } from '../modulos/plataforma/servico.js';
 import { ServicoDeCadastros } from '../modulos/cadastros/servico.js';
 import {
   ServicoDeIndicadores,
@@ -195,6 +197,19 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       rotasDeIndicadores({
         servico: new ServicoDeIndicadores(prisma),
         jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/plataforma',
+      rotasDaPlataforma({
+        servico: new ServicoDaPlataforma(prisma, env.JWT_SECRET),
+        segredo: env.JWT_SECRET,
+        cookieSeguro:
+          env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
+        ...(modulos.limiteDeLoginPorMinuto === undefined
+          ? {}
+          : { limiteDeEntradaPorMinuto: modulos.limiteDeLoginPorMinuto }),
       }),
     );
 
