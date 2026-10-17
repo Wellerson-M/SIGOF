@@ -48,6 +48,7 @@ const esquemaAbertura = z
       .max(10)
       .optional(),
     confirmarDuplicidade: z.boolean().optional(),
+    verificacoes: z.array(z.string().uuid()).max(50).optional(),
     registro: z
       .object({
         acaoTomada: z.string().trim().max(2000).optional(),
@@ -192,6 +193,22 @@ export function rotasDeSolicitacoes(opcoes: {
         status,
         observacao,
         classificacao,
+      ),
+    );
+  });
+
+  rotas.put('/:id/verificacoes/:itemId', async (req, res) => {
+    const { marcada } = validar(z.object({ marcada: z.boolean() }), req.body);
+    const itemId = z.string().uuid().safeParse(req.params.itemId);
+    if (!itemId.success) {
+      throw new ErroNaoEncontrado('Item de verificação não encontrado');
+    }
+    res.json(
+      await servico.marcarVerificacao(
+        usuarioDa(req),
+        idDa(req),
+        itemId.data,
+        marcada,
       ),
     );
   });

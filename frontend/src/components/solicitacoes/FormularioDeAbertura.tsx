@@ -5,6 +5,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ErroDaApi } from '@/lib/api';
 import { cadastros, hashDoArquivo, type Filial } from '@/lib/cadastros';
 import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
+import { MarcacoesDaAbertura, useItensDaAbertura } from './Verificacoes';
+import { useSessao } from '@/lib/sessao';
 import { enviarAnexos } from './Anexos';
 import {
   NOME_DA_PRIORIDADE,
@@ -43,6 +45,9 @@ export function FormularioDeAbertura() {
   const [cte, setCte] = useState('');
   const [nf, setNf] = useState('');
   const [fatura, setFatura] = useState('');
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const { usuario } = useSessao();
+  const itensDaAbertura = useItensDaAbertura(tipo, usuario.perfil);
   const [pagadorCorreto, setPagadorCorreto] = useState('');
   const [prioridade, setPrioridade] = useState<Prioridade>('MEDIA');
   const [descricao, setDescricao] = useState('');
@@ -82,6 +87,9 @@ export function FormularioDeAbertura() {
     const dados: DadosDeAbertura = {
       tipo,
       ...documentosDoFormulario(cte, nf, fatura),
+      ...(marcadosValidos(marcados, itensDaAbertura).length > 0
+        ? { verificacoes: marcadosValidos(marcados, itensDaAbertura) }
+        : {}),
       pagadorCorreto:
         tipo === 'TROCA_PAGADOR'
           ? pagadorCorreto.trim() || undefined
@@ -124,6 +132,7 @@ export function FormularioDeAbertura() {
     setCte('');
     setNf('');
     setFatura('');
+    setMarcados([]);
     setPagadorCorreto('');
     setDescricao('');
     setPrioridade('MEDIA');
@@ -295,6 +304,13 @@ export function FormularioDeAbertura() {
         />
       </label>
 
+      <div className="contents">
+        <MarcacoesDaAbertura
+          itens={itensDaAbertura}
+          marcados={marcados}
+          aoMudar={setMarcados}
+        />
+      </div>
       <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
         Anexos (opcional)
         <input
@@ -376,4 +392,12 @@ export function FormularioDeAbertura() {
       )}
     </form>
   );
+}
+
+/** Só os marcados que ainda valem (mudar o tipo pode tirar um item). */
+function marcadosValidos(
+  marcados: string[],
+  itens: { id: string }[],
+): string[] {
+  return marcados.filter((id) => itens.some((item) => item.id === id));
 }

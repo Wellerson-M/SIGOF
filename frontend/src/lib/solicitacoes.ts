@@ -103,6 +103,7 @@ export interface Detalhe extends Resumo {
   resolvidoEm: string | null;
   /** De quem foi o erro; null para o solicitante e quando não informada. */
   causa: CausaRegistrada | null;
+  verificacoes: VerificacaoDaSolicitacao[];
   historico: Evento[];
   mensagens: Mensagem[];
   emails: EmailEnviado[];
@@ -148,6 +149,16 @@ export function consultaDaLista(filtros: FiltrosDaLista): string {
   return parametros.toString();
 }
 
+export interface VerificacaoDaSolicitacao {
+  itemId: string;
+  texto: string;
+  marcada: boolean;
+  marcadaPor: Pessoa | null;
+  marcadaEm: string | null;
+  obrigatorioParaResolver: boolean;
+  podeMarcar: boolean;
+}
+
 /** De quem foi o erro, informado ao resolver (só a equipe vê). */
 export interface Classificacao {
   causaId: string;
@@ -185,6 +196,8 @@ export interface DadosDeAbertura {
   filialId?: string;
   hashesDosAnexos?: string[];
   confirmarDuplicidade?: boolean;
+  /** Itens de verificação já marcados ao abrir. */
+  verificacoes?: string[];
   /** Registro rápido: já foi resolvido; a solicitação nasce resolvida. */
   registro?: { acaoTomada?: string; classificacao?: Classificacao };
 }
@@ -211,6 +224,11 @@ export const api = {
       method: 'POST',
       ...json({ status, observacao, classificacao }),
     }),
+  marcarVerificacao: (id: string, itemId: string, marcada: boolean) =>
+    pedir<VerificacaoDaSolicitacao[]>(
+      `/solicitacoes/${id}/verificacoes/${itemId}`,
+      { method: 'PUT', ...json({ marcada }) },
+    ),
   classificar: (id: string, classificacao: Classificacao) =>
     pedir<CausaRegistrada>(`/solicitacoes/${id}/causa`, {
       method: 'PUT',

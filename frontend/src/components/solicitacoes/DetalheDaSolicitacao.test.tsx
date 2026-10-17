@@ -84,6 +84,7 @@ function detalhe(extra: Partial<Detalhe> = {}): Detalhe {
     anexos: [],
     totais: { anexos: 0, mensagens: 1 },
     causa: null,
+    verificacoes: [],
     pode: {
       mudarPrioridade: true,
       atribuir: true,
@@ -525,5 +526,46 @@ describe('DetalheDaSolicitacao', () => {
 
     await userEvent.click(await screen.findByText('📎 nf.xml'));
     expect(baixar).toHaveBeenCalledWith('s1', 'x');
+  });
+
+  it('marca uma verificação no detalhe', async () => {
+    vi.spyOn(api, 'detalhar').mockResolvedValue(
+      detalhe({
+        verificacoes: [
+          {
+            itemId: 'conf',
+            texto: 'Conferido com o financeiro',
+            marcada: false,
+            marcadaPor: null,
+            marcadaEm: null,
+            obrigatorioParaResolver: true,
+            podeMarcar: true,
+          },
+        ],
+      }),
+    );
+    vi.spyOn(api, 'responsaveis').mockResolvedValue([]);
+    const marcar = vi.spyOn(api, 'marcarVerificacao').mockResolvedValue([
+      {
+        itemId: 'conf',
+        texto: 'Conferido com o financeiro',
+        marcada: true,
+        marcadaPor: { id: 'ana', nome: 'André Analista' },
+        marcadaEm: '2026-10-17T10:00:00Z',
+        obrigatorioParaResolver: true,
+        podeMarcar: true,
+      },
+    ]);
+    render(<DetalheDaSolicitacao id="s1" />);
+
+    expect(
+      await screen.findByText('(necessário para resolver)'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText(/Conferido com o financeiro/));
+
+    expect(marcar).toHaveBeenCalledWith('s1', 'conf', true);
+    expect(
+      await screen.findByLabelText(/Conferido com o financeiro/),
+    ).toBeChecked();
   });
 });
