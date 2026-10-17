@@ -307,3 +307,44 @@ describe('haDuplicidade', () => {
     expect(haDuplicidade(candidata(), [])).toBe(false);
   });
 });
+
+describe('vários documentos', () => {
+  it('basta um CTe em comum entre as listas', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: '100', ctes: ['100', '101', '102'] }),
+      [solicitacao({ cte: '90', ctes: ['90', '102'] })],
+    );
+
+    expect(motivos).toEqual([
+      expect.objectContaining({ documento: 'CTE', valor: '102' }),
+    ]);
+  });
+
+  it('NF da lista também conta', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: null, nfs: ['555', '556'] }),
+      [solicitacao({ cte: null, nf: '556' })],
+    );
+
+    expect(motivos).toHaveLength(1);
+  });
+
+  it('a mesma fatura (ignorando maiúsculas e espaços) é duplicidade', () => {
+    const motivos = encontrarDuplicidades(
+      candidata({ cte: null, fatura: ' fat-123 ' }),
+      [solicitacao({ cte: null, fatura: 'FAT-123' })],
+    );
+
+    expect(motivos).toEqual([
+      expect.objectContaining({ documento: 'FATURA', valor: 'FAT-123' }),
+    ]);
+  });
+
+  it('listas sem número em comum não acusam', () => {
+    expect(
+      encontrarDuplicidades(candidata({ cte: '1', ctes: ['1', '2'] }), [
+        solicitacao({ cte: '3', ctes: ['3', '4'] }),
+      ]),
+    ).toHaveLength(0);
+  });
+});

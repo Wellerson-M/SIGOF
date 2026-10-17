@@ -78,6 +78,7 @@ export class ServicoDeIndicadores {
         extra.filial,
         extra.cte,
         extra.nf,
+        extra.fatura,
         NOME_DO_STATUS[s.status],
         NOME_DA_PRIORIDADE[s.prioridade],
         extra.solicitante,
@@ -99,6 +100,7 @@ export class ServicoDeIndicadores {
         'Filial',
         'CTe',
         'NF',
+        'Fatura',
         'Status',
         'Prioridade',
         'Solicitante',
@@ -194,8 +196,9 @@ export class ServicoDeIndicadores {
     }));
     const extras = registros.map((r) => ({
       protocolo: r.protocolo,
-      cte: r.cte,
-      nf: r.nf,
+      cte: r.ctes.length > 0 ? r.ctes.join(', ') : r.cte,
+      nf: r.nfs.length > 0 ? r.nfs.join(', ') : r.nf,
+      fatura: r.fatura,
       solicitante: r.solicitante.nome,
       filial: r.filial?.nome ?? null,
       causaComentario: r.causaComentario,

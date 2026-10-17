@@ -244,8 +244,15 @@ model Solicitacao {
   filialId      String? @map("filial_id")
 
   tipo           TipoOcorrencia
+  /// O primeiro CTe e a primeira NF (o que aparece no cartão e no assunto
+  /// do e-mail). A lista completa fica em `ctes` e `nfs`.
   cte            String?
   nf             String?
+  /// Todos os documentos: uma fatura inteira pode ter vários CTe e NF.
+  ctes           String[]       @default([])
+  nfs            String[]       @default([])
+  /// Número da fatura, quando a correção é da fatura inteira.
+  fatura         String?
   pagadorCorreto String?        @map("pagador_correto")
   descricao      String
 
@@ -293,6 +300,8 @@ model Solicitacao {
   // sempre por empresa + documento dentro da janela de 7 dias.
   @@index([empresaId, cte])
   @@index([empresaId, nf])
+  @@index([ctes], type: Gin)
+  @@index([nfs], type: Gin)
   @@index([empresaId, status])
   @@map("solicitacoes")
 }
