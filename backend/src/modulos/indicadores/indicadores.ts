@@ -2,7 +2,9 @@ import { Router } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import {
+  balancoDoMes,
   calcularIndicadores,
+  type LinhaDoBalanco,
   diaLocal,
   montarCsv,
   type Indicadores,
@@ -15,7 +17,9 @@ import {
   usuarioDa,
 } from '../../http/autenticacao.js';
 import { validar } from '../../http/validacao.js';
+import { registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
+import { inicioDoDia } from '../solicitacoes/servico.js';
 import {
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
@@ -117,6 +121,104 @@ export class ServicoDeIndicadores {
     );
   }
 
+  /**
+   * Balanço do mês por digitador: CTe emitidos (importados) e erros
+   * registrados nas solicitações resolvidas no mês (o "qual" das causas).
+   */
+  async balanco(
+    usuario: UsuarioAutenticado,
+    mes: string,
+  ): Promise<{
+    mes: string;
+    linhas: LinhaDoBalanco[];
+    importadoEm: Date | null;
+  }> {
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: usuario.empresaId },
+      select: { fusoHorario: true },
+    });
+    const [ano, numero] = mes.split('-').map(Number) as [number, number];
+    const proximo =
+      numero === 12
+        ? `${ano + 1}-01-01`
+        : `${ano}-${String(numero + 1).padStart(2, '0')}-01`;
+    const de = inicioDoDia(`${mes}-01`, empresa.fusoHorario);
+    const ate = inicioDoDia(proximo, empresa.fusoHorario);
+
+    const [producao, comErro] = await Promise.all([
+      this.prisma.producaoDoDigitador.findMany({
+        where: { empresaId: usuario.empresaId, mes },
+      }),
+      this.prisma.solicitacao.findMany({
+        where: {
+          empresaId: usuario.empresaId,
+          status: 'RESOLVIDO',
+          resolvidoEm: { gte: de, lt: ate },
+          causaDetalhe: { not: null },
+        },
+        select: { causaDetalhe: true },
+      }),
+    ]);
+    return {
+      mes,
+      linhas: balancoDoMes(
+        producao,
+        comErro.map((s) => ({ digitador: s.causaDetalhe! })),
+      ),
+      importadoEm:
+        producao.length > 0
+          ? new Date(Math.max(...producao.map((p) => p.importadoEm.getTime())))
+          : null,
+    };
+  }
+
+  /** Substitui a produção do mês pela planilha importada. */
+  async importarProducao(
+    usuario: UsuarioAutenticado,
+    mes: string,
+    linhas: { digitador: string; ctesEmitidos: number }[],
+  ): Promise<number> {
+    // A mesma pessoa em duas linhas: soma
+    const somadas = new Map<
+      string,
+      { digitador: string; ctesEmitidos: number }
+    >();
+    for (const l of linhas) {
+      const nome = l.digitador.trim().replace(/\s+/g, ' ');
+      const chave = nome.toLocaleLowerCase('pt-BR');
+      const atual = somadas.get(chave);
+      somadas.set(chave, {
+        digitador: atual?.digitador ?? nome,
+        ctesEmitidos: (atual?.ctesEmitidos ?? 0) + l.ctesEmitidos,
+      });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.producaoDoDigitador.deleteMany({
+        where: { empresaId: usuario.empresaId, mes },
+      });
+      await tx.producaoDoDigitador.createMany({
+        data: [...somadas.values()].map((l) => ({
+          empresaId: usuario.empresaId,
+          mes,
+          digitador: l.digitador,
+          ctesEmitidos: l.ctesEmitidos,
+          importadoPorId: usuario.id,
+        })),
+      });
+      await registrar(tx, {
+        empresaId: usuario.empresaId,
+        acao: 'CADASTRO_ALTERADO',
+        autorId: usuario.id,
+        detalhes: {
+          cadastro: 'produção dos digitadores',
+          mes,
+          digitadores: somadas.size,
+        },
+      });
+    });
+    return somadas.size;
+  }
+
   /** Nome do arquivo: sigof-solicitacoes-2026-10-16-30dias.csv */
   async nomeDoCsv(usuario: UsuarioAutenticado, dias: number): Promise<string> {
     const empresa = await this.prisma.empresa.findUniqueOrThrow({
@@ -193,6 +295,8 @@ export class ServicoDeIndicadores {
       ),
       causa: r.causa ? { nome: r.causa.nome, detalhe: r.causaDetalhe } : null,
       registroRapido: r.registroRapido,
+      filial: r.filial?.nome ?? null,
+      solicitante: r.solicitante.nome,
     }));
     const extras = registros.map((r) => ({
       protocolo: r.protocolo,
@@ -216,6 +320,23 @@ const esquemaPeriodo = z.object({
     .default(30),
 });
 
+const mes = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use o mês no formato AAAA-MM');
+const esquemaMes = z.object({ mes });
+const esquemaProducao = z.object({
+  mes,
+  linhas: z
+    .array(
+      z.object({
+        digitador: z.string().trim().min(1).max(80),
+        ctesEmitidos: z.number().int().min(0).max(1_000_000),
+      }),
+    )
+    .min(1, 'A planilha está vazia')
+    .max(500),
+});
+
 /** /api/indicadores — supervisor e administrador. */
 export function rotasDeIndicadores(opcoes: {
   servico: ServicoDeIndicadores;
@@ -228,6 +349,21 @@ export function rotasDeIndicadores(opcoes: {
   rotas.get('/', async (req, res) => {
     const { dias } = validar(esquemaPeriodo, req.query);
     res.json(await servico.calcular(usuarioDa(req), dias));
+  });
+
+  rotas.get('/digitadores', async (req, res) => {
+    const { mes } = validar(esquemaMes, req.query);
+    res.json(await servico.balanco(usuarioDa(req), mes));
+  });
+
+  rotas.put('/producao', async (req, res) => {
+    const { mes, linhas } = validar(esquemaProducao, req.body);
+    const digitadores = await servico.importarProducao(
+      usuarioDa(req),
+      mes,
+      linhas,
+    );
+    res.json({ mes, digitadores });
   });
 
   rotas.get('/solicitacoes.csv', async (req, res) => {
