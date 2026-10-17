@@ -453,17 +453,32 @@ export class ServicoDaPlataforma {
  * Cria um administrador da plataforma (usado pelo script do servidor).
  * Devolve a senha provisória, que ele troca no primeiro acesso.
  */
+/**
+ * Cria o administrador ou, se o e-mail já existe, gera outra senha
+ * provisória para ele (destrava e exige a troca). Assim, uma senha
+ * perdida no caminho se recupera rodando o mesmo comando de novo.
+ */
 export async function criarAdministradorDaPlataforma(
   prisma: PrismaClient,
   dados: { nome: string; email: string },
-): Promise<string> {
+): Promise<{ senha: string; novo: boolean }> {
   const senhaProvisoria = gerarSenhaProvisoria(16);
-  await prisma.administradorDaPlataforma.create({
-    data: {
-      nome: dados.nome.trim(),
-      email: dados.email.trim().toLowerCase(),
-      senhaHash: await gerarHashDeSenha(senhaProvisoria),
+  const senhaHash = await gerarHashDeSenha(senhaProvisoria);
+  const email = dados.email.trim().toLowerCase();
+  const existente = await prisma.administradorDaPlataforma.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  await prisma.administradorDaPlataforma.upsert({
+    where: { email },
+    create: { nome: dados.nome.trim(), email, senhaHash },
+    update: {
+      senhaHash,
+      trocarSenha: true,
+      ativo: true,
+      falhasDeLogin: 0,
+      bloqueadoAte: null,
     },
   });
-  return senhaProvisoria;
+  return { senha: senhaProvisoria, novo: !existente };
 }

@@ -44,6 +44,8 @@ az vm run-command invoke -g rg-sigof -n vm-sigof --command-id RunShellScript   -
 
 A resposta demora cerca de um minuto e traz, no campo `message`, o e-mail e a senha provisória.
 
+O nome vai entre aspas simples dentro do script: se tiver apóstrofo (D'Ávila), escreva sem ele. Rodar o mesmo comando de novo com o mesmo e-mail gera outra senha provisória e destrava a conta, para quando a primeira se perdeu.
+
 A senha provisória aparece uma vez; no primeiro acesso ela é trocada.
 
 ## Release e produção *(a implementar — issue #48)*
