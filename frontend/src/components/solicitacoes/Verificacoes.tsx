@@ -94,9 +94,17 @@ export function VerificacoesDaSolicitacao({
   async function alternar(item: VerificacaoDaSolicitacao) {
     setErro(null);
     setOcupado(item.itemId);
+    const antes = itens;
+    // Muda na hora; se o servidor recusar, volta
+    setItens(
+      itens.map((i) =>
+        i.itemId === item.itemId ? { ...i, marcada: !i.marcada } : i,
+      ),
+    );
     try {
       setItens(await aoMarcar(item.itemId, !item.marcada));
     } catch (falha) {
+      setItens(antes);
       setErro(mensagemDoErro(falha));
     } finally {
       setOcupado(null);

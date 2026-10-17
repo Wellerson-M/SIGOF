@@ -32,6 +32,19 @@ Staging e produção usam **a mesma imagem Docker**: o que vai para a produção
 
 **Qual versão está no ar?** O rodapé do menu lateral e a aba *Administração → Sistema* mostram o ambiente e a versão (por enquanto o commit da `main`; depois da v1.0.0, a etiqueta da release). Os dados vêm de `GET /api/sistema`, que não exige login.
 
+## Administração da plataforma
+
+Quem opera o SIGOF (cadastra transportadoras, ativa/desativa, cria administrador de empresa) entra por **`/plataforma/entrar`**, com login próprio, separado das empresas: outra tabela (`administradores_da_plataforma`), outro cookie (`sigof_plataforma`, só em `/api/plataforma`, SameSite=Strict) e trilha própria (`eventos_da_plataforma`, sem UPDATE). O administrador da plataforma vê cadastro e números de uso, nunca o conteúdo das solicitações.
+
+Não há tela para criar o primeiro administrador da plataforma, de propósito. Ele nasce no servidor:
+
+```sh
+cd /opt/sigof
+docker compose exec api-staging npm run plataforma:criar-admin -- --nome "Seu nome" --email voce@exemplo.com
+```
+
+A senha provisória aparece uma vez; no primeiro acesso ela é trocada.
+
 ## Release e produção *(a implementar — issue #48)*
 
 A produção **nunca** recebe um merge direto. O fluxo planejado é este:

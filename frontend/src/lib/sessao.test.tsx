@@ -169,7 +169,8 @@ describe('ProvedorDeSessao', () => {
       </ProvedorDeSessao>,
     );
     await screen.findByText('André Analista');
-    expect(replace).toHaveBeenCalledWith('/conta');
+    // O redirecionamento vem num efeito, logo depois de o nome aparecer
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/conta'));
   });
 
   it('na própria Minha conta não redireciona, e atualizar busca de novo', async () => {
