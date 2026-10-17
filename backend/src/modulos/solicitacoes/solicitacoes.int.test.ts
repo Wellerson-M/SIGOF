@@ -503,4 +503,71 @@ describe.skipIf(!temBanco)('solicitações (integração, banco real)', () => {
       expect(internaDoSolicitante.status).toBe(403);
     });
   });
+
+  describe('vários documentos (fatura inteira)', () => {
+    it('guarda a lista, usa o primeiro como principal e acha por qualquer um', async () => {
+      const solicitante = await como('SOLICITANTE');
+      const resposta = await solicitante.post('/api/solicitacoes', {
+        tipo: 'REVERSAO',
+        ctes: ['88001', '088002', 'CTe 88003', '88001'],
+        nfs: ['7001'],
+        fatura: ' fat-9 ',
+        descricao: 'Fatura inteira recusada, reverter todos os CTe.',
+      });
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({
+        cte: '88001',
+        ctes: ['88001', '88002', '88003'],
+        nf: '7001',
+        nfs: ['7001'],
+        fatura: 'FAT-9',
+      });
+
+      const busca = await (
+        await como('ANALISTA')
+      ).get('/api/solicitacoes/lista?busca=88003');
+      expect(busca.body.itens.map((i: { id: string }) => i.id)).toContain(
+        resposta.body.id,
+      );
+    });
+
+    it('um CTe em comum com outra solicitação já gera o alerta', async () => {
+      const solicitante = await como('SOLICITANTE');
+      await solicitante.post('/api/solicitacoes', {
+        tipo: 'REVERSAO',
+        ctes: ['89001', '89002'],
+        descricao: 'Primeira leva de CTe para reverter.',
+      });
+      const repetida = await solicitante.post('/api/solicitacoes', {
+        tipo: 'REVERSAO',
+        ctes: ['89500', '89002'],
+        descricao: 'Segunda leva, com um CTe repetido.',
+      });
+
+      expect(repetida.status).toBe(409);
+      expect(repetida.body.detalhes.duplicidades[0]).toMatchObject({
+        documento: 'CTE',
+        valor: '89002',
+      });
+    });
+
+    it('só a fatura já basta para abrir; a mesma fatura gera alerta', async () => {
+      const solicitante = await como('SOLICITANTE');
+      const primeira = await solicitante.post('/api/solicitacoes', {
+        tipo: 'AJUSTE_FISCAL',
+        fatura: 'F-777',
+        descricao: 'Fatura com alíquota errada em todos os CTe.',
+      });
+      expect(primeira.status).toBe(201);
+
+      const repetida = await solicitante.post('/api/solicitacoes', {
+        tipo: 'AJUSTE_FISCAL',
+        fatura: 'f-777',
+        descricao: 'Mesma fatura de novo, por engano.',
+      });
+      expect(repetida.status).toBe(409);
+      expect(repetida.body.detalhes.duplicidades[0].documento).toBe('FATURA');
+    });
+  });
 });

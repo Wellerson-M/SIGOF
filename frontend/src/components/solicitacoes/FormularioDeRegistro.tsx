@@ -16,11 +16,13 @@ import {
   TIPOS,
   api,
   dataCurta,
+  documentos,
   mensagemDoErro,
   type Duplicidade,
   type Resumo,
   type Tipo,
 } from '@/lib/solicitacoes';
+import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
 import { enviarAnexos } from './Anexos';
 import { CampoDoQual, temQual } from './CampoDoQual';
 
@@ -30,6 +32,7 @@ const ROTULO = 'flex flex-col gap-1.5 text-sm font-medium text-texto';
 
 function descreverMotivo(d: Duplicidade): string {
   if (d.documento === 'ANEXO') return `mesmo arquivo (${d.valor})`;
+  if (d.documento === 'FATURA') return `fatura ${d.valor}`;
   return `${d.documento === 'CTE' ? 'CTe' : 'NF'} ${d.valor}`;
 }
 
@@ -48,6 +51,7 @@ export function FormularioDeRegistro() {
   const [filialId, setFilialId] = useState('');
   const [cte, setCte] = useState('');
   const [nf, setNf] = useState('');
+  const [fatura, setFatura] = useState('');
   const [pagadorCorreto, setPagadorCorreto] = useState('');
   const [oQueEra, setOQueEra] = useState('');
   const [oQueFoiFeito, setOQueFoiFeito] = useState('');
@@ -60,7 +64,7 @@ export function FormularioDeRegistro() {
   const [erro, setErro] = useState<string | null>(null);
   const [duplicidades, setDuplicidades] = useState<Duplicidade[] | null>(null);
   const [registradas, setRegistradas] = useState<Resumo[]>([]);
-  const campoCte = useRef<HTMLInputElement>(null);
+  const campoCte = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -95,8 +99,7 @@ export function FormularioDeRegistro() {
     try {
       const nova = await api.abrir({
         tipo,
-        cte: cte.trim() || undefined,
-        nf: nf.trim() || undefined,
+        ...documentosDoFormulario(cte, nf, fatura),
         pagadorCorreto:
           tipo === 'TROCA_PAGADOR'
             ? pagadorCorreto.trim() || undefined
@@ -127,6 +130,7 @@ export function FormularioDeRegistro() {
       // Pronto para o próximo: tipo e filial ficam
       setCte('');
       setNf('');
+      setFatura('');
       setPagadorCorreto('');
       setOQueEra('');
       setOQueFoiFeito('');
@@ -194,22 +198,36 @@ export function FormularioDeRegistro() {
           )}
           <label className={ROTULO}>
             CTe
-            <input
+            <textarea
               ref={campoCte}
               value={cte}
               onChange={(evento) => setCte(evento.target.value)}
-              inputMode="numeric"
-              maxLength={60}
-              className={CAMPO}
+              rows={1}
+              maxLength={20000}
+              placeholder="Número ou chave; vários, um por linha"
+              className={`${CAMPO} min-h-10 resize-y py-2`}
             />
+            <Contagem valor={cte} nome="CTe" />
           </label>
           <label className={ROTULO}>
             NF
-            <input
+            <textarea
               value={nf}
               onChange={(evento) => setNf(evento.target.value)}
-              inputMode="numeric"
-              maxLength={60}
+              rows={1}
+              maxLength={20000}
+              placeholder="Número ou chave; vários, um por linha"
+              className={`${CAMPO} min-h-10 resize-y py-2`}
+            />
+            <Contagem valor={nf} nome="NF" />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+            Fatura
+            <input
+              value={fatura}
+              onChange={(evento) => setFatura(evento.target.value)}
+              maxLength={40}
+              placeholder="Quando é a fatura inteira"
               className={CAMPO}
             />
           </label>
@@ -369,7 +387,7 @@ export function FormularioDeRegistro() {
                   {r.protocolo}
                 </Link>{' '}
                 — {NOME_DO_TIPO[r.tipo]}
-                {r.cte ? `, CTe ${r.cte}` : ''}
+                {documentos(r) ? `, ${documentos(r)}` : ''}
               </li>
             ))}
           </ul>

@@ -23,6 +23,9 @@
  *  - **Arquivo anexado.** Mandar os mesmos arquivos digitando outro CTe e
  *    outra NF passava sem aviso. O conteúdo de cada anexo é comparado pelo
  *    SHA-256, independentemente da filial.
+ *  - **Vários documentos.** Uma solicitação pode ter vários CTe e NF (uma
+ *    fatura inteira para reverter) e o número da fatura. Basta um número em
+ *    comum para avisar.
  */
 
 import type { Status } from './status.js';
@@ -41,6 +44,10 @@ export interface SolicitacaoComparavel {
   criadoEm: Date;
   filialId?: string | null | undefined;
   anexos?: readonly AnexoComparavel[] | undefined;
+  /** Todos os CTe e NF (o `cte`/`nf` acima é o primeiro de cada). */
+  ctes?: readonly string[] | undefined;
+  nfs?: readonly string[] | undefined;
+  fatura?: string | null | undefined;
 }
 
 export interface AnexoComparavel {
@@ -54,13 +61,16 @@ export interface CandidataDuplicidade {
   nf: string | null;
   criadoEm: Date;
   filialId?: string | null | undefined;
+  ctes?: readonly string[] | undefined;
+  nfs?: readonly string[] | undefined;
+  fatura?: string | null | undefined;
   /** SHA-256 dos arquivos que a pessoa vai anexar. */
   hashesDosAnexos?: readonly string[] | undefined;
 }
 
 export interface MotivoDuplicidade {
   solicitacao: SolicitacaoComparavel;
-  documento: 'CTE' | 'NF' | 'ANEXO';
+  documento: 'CTE' | 'NF' | 'FATURA' | 'ANEXO';
   /** O número do documento, ou o nome do arquivo igual já anexado. */
   valor: string;
 }
@@ -111,19 +121,43 @@ export function normalizarDocumento(valor: string | null): string | null {
   return semZerosIniciais === '' ? null : semZerosIniciais;
 }
 
+/** Os números de um tipo de documento, normalizados e sem repetir. */
+export function numeros(
+  principal: string | null | undefined,
+  lista: readonly string[] | undefined,
+): Set<string> {
+  const todos = new Set<string>();
+  for (const valor of [principal ?? null, ...(lista ?? [])]) {
+    const numero = normalizarDocumento(valor);
+    if (numero !== null) todos.add(numero);
+  }
+  return todos;
+}
+
+function emComum(a: Set<string>, b: Set<string>): string | null {
+  for (const valor of a) if (b.has(valor)) return valor;
+  return null;
+}
+
 export function encontrarDuplicidades(
   candidata: CandidataDuplicidade,
   existentes: readonly SolicitacaoComparavel[],
   janelaDias: number = JANELA_DUPLICIDADE_DIAS_PADRAO,
 ): MotivoDuplicidade[] {
-  const cteCandidata = normalizarDocumento(candidata.cte);
-  const nfCandidata = normalizarDocumento(candidata.nf);
+  const ctesCandidata = numeros(candidata.cte, candidata.ctes);
+  const nfsCandidata = numeros(candidata.nf, candidata.nfs);
+  const faturaCandidata = candidata.fatura?.trim().toUpperCase() || null;
 
   const hashes = new Set(
     (candidata.hashesDosAnexos ?? []).map((h) => h.toLowerCase()),
   );
 
-  if (cteCandidata === null && nfCandidata === null && hashes.size === 0) {
+  if (
+    ctesCandidata.size === 0 &&
+    nfsCandidata.size === 0 &&
+    faturaCandidata === null &&
+    hashes.size === 0
+  ) {
     return [];
   }
 
@@ -152,24 +186,34 @@ export function encontrarDuplicidades(
       continue;
     }
 
-    const cteExistente = normalizarDocumento(existente.cte);
-    const nfExistente = normalizarDocumento(existente.nf);
     const filial = mesmaFilial(candidata.filialId, existente.filialId);
 
-    if (filial && cteCandidata !== null && cteExistente === cteCandidata) {
-      motivos.push({
-        solicitacao: existente,
-        documento: 'CTE',
-        valor: cteCandidata,
-      });
+    const cte = filial
+      ? emComum(ctesCandidata, numeros(existente.cte, existente.ctes))
+      : null;
+    if (cte !== null) {
+      motivos.push({ solicitacao: existente, documento: 'CTE', valor: cte });
       continue;
     }
 
-    if (filial && nfCandidata !== null && nfExistente === nfCandidata) {
+    const nf = filial
+      ? emComum(nfsCandidata, numeros(existente.nf, existente.nfs))
+      : null;
+    if (nf !== null) {
+      motivos.push({ solicitacao: existente, documento: 'NF', valor: nf });
+      continue;
+    }
+
+    const faturaExistente = existente.fatura?.trim().toUpperCase() || null;
+    if (
+      filial &&
+      faturaCandidata !== null &&
+      faturaExistente === faturaCandidata
+    ) {
       motivos.push({
         solicitacao: existente,
-        documento: 'NF',
-        valor: nfCandidata,
+        documento: 'FATURA',
+        valor: faturaCandidata,
       });
       continue;
     }

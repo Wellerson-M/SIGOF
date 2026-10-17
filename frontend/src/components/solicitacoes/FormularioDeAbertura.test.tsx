@@ -34,7 +34,7 @@ describe('FormularioDeAbertura', () => {
     expect(abrir).toHaveBeenCalledWith(
       expect.objectContaining({
         tipo: 'REVERSAO',
-        cte: '12345',
+        ctes: ['12345'],
         prioridade: 'MEDIA',
         confirmarDuplicidade: false,
       }),
@@ -209,6 +209,30 @@ describe('FormularioDeAbertura', () => {
       expect.objectContaining({
         hashesDosAnexos: [expect.stringMatching(/^[0-9a-f]{64}$/)],
       }),
+    );
+  });
+
+  it('fatura inteira: vários CTe colados, um por linha, e o número da fatura', async () => {
+    const abrir = vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+    render(<FormularioDeAbertura />);
+    const usuario = userEvent.setup();
+
+    await usuario.type(
+      screen.getByLabelText(/^Número do CTe/),
+      '100{Enter}101{Enter}102',
+    );
+    expect(screen.getByText('3 CTe')).toBeInTheDocument();
+    await usuario.type(screen.getByLabelText('Fatura'), 'F-9');
+    await usuario.type(
+      screen.getByLabelText('O que precisa ser corrigido'),
+      'Fatura inteira recusada pelo cliente.',
+    );
+    await usuario.click(
+      screen.getByRole('button', { name: 'Abrir solicitação' }),
+    );
+
+    expect(abrir).toHaveBeenCalledWith(
+      expect.objectContaining({ ctes: ['100', '101', '102'], fatura: 'F-9' }),
     );
   });
 });

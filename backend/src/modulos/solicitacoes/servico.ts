@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   encontrarDuplicidades,
   normalizarDocumento,
+  numeros,
 } from '../../dominio/duplicidade.js';
 import {
   compararNaFila,
@@ -44,6 +45,10 @@ export interface DadosDeAbertura {
   tipo: TipoOcorrencia;
   cte?: string | undefined;
   nf?: string | undefined;
+  /** Vários CTe e NF (fatura inteira); o primeiro vira o principal. */
+  ctes?: string[] | undefined;
+  nfs?: string[] | undefined;
+  fatura?: string | undefined;
   pagadorCorreto?: string | undefined;
   descricao: string;
   prioridade?: Prioridade | undefined;
@@ -81,6 +86,9 @@ export interface Resumo {
   tipo: TipoOcorrencia;
   cte: string | null;
   nf: string | null;
+  ctes: string[];
+  nfs: string[];
+  fatura: string | null;
   descricao: string;
   status: Status;
   prioridade: Prioridade;
@@ -328,12 +336,15 @@ export class ServicoDeSolicitacoes {
     }
     const acaoTomada = registro?.acaoTomada?.trim() || null;
 
-    const cte = normalizarDocumento(dados.cte ?? null);
-    const nf = normalizarDocumento(dados.nf ?? null);
+    const ctes = [...numeros(dados.cte, dados.ctes)];
+    const nfs = [...numeros(dados.nf, dados.nfs)];
+    const cte = ctes[0] ?? null;
+    const nf = nfs[0] ?? null;
+    const fatura = dados.fatura?.trim().toUpperCase() || null;
     const pagadorCorreto = dados.pagadorCorreto?.trim() || null;
 
-    if (dados.tipo !== 'OUTRO' && cte === null && nf === null) {
-      throw new ErroDeRegraDeNegocio('Informe o número do CTe ou da NF');
+    if (dados.tipo !== 'OUTRO' && cte === null && nf === null && !fatura) {
+      throw new ErroDeRegraDeNegocio('Informe o CTe, a NF ou a fatura');
     }
     if (dados.tipo === 'TROCA_PAGADOR' && pagadorCorreto === null) {
       throw new ErroDeRegraDeNegocio(
@@ -350,13 +361,14 @@ export class ServicoDeSolicitacoes {
         tx,
         usuario.empresaId,
         dados.filialId,
-        cte !== null || nf !== null,
+        cte !== null || nf !== null || fatura !== null,
       );
 
       if (!dados.confirmarDuplicidade) {
         await this.barrarDuplicidade(tx, usuario.empresaId, {
-          cte,
-          nf,
+          ctes,
+          nfs,
+          fatura,
           filialId,
           hashes: dados.hashesDosAnexos ?? [],
           agora,
@@ -398,6 +410,9 @@ export class ServicoDeSolicitacoes {
           tipo: dados.tipo,
           cte,
           nf,
+          ctes,
+          nfs,
+          fatura,
           pagadorCorreto,
           descricao: dados.descricao.trim(),
           prioridade: dados.prioridade ?? 'MEDIA',
@@ -490,10 +505,14 @@ export class ServicoDeSolicitacoes {
                   OR: [
                     { protocolo: { contains: busca, mode: 'insensitive' } },
                     { descricao: { contains: busca, mode: 'insensitive' } },
+                    { fatura: { contains: busca, mode: 'insensitive' } },
+                    { fatura: { contains: busca, mode: 'insensitive' } },
                     ...(digitos
                       ? [
                           { cte: { contains: digitos } },
                           { nf: { contains: digitos } },
+                          { ctes: { has: digitos } },
+                          { nfs: { has: digitos } },
                         ]
                       : []),
                   ],
@@ -572,6 +591,8 @@ export class ServicoDeSolicitacoes {
                   ? [
                       { cte: { contains: digitos } },
                       { nf: { contains: digitos } },
+                      { ctes: { has: digitos } },
+                      { nfs: { has: digitos } },
                     ]
                   : []),
               ],
@@ -1029,17 +1050,23 @@ export class ServicoDeSolicitacoes {
     tx: Transacao,
     empresaId: string,
     candidata: {
-      cte: string | null;
-      nf: string | null;
+      ctes: string[];
+      nfs: string[];
+      fatura: string | null;
       filialId: string | null;
       hashes: string[];
       agora: Date;
       janelaDias: number;
     },
   ): Promise<void> {
-    const { cte, nf, filialId, agora, janelaDias } = candidata;
+    const { ctes, nfs, fatura, filialId, agora, janelaDias } = candidata;
     const hashes = [...new Set(candidata.hashes.map((h) => h.toLowerCase()))];
-    if (cte === null && nf === null && hashes.length === 0) {
+    if (
+      ctes.length === 0 &&
+      nfs.length === 0 &&
+      fatura === null &&
+      hashes.length === 0
+    ) {
       return;
     }
 
@@ -1049,8 +1076,9 @@ export class ServicoDeSolicitacoes {
         status: { not: 'CANCELADO' },
         criadoEm: { gte: new Date(agora.getTime() - janelaDias * DIA) },
         OR: [
-          ...(cte ? [{ cte }] : []),
-          ...(nf ? [{ nf }] : []),
+          ...(ctes.length > 0 ? [{ ctes: { hasSome: ctes } }] : []),
+          ...(nfs.length > 0 ? [{ nfs: { hasSome: nfs } }] : []),
+          ...(fatura ? [{ fatura }] : []),
           ...(hashes.length > 0
             ? [{ anexos: { some: { sha256: { in: hashes } } } }]
             : []),
@@ -1062,6 +1090,9 @@ export class ServicoDeSolicitacoes {
         protocolo: true,
         cte: true,
         nf: true,
+        ctes: true,
+        nfs: true,
+        fatura: true,
         filialId: true,
         status: true,
         criadoEm: true,
@@ -1076,8 +1107,11 @@ export class ServicoDeSolicitacoes {
     const motivos = encontrarDuplicidades(
       {
         empresaId,
-        cte,
-        nf,
+        cte: ctes[0] ?? null,
+        nf: nfs[0] ?? null,
+        ctes,
+        nfs,
+        fatura,
         filialId,
         hashesDosAnexos: hashes,
         criadoEm: agora,
@@ -1314,6 +1348,9 @@ export class ServicoDeSolicitacoes {
       tipo: s.tipo,
       cte: s.cte,
       nf: s.nf,
+      ctes: s.ctes,
+      nfs: s.nfs,
+      fatura: s.fatura,
       descricao: s.descricao,
       status: s.status,
       prioridade: s.prioridade,

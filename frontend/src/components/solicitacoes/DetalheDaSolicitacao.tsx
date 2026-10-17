@@ -279,8 +279,27 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
               {detalhe.filial && (
                 <Dado nome="Filial">{detalhe.filial.nome}</Dado>
               )}
-              <Dado nome="CTe">{detalhe.cte ?? '—'}</Dado>
-              <Dado nome="NF">{detalhe.nf ?? '—'}</Dado>
+              {detalhe.fatura && <Dado nome="Fatura">{detalhe.fatura}</Dado>}
+              <Dado
+                nome={
+                  detalhe.ctes?.length > 1
+                    ? `CTe (${detalhe.ctes.length})`
+                    : 'CTe'
+                }
+              >
+                {detalhe.ctes?.length > 1
+                  ? detalhe.ctes.join(', ')
+                  : (detalhe.cte ?? '—')}
+              </Dado>
+              <Dado
+                nome={
+                  detalhe.nfs?.length > 1 ? `NF (${detalhe.nfs.length})` : 'NF'
+                }
+              >
+                {detalhe.nfs?.length > 1
+                  ? detalhe.nfs.join(', ')
+                  : (detalhe.nf ?? '—')}
+              </Dado>
               {detalhe.pagadorCorreto && (
                 <Dado nome="Pagador correto">{detalhe.pagadorCorreto}</Dado>
               )}

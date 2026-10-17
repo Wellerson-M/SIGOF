@@ -29,6 +29,10 @@ export interface Resumo {
   tipo: Tipo;
   cte: string | null;
   nf: string | null;
+  /** Todos os CTe e NF (fatura inteira); `cte`/`nf` são os primeiros. */
+  ctes: string[];
+  nfs: string[];
+  fatura: string | null;
   descricao: string;
   status: Status;
   prioridade: Prioridade;
@@ -164,7 +168,7 @@ export interface Duplicidade {
   status: Status;
   criadoEm: string;
   /** ANEXO: um dos arquivos é igual a um já enviado (valor = nome dele). */
-  documento: 'CTE' | 'NF' | 'ANEXO';
+  documento: 'CTE' | 'NF' | 'FATURA' | 'ANEXO';
   valor: string;
 }
 
@@ -172,6 +176,9 @@ export interface DadosDeAbertura {
   tipo: Tipo;
   cte?: string;
   nf?: string;
+  ctes?: string[];
+  nfs?: string[];
+  fatura?: string;
   pagadorCorreto?: string;
   descricao: string;
   prioridade: Prioridade;
@@ -386,10 +393,39 @@ export function dataCurta(iso: string): string {
 }
 
 /** "CTe 12345 · NF 998877" */
-export function documentos(s: Pick<Resumo, 'cte' | 'nf'>): string {
-  return [s.cte && `CTe ${s.cte}`, s.nf && `NF ${s.nf}`]
+export function documentos(
+  s: Pick<Resumo, 'cte' | 'nf'> &
+    Partial<Pick<Resumo, 'ctes' | 'nfs' | 'fatura'>>,
+): string {
+  const mais = (lista: string[] | undefined) =>
+    lista && lista.length > 1 ? ` +${lista.length - 1}` : '';
+  return [
+    s.fatura && `Fatura ${s.fatura}`,
+    s.cte && `CTe ${s.cte}${mais(s.ctes)}`,
+    s.nf && `NF ${s.nf}${mais(s.nfs)}`,
+  ]
     .filter(Boolean)
     .join(' · ');
+}
+
+/**
+ * Os números digitados ou colados num campo de documentos: um por linha,
+ * ou separados por vírgula ou ponto e vírgula (colado do Excel, vem um por
+ * linha). Espaço também separa, menos dentro de uma chave de acesso, que
+ * costuma vir em blocos de 4 dígitos.
+ */
+export function separarDocumentos(texto: string): string[] {
+  return texto
+    .split(/[\n,;]+/)
+    .flatMap((parte) => {
+      const limpo = parte.trim();
+      if (!limpo) return [];
+      const digitos = limpo.replace(/\D/g, '');
+      return /\s/.test(limpo) && digitos.length !== 44
+        ? limpo.split(/\s+/)
+        : [limpo];
+    })
+    .filter(Boolean);
 }
 
 /**
