@@ -293,7 +293,7 @@ export function Formulario() {
           className="flex flex-wrap items-end gap-2"
         >
           <label className={ROTULO}>
-            Novo tipo de ocorrência
+            <span>Novo tipo de ocorrência</span>
             <input
               value={nomeDoNovo}
               onChange={(evento) => setNomeDoNovo(evento.target.value)}
@@ -317,7 +317,7 @@ export function Formulario() {
         className="flex flex-col gap-4 rounded-md border border-borda bg-superficie p-4"
       >
         <label className={ROTULO}>
-          Nome do tipo
+          <span>Nome do tipo</span>
           <input
             value={rascunho.nome}
             onChange={(evento) => {

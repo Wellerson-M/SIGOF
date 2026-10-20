@@ -56,13 +56,19 @@ export function codigoParaTipo(nome: string, usados: Iterable<string>): string {
       .normalize('NFD')
       .replace(/\p{M}/gu, '')
       .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '')
+      // Palavras unidas por um _ só (sem _ no começo nem no fim)
+      .split(/[^A-Z0-9]/)
+      .filter(Boolean)
+      .join('_')
       .slice(0, 36)
-      .replace(/_+$/, '') || 'TIPO';
+      .replace(/_$/, '') || 'TIPO';
   const ocupados = new Set([...TIPOS_DO_SISTEMA, ...usados]);
+  let n = 1;
   let codigo = base;
-  for (let n = 2; ocupados.has(codigo); n++) codigo = `${base}_${n}`;
+  while (ocupados.has(codigo)) {
+    n += 1;
+    codigo = `${base}_${n}`;
+  }
   return codigo;
 }
 
@@ -162,14 +168,6 @@ function regrasPadrao(
         campos: campos({ pagadorCorreto: { modo: 'OBRIGATORIO' } }),
         motivos: [],
       };
-    case 'AJUSTE_FISCAL':
-      return {
-        tipo,
-        ativo: true,
-        exigirDocumento: true,
-        campos: campos({}),
-        motivos: [],
-      };
     case 'OUTRO':
       return {
         tipo,
@@ -179,7 +177,7 @@ function regrasPadrao(
         motivos: [],
       };
     default:
-      // Tipo criado pela empresa: começa como um formulário comum
+      // Ajuste fiscal e os tipos criados pela empresa: o formulário comum
       return {
         tipo,
         ativo: true,
