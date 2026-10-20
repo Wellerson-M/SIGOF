@@ -29,10 +29,12 @@ const esquemaAlteracaoDeCausa = esquemaNovaCausa
   .extend({ ativa: z.boolean().optional() })
   .strict();
 
-const TIPOS = ['REVERSAO', 'TROCA_PAGADOR', 'AJUSTE_FISCAL', 'OUTRO'] as const;
 const esquemaNovaVerificacao = z.object({
   texto: z.string().trim().min(3, 'Escreva o que deve ser marcado').max(200),
-  tipos: z.array(z.enum(TIPOS)).max(4).optional(),
+  tipos: z
+    .array(z.string().regex(/^[A-Z0-9_]{1,40}$/, 'Tipo de ocorrência inválido'))
+    .max(40)
+    .optional(),
   quemMarca: z.enum(['SOLICITANTE', 'EQUIPE', 'QUALQUER']).optional(),
   obrigatorioParaResolver: z.boolean().optional(),
   ordem: z.number().int().min(0).max(1000).optional(),

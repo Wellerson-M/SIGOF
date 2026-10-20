@@ -9,15 +9,62 @@
  * comportamento padrão sem quebrar as configurações já salvas.
  */
 
-export type TipoOcorrencia =
-  'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/**
+ * Código do tipo: um dos quatro do sistema ou um criado pela empresa. O
+ * código não muda quando o tipo é renomeado (é o que fica gravado).
+ */
+export type TipoOcorrencia = string;
 
-export const TIPOS: readonly TipoOcorrencia[] = [
+export const TIPOS_DO_SISTEMA = [
   'REVERSAO',
   'TROCA_PAGADOR',
   'AJUSTE_FISCAL',
   'OUTRO',
-];
+] as const;
+
+export type TipoDoSistema = (typeof TIPOS_DO_SISTEMA)[number];
+
+export const NOME_DO_TIPO_DO_SISTEMA: Record<TipoDoSistema, string> = {
+  REVERSAO: 'Reversão',
+  TROCA_PAGADOR: 'Troca de pagador',
+  AJUSTE_FISCAL: 'Ajuste fiscal',
+  OUTRO: 'Outro',
+};
+
+export function ehDoSistema(tipo: string): tipo is TipoDoSistema {
+  return (TIPOS_DO_SISTEMA as readonly string[]).includes(tipo);
+}
+
+/** O nome do tipo: o que a empresa deu, o do sistema ou, por fim, o código. */
+export function nomeDoTipo(
+  tipo: string,
+  nomes?: ReadonlyMap<string, string>,
+): string {
+  return (
+    nomes?.get(tipo) ??
+    (ehDoSistema(tipo) ? NOME_DO_TIPO_DO_SISTEMA[tipo] : tipo)
+  );
+}
+
+/**
+ * Código para um tipo novo, tirado do nome: "Cobrança em duplicidade" vira
+ * COBRANCA_EM_DUPLICIDADE (com _2, _3... se já existir).
+ */
+export function codigoParaTipo(nome: string, usados: Iterable<string>): string {
+  const base =
+    nome
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 36)
+      .replace(/_+$/, '') || 'TIPO';
+  const ocupados = new Set([...TIPOS_DO_SISTEMA, ...usados]);
+  let codigo = base;
+  for (let n = 2; ocupados.has(codigo); n++) codigo = `${base}_${n}`;
+  return codigo;
+}
 
 export type Modo = 'OCULTO' | 'OPCIONAL' | 'OBRIGATORIO';
 
@@ -43,6 +90,10 @@ export interface Campo {
 
 export interface ConfiguracaoDoTipo {
   tipo: TipoOcorrencia;
+  /** Como aparece nas telas (a empresa pode renomear). */
+  nome: string;
+  /** Um dos quatro do sistema (volta ao padrão; não é excluído). */
+  doSistema: boolean;
   /** Desligado, o tipo some do formulário (as antigas continuam valendo). */
   ativo: boolean;
   /** Pelo menos um entre CTe, NF e fatura. */
@@ -78,6 +129,16 @@ function campos(
 
 /** Como cada tipo começa. A empresa altera o que quiser na Administração. */
 export function configuracaoPadrao(tipo: TipoOcorrencia): ConfiguracaoDoTipo {
+  return {
+    ...regrasPadrao(tipo),
+    nome: nomeDoTipo(tipo),
+    doSistema: ehDoSistema(tipo),
+  };
+}
+
+function regrasPadrao(
+  tipo: TipoOcorrencia,
+): Omit<ConfiguracaoDoTipo, 'nome' | 'doSistema'> {
   switch (tipo) {
     case 'REVERSAO':
       return {
@@ -117,11 +178,21 @@ export function configuracaoPadrao(tipo: TipoOcorrencia): ConfiguracaoDoTipo {
         campos: campos({}),
         motivos: [],
       };
+    default:
+      // Tipo criado pela empresa: começa como um formulário comum
+      return {
+        tipo,
+        ativo: true,
+        exigirDocumento: true,
+        campos: campos({}),
+        motivos: [],
+      };
   }
 }
 
 /** O que fica gravado no banco: só o que a empresa definiu. */
 export interface ConfiguracaoSalva {
+  nome?: string | null | undefined;
   ativo: boolean;
   exigirDocumento: boolean | null;
   campos: unknown;
@@ -164,6 +235,8 @@ export function mesclarConfiguracao(
 
   return {
     tipo,
+    nome: salva.nome?.trim() || padrao.nome,
+    doSistema: padrao.doSistema,
     ativo: salva.ativo,
     exigirDocumento: salva.exigirDocumento ?? padrao.exigirDocumento,
     campos: resultado,

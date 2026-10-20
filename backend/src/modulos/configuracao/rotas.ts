@@ -1,10 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import {
-  CAMPOS,
-  TIPOS,
-  type TipoOcorrencia,
-} from '../../dominio/formulario.js';
+import { CAMPOS, type TipoOcorrencia } from '../../dominio/formulario.js';
 import { MODULOS } from '../../dominio/modulos.js';
 import {
   autenticar,
@@ -29,7 +25,14 @@ const esquemaDosCampos = z.object(
   >,
 );
 
+const nomeDoTipo = z
+  .string()
+  .trim()
+  .min(2, 'Dê um nome ao tipo de ocorrência')
+  .max(60, 'Nome com no máximo 60 caracteres');
+
 const esquemaDoFormulario = z.object({
+  nome: nomeDoTipo.optional(),
   ativo: z.boolean(),
   exigirDocumento: z.boolean(),
   campos: esquemaDosCampos,
@@ -49,9 +52,14 @@ const esquemaListagem = z.object({
     .transform((valor) => valor === '1'),
 });
 
+const esquemaDoTipoNovo = z.object({ nome: nomeDoTipo });
+
+/** O código vem na URL; se existe na empresa, o serviço confere. */
 function tipoDa(req: Request): TipoOcorrencia {
-  const tipo = TIPOS.find((t) => t === req.params.tipo);
-  if (!tipo) throw new ErroNaoEncontrado('Tipo de ocorrência não encontrado');
+  const tipo = req.params.tipo;
+  if (typeof tipo !== 'string' || !/^[A-Z0-9_]{1,40}$/.test(tipo)) {
+    throw new ErroNaoEncontrado('Tipo de ocorrência não encontrado');
+  }
   return tipo;
 }
 
@@ -81,6 +89,16 @@ export function rotasDeConfiguracao(opcoes: {
     res.json(
       await servico.formulario(usuario, todos && usuario.perfil === 'ADMIN'),
     );
+  });
+
+  rotas.post('/tipos', soAdmin, async (req, res) => {
+    const { nome } = validar(esquemaDoTipoNovo, req.body);
+    res.status(201).json(await servico.criarTipo(usuarioDa(req), nome, req.ip));
+  });
+
+  rotas.delete('/tipos/:tipo', soAdmin, async (req, res) => {
+    await servico.excluirTipo(usuarioDa(req), tipoDa(req), req.ip);
+    res.status(204).end();
   });
 
   rotas.put('/formulario/:tipo', soAdmin, async (req, res) => {

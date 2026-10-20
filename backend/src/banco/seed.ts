@@ -9,12 +9,8 @@
  * existe só para provar que uma empresa nunca enxerga os dados da outra.
  */
 import { config } from 'dotenv';
-import type {
-  Prisma,
-  StatusSolicitacao,
-  TipoOcorrencia,
-  Prioridade,
-} from '@prisma/client';
+import type { Prisma, StatusSolicitacao, Prioridade } from '@prisma/client';
+import type { TipoOcorrencia } from '../dominio/formulario.js';
 import { competenciaDe, formatarProtocolo } from '../dominio/protocolo.js';
 import { expedienteDaEmpresa, iniciarSla } from '../dominio/sla.js';
 import { CAUSAS_PADRAO } from '../modulos/cadastros/servico.js';

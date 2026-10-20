@@ -480,5 +480,126 @@ describe.skipIf(!temBanco)(
         expect(daOutra.body.tipos).toHaveLength(4);
       });
     });
+
+    describe('tipos da empresa', () => {
+      it('cria um tipo, abre solicitação nele e o nome aparece no /eu', async () => {
+        const admin = await como('ADMIN');
+        const criado = await admin.post('/api/configuracao/tipos', {
+          nome: '  Cobrança   em duplicidade ',
+        });
+        expect(criado.status).toBe(201);
+        expect(criado.body).toMatchObject({
+          tipo: 'COBRANCA_EM_DUPLICIDADE',
+          nome: 'Cobrança em duplicidade',
+          doSistema: false,
+          ativo: true,
+        });
+
+        const repetido = await admin.post('/api/configuracao/tipos', {
+          nome: 'cobrança em duplicidade',
+        });
+        expect(repetido.status).toBe(422);
+        // Nem com o nome de um tipo do sistema
+        expect(
+          (await admin.post('/api/configuracao/tipos', { nome: 'Reversão' }))
+            .status,
+        ).toBe(422);
+
+        const solicitante = await como('SOLICITANTE');
+        expect(
+          (await solicitante.get('/api/configuracao/formulario')).body.tipos,
+        ).toHaveLength(5);
+        const aberta = await solicitante.post('/api/solicitacoes', {
+          tipo: 'COBRANCA_EM_DUPLICIDADE',
+          cte: '4242',
+          descricao: 'Fatura cobrada duas vezes do cliente.',
+        });
+        expect(aberta.status).toBe(201);
+        expect(aberta.body.tipo).toBe('COBRANCA_EM_DUPLICIDADE');
+
+        const eu = await solicitante.get('/api/auth/eu');
+        expect(eu.body.empresa.tipos).toContainEqual({
+          tipo: 'COBRANCA_EM_DUPLICIDADE',
+          nome: 'Cobrança em duplicidade',
+        });
+
+        // Tipo que não existe na empresa não abre
+        const inexistente = await solicitante.post('/api/solicitacoes', {
+          tipo: 'NAO_EXISTE',
+          cte: '4243',
+          descricao: 'Tipo que a empresa não tem.',
+        });
+        expect(inexistente.status).toBe(422);
+
+        // Usado: só desliga, não exclui
+        const excluir = await admin.delete(
+          '/api/configuracao/tipos/COBRANCA_EM_DUPLICIDADE',
+        );
+        expect(excluir.status).toBe(422);
+        expect(excluir.body.erro).toMatch(/desligue/);
+      });
+
+      it('renomeia tipo do sistema e volta ao nome original ao restaurar', async () => {
+        const admin = await como('ADMIN');
+        const renomeado = await admin.put(
+          '/api/configuracao/formulario/AJUSTE_FISCAL',
+          { ...formularioDe('AJUSTE_FISCAL'), nome: 'Correção fiscal' },
+        );
+        expect(renomeado.status).toBe(200);
+        expect(renomeado.body.nome).toBe('Correção fiscal');
+        expect(
+          (await admin.get('/api/auth/eu')).body.empresa.tipos,
+        ).toContainEqual({ tipo: 'AJUSTE_FISCAL', nome: 'Correção fiscal' });
+
+        const restaurado = await admin.delete(
+          '/api/configuracao/formulario/AJUSTE_FISCAL',
+        );
+        expect(restaurado.body.nome).toBe('Ajuste fiscal');
+        // Tipo do sistema não é excluído
+        expect(
+          (await admin.delete('/api/configuracao/tipos/AJUSTE_FISCAL')).status,
+        ).toBe(422);
+      });
+
+      it('exclui tipo sem uso e desliga a verificação que só valia para ele', async () => {
+        const admin = await como('ADMIN');
+        const criado = await admin.post('/api/configuracao/tipos', {
+          nome: 'Avaria',
+        });
+        const item = await admin.post('/api/cadastros/verificacoes', {
+          texto: 'Fotos da avaria anexadas?',
+          tipos: [criado.body.tipo],
+        });
+        expect(item.status).toBe(201);
+        expect(
+          (
+            await admin.post('/api/cadastros/verificacoes', {
+              texto: 'Tipo inventado',
+              tipos: ['INVENTADO'],
+            })
+          ).status,
+        ).toBe(422);
+
+        const excluido = await admin.delete(
+          `/api/configuracao/tipos/${criado.body.tipo}`,
+        );
+        expect(excluido.status).toBe(204);
+        expect(
+          (await admin.get('/api/configuracao/formulario?todos=1')).body.tipos,
+        ).toHaveLength(4);
+        const depois = await prisma.itemDeVerificacao.findUniqueOrThrow({
+          where: { id: item.body.id },
+        });
+        expect(depois).toMatchObject({ tipos: [], ativo: false });
+      });
+
+      it('só o administrador cria e exclui tipos', async () => {
+        const supervisor = await como('SUPERVISOR');
+        expect(
+          (await supervisor.post('/api/configuracao/tipos', { nome: 'Teste' }))
+            .status,
+        ).toBe(403);
+      });
+    });
   },
 );

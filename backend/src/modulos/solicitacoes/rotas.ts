@@ -14,7 +14,8 @@ const STATUS = [
   'CANCELADO',
 ] as const;
 const PRIORIDADES = ['BAIXA', 'MEDIA', 'ALTA', 'URGENTE'] as const;
-const TIPOS = ['REVERSAO', 'TROCA_PAGADOR', 'AJUSTE_FISCAL', 'OUTRO'] as const;
+/** Código de tipo: os do sistema e os criados pela empresa (o serviço confere). */
+const codigoDeTipo = z.string().regex(/^[A-Z0-9_]{1,40}$/);
 
 /** Campo de texto opcional: vazio conta como não informado. */
 const opcional = (maximo: number) =>
@@ -26,7 +27,7 @@ const opcional = (maximo: number) =>
     .transform((valor) => valor || undefined);
 
 const esquemaAbertura = z.object({
-  tipo: z.enum(TIPOS, { message: 'Escolha o tipo de ocorrência' }),
+  tipo: codigoDeTipo.catch(''),
   cte: opcional(60),
   nf: opcional(60),
   ctes: z
@@ -123,7 +124,13 @@ const esquemaLista = z.object({
   pagina: z.coerce.number().int().min(1).max(10_000).default(1),
   status: lista([...STATUS]),
   prioridade: lista([...PRIORIDADES]),
-  tipo: lista([...TIPOS]),
+  tipo: z
+    .string()
+    .optional()
+    .transform((texto) =>
+      texto ? texto.split(',').filter(Boolean) : undefined,
+    )
+    .pipe(z.array(codigoDeTipo).max(40).optional()),
   responsavelId: z.string().uuid().optional(),
   minhas: z
     .enum(['true', 'false'])

@@ -5,6 +5,8 @@
  * texto pronto, o que deixa cada formato testável isoladamente.
  */
 
+import { nomeDoTipo } from '../../dominio/formulario.js';
+
 export type Status =
   | 'NOVO'
   | 'EM_ANDAMENTO'
@@ -13,7 +15,8 @@ export type Status =
   | 'RESOLVIDO'
   | 'CANCELADO';
 export type Prioridade = 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
-export type Tipo = 'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/** Código do tipo (um dos do sistema ou um criado pela empresa). */
+export type Tipo = string;
 
 /** O que aconteceu na solicitação. */
 export type Ocorrido =
@@ -48,6 +51,8 @@ export interface Retrato {
   id: string;
   protocolo: string;
   tipo: Tipo;
+  /** O nome que a empresa deu ao tipo (sem ele, o do sistema). */
+  tipoNome?: string | undefined;
   cte: string | null;
   nf: string | null;
   ctes?: string[] | undefined;
@@ -83,12 +88,9 @@ export const NOME_DA_PRIORIDADE: Record<Prioridade, string> = {
   URGENTE: 'Urgente',
 };
 
-export const NOME_DO_TIPO: Record<Tipo, string> = {
-  REVERSAO: 'Reversão',
-  TROCA_PAGADOR: 'Troca de pagador',
-  AJUSTE_FISCAL: 'Ajuste fiscal',
-  OUTRO: 'Outro',
-};
+function nomeDoTipoDo(retrato: Retrato): string {
+  return retrato.tipoNome ?? nomeDoTipo(retrato.tipo);
+}
 
 export const AVISO_DE_NAO_RESPONDA =
   'Esta é uma mensagem automática do SIGOF. Não responda: respostas a este ' +
@@ -156,7 +158,7 @@ export function assuntoDe(retrato: Retrato): string {
     documento = ` — CTe ${retrato.cte}${outrosCtes > 0 ? ` +${outrosCtes}` : ''}`;
   else if (retrato.nf) documento = ` — NF ${retrato.nf}`;
   else if (retrato.fatura) documento = ` — Fatura ${retrato.fatura}`;
-  return `[SIGOF ${retrato.protocolo}] ${NOME_DO_TIPO[retrato.tipo]}${documento}`;
+  return `[SIGOF ${retrato.protocolo}] ${nomeDoTipoDo(retrato)}${documento}`;
 }
 
 function dataDoPrazo(data: Date, fusoHorario: string): string {
@@ -290,7 +292,7 @@ export function montarEmailDeItens(dados: {
 
   const linhas: [string, string][] = [
     ['Protocolo', retrato.protocolo],
-    ['Tipo', NOME_DO_TIPO[retrato.tipo]],
+    ['Tipo', nomeDoTipoDo(retrato)],
     ['CTe', listaDeDocumentos(retrato.cte, retrato.ctes)],
     ['NF', listaDeDocumentos(retrato.nf, retrato.nfs)],
     ...(retrato.fatura ? [['Fatura', retrato.fatura] as [string, string]] : []),

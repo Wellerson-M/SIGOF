@@ -10,6 +10,7 @@ import {
   type Indicadores,
   type SolicitacaoParaIndicadores,
 } from '../../dominio/indicadores.js';
+import { nomeDoTipo } from '../../dominio/formulario.js';
 import { moduloLigado } from '../../dominio/modulos.js';
 import { expedienteDaEmpresa } from '../../dominio/sla.js';
 import {
@@ -21,12 +22,9 @@ import { ErroDeRegraDeNegocio } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
 import { registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
+import { nomesDosTipos } from '../configuracao/servico.js';
 import { inicioDoDia } from '../solicitacoes/servico.js';
-import {
-  NOME_DA_PRIORIDADE,
-  NOME_DO_STATUS,
-  NOME_DO_TIPO,
-} from '../avisos/modelos.js';
+import { NOME_DA_PRIORIDADE, NOME_DO_STATUS } from '../avisos/modelos.js';
 
 const DIA = 24 * 60 * 60_000;
 
@@ -63,6 +61,7 @@ export class ServicoDeIndicadores {
       usuario,
       dias,
     );
+    const nomes = await nomesDosTipos(this.prisma, usuario.empresaId);
     const de = agora.getTime() - dias * DIA;
     const fuso = empresa.fusoHorario;
     const dataHora = (data: Date | null) =>
@@ -80,7 +79,7 @@ export class ServicoDeIndicadores {
       .map(({ s, extra }) => [
         extra.protocolo,
         dataHora(s.criadoEm),
-        NOME_DO_TIPO[s.tipo],
+        nomeDoTipo(s.tipo, nomes),
         extra.filial,
         extra.cte,
         extra.nf,

@@ -2,8 +2,11 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   CAMPOS,
   PRIORIDADES,
-  TIPOS,
+  TIPOS_DO_SISTEMA,
+  codigoParaTipo,
+  ehDoSistema,
   mesclarConfiguracao,
+  nomeDoTipo,
   type Campo,
   type ConfiguracaoDoTipo,
   type NomeDoCampo,
@@ -16,11 +19,18 @@ import {
   type ChavesDosModulos,
   type Modulo,
 } from '../../dominio/modulos.js';
-import { ErroAcessoNegado, ErroDeRegraDeNegocio } from '../../http/erros.js';
+import {
+  ErroAcessoNegado,
+  ErroDeRegraDeNegocio,
+  ErroNaoEncontrado,
+} from '../../http/erros.js';
 import { diferencas, registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
 
 type Leitor = PrismaClient | Prisma.TransactionClient;
+
+/** Quantos tipos a empresa pode criar além dos quatro do sistema. */
+const LIMITE_DE_TIPOS = 30;
 
 export interface ModulosDaEmpresa {
   /** O que a plataforma deixa a empresa usar. */
@@ -39,6 +49,8 @@ export interface FormularioDaEmpresa {
 
 /** O que o administrador manda ao salvar um tipo. */
 export interface AlteracaoDoFormulario {
+  /** Novo nome do tipo (sem ele, fica o atual). */
+  nome?: string | undefined;
   ativo: boolean;
   exigirDocumento: boolean;
   campos: Record<NomeDoCampo, Campo>;
@@ -58,9 +70,15 @@ export async function formularioEfetivo(
   const salvas = personalizavel
     ? await leitor.configuracaoDoFormulario.findMany({
         where: { empresaId: empresa.id },
+        orderBy: { criadoEm: 'asc' },
       })
     : [];
-  return TIPOS.map((tipo) => {
+  // Os do sistema primeiro, depois os da empresa na ordem em que nasceram
+  const tipos = [
+    ...TIPOS_DO_SISTEMA,
+    ...salvas.filter((s) => s.daEmpresa).map((s) => s.tipo),
+  ];
+  return tipos.map((tipo) => {
     const config = mesclarConfiguracao(
       tipo,
       salvas.find((s) => s.tipo === tipo) ?? null,
@@ -76,9 +94,44 @@ export async function configuracaoDoTipo(
   leitor: Leitor,
   empresa: ChavesDosModulos & { id: string },
   tipo: TipoOcorrencia,
-): Promise<ConfiguracaoDoTipo> {
+): Promise<ConfiguracaoDoTipo | undefined> {
   const todas = await formularioEfetivo(leitor, empresa);
-  return todas.find((c) => c.tipo === tipo)!;
+  return todas.find((c) => c.tipo === tipo);
+}
+
+/**
+ * Os nomes que a empresa deu aos tipos (para telas, e-mails e planilhas).
+ * Vale mesmo com o módulo do formulário desligado: solicitação antiga de um
+ * tipo criado pela empresa continua com o nome certo.
+ */
+export async function nomesDosTipos(
+  leitor: Leitor,
+  empresaId: string,
+): Promise<Map<string, string>> {
+  const salvas = await leitor.configuracaoDoFormulario.findMany({
+    where: { empresaId, nome: { not: null } },
+    select: { tipo: true, nome: true },
+  });
+  return new Map(salvas.map((s) => [s.tipo, s.nome!]));
+}
+
+/** Todos os tipos que a empresa já teve, com o nome de agora. */
+export async function tiposConhecidos(
+  leitor: Leitor,
+  empresaId: string,
+): Promise<{ tipo: string; nome: string }[]> {
+  const salvas = await leitor.configuracaoDoFormulario.findMany({
+    where: { empresaId },
+    select: { tipo: true, nome: true, daEmpresa: true },
+    orderBy: { criadoEm: 'asc' },
+  });
+  const nomes = new Map(
+    salvas.flatMap((s) => (s.nome ? [[s.tipo, s.nome] as const] : [])),
+  );
+  return [
+    ...TIPOS_DO_SISTEMA,
+    ...salvas.filter((s) => s.daEmpresa).map((s) => s.tipo),
+  ].map((tipo) => ({ tipo, nome: nomeDoTipo(tipo, nomes) }));
 }
 
 /** Sem vazios nem repetidos (ignorando maiúsculas), na ordem digitada. */
@@ -179,12 +232,13 @@ export class ServicoDeConfiguracao {
     alteracao: AlteracaoDoFormulario,
     ip?: string,
   ): Promise<ConfiguracaoDoTipo> {
-    const empresa = await this.chaves(admin.empresaId);
-    if (!moduloLigado(empresa, 'FORMULARIO')) {
-      throw new ErroAcessoNegado(
-        'Ligue o módulo "Formulário personalizado" para alterar o formulário',
-      );
-    }
+    const empresa = await this.chavesParaPersonalizar(admin.empresaId);
+    const antes = await this.tipoExistente(empresa, tipo);
+    const nome = await this.nomeLivre(
+      empresa,
+      alteracao.nome ?? antes.nome,
+      tipo,
+    );
 
     const motivos = limparLista(alteracao.motivos);
     const campos = this.conferirCampos(alteracao.campos, motivos);
@@ -199,8 +253,9 @@ export class ServicoDeConfiguracao {
       }
     }
 
-    const antes = await configuracaoDoTipo(this.prisma, empresa, tipo);
     const dados = {
+      // O nome do sistema não precisa ser gravado
+      nome: antes.doSistema && nome === nomeDoTipo(tipo) ? null : nome,
       ativo: alteracao.ativo,
       exigirDocumento: alteracao.exigirDocumento,
       campos: campos as unknown as Prisma.InputJsonValue,
@@ -209,7 +264,12 @@ export class ServicoDeConfiguracao {
     await this.prisma.$transaction(async (tx) => {
       await tx.configuracaoDoFormulario.upsert({
         where: { empresaId_tipo: { empresaId: admin.empresaId, tipo } },
-        create: { empresaId: admin.empresaId, tipo, ...dados },
+        create: {
+          empresaId: admin.empresaId,
+          tipo,
+          daEmpresa: !antes.doSistema,
+          ...dados,
+        },
         update: dados,
       });
       await registrar(tx, {
@@ -220,30 +280,124 @@ export class ServicoDeConfiguracao {
           tipo,
           ...diferencas(
             {
+              nome: antes.nome,
               ativo: antes.ativo,
               exigirDocumento: antes.exigirDocumento,
               campos: antes.campos,
               motivos: antes.motivos,
             },
-            { ...dados, campos },
+            { ...dados, nome, campos },
           ),
         } as Prisma.InputJsonValue,
         ip,
       });
     });
-    return configuracaoDoTipo(this.prisma, empresa, tipo);
+    return this.tipoExistente(empresa, tipo);
   }
 
-  /** Volta o tipo ao padrão do sistema (apaga o que foi salvo). */
+  /**
+   * Cria um tipo de ocorrência da empresa. Nasce ativo, com o formulário
+   * comum (documento, descrição, anexos); o administrador ajusta depois.
+   */
+  async criarTipo(
+    admin: UsuarioAutenticado,
+    nomeDigitado: string,
+    ip?: string,
+  ): Promise<ConfiguracaoDoTipo> {
+    const empresa = await this.chavesParaPersonalizar(admin.empresaId);
+    const nome = await this.nomeLivre(empresa, nomeDigitado);
+    const existentes = await this.prisma.configuracaoDoFormulario.findMany({
+      where: { empresaId: admin.empresaId },
+      select: { tipo: true, daEmpresa: true },
+    });
+    if (existentes.filter((e) => e.daEmpresa).length >= LIMITE_DE_TIPOS) {
+      throw new ErroDeRegraDeNegocio(
+        `No máximo ${LIMITE_DE_TIPOS} tipos criados pela empresa`,
+      );
+    }
+    const tipo = codigoParaTipo(
+      nome,
+      existentes.map((e) => e.tipo),
+    );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.configuracaoDoFormulario.create({
+        data: { empresaId: admin.empresaId, tipo, nome, daEmpresa: true },
+      });
+      await registrar(tx, {
+        empresaId: admin.empresaId,
+        acao: 'FORMULARIO_ALTERADO',
+        autorId: admin.id,
+        detalhes: { tipo, criado: nome },
+        ip,
+      });
+    });
+    return this.tipoExistente(empresa, tipo);
+  }
+
+  /**
+   * Exclui um tipo criado pela empresa que nunca foi usado. Com
+   * solicitação, ele só pode ser desligado (o histórico aponta para ele).
+   */
+  async excluirTipo(
+    admin: UsuarioAutenticado,
+    tipo: TipoOcorrencia,
+    ip?: string,
+  ): Promise<void> {
+    const empresa = await this.chavesParaPersonalizar(admin.empresaId);
+    const config = await this.tipoExistente(empresa, tipo);
+    if (config.doSistema) {
+      throw new ErroDeRegraDeNegocio(
+        'Os tipos do sistema não são excluídos: desligue o que não usar',
+      );
+    }
+    const usadas = await this.prisma.solicitacao.count({
+      where: { empresaId: admin.empresaId, tipo },
+    });
+    if (usadas > 0) {
+      throw new ErroDeRegraDeNegocio(
+        'Já há solicitações deste tipo: desligue-o em vez de excluir',
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.configuracaoDoFormulario.delete({
+        where: { empresaId_tipo: { empresaId: admin.empresaId, tipo } },
+      });
+      // Item de verificação que valia só para ele não pode passar a valer
+      // para todos (lista vazia = todos os tipos): esse é desligado
+      const itens = await tx.itemDeVerificacao.findMany({
+        where: { empresaId: admin.empresaId, tipos: { has: tipo } },
+        select: { id: true, tipos: true },
+      });
+      for (const item of itens) {
+        const restantes = item.tipos.filter((t) => t !== tipo);
+        await tx.itemDeVerificacao.update({
+          where: { id: item.id },
+          data:
+            restantes.length > 0
+              ? { tipos: restantes }
+              : { tipos: restantes, ativo: false },
+        });
+      }
+      await registrar(tx, {
+        empresaId: admin.empresaId,
+        acao: 'FORMULARIO_ALTERADO',
+        autorId: admin.id,
+        detalhes: { tipo, excluido: config.nome },
+        ip,
+      });
+    });
+  }
+
+  /** Volta um tipo do sistema ao padrão (apaga o que foi salvo, nome inclusive). */
   async restaurarFormulario(
     admin: UsuarioAutenticado,
     tipo: TipoOcorrencia,
     ip?: string,
   ): Promise<ConfiguracaoDoTipo> {
-    const empresa = await this.chaves(admin.empresaId);
-    if (!moduloLigado(empresa, 'FORMULARIO')) {
-      throw new ErroAcessoNegado(
-        'Ligue o módulo "Formulário personalizado" para alterar o formulário',
+    const empresa = await this.chavesParaPersonalizar(admin.empresaId);
+    if (!ehDoSistema(tipo)) {
+      throw new ErroDeRegraDeNegocio(
+        'Só os tipos do sistema têm um padrão para voltar',
       );
     }
     await this.prisma.$transaction(async (tx) => {
@@ -260,7 +414,48 @@ export class ServicoDeConfiguracao {
         });
       }
     });
-    return configuracaoDoTipo(this.prisma, empresa, tipo);
+    return this.tipoExistente(empresa, tipo);
+  }
+
+  private async tipoExistente(
+    empresa: ChavesDosModulos & { id: string },
+    tipo: TipoOcorrencia,
+  ): Promise<ConfiguracaoDoTipo> {
+    const config = await configuracaoDoTipo(this.prisma, empresa, tipo);
+    if (!config) {
+      throw new ErroNaoEncontrado('Tipo de ocorrência não encontrado');
+    }
+    return config;
+  }
+
+  /** Nome aparado, sem repetir o de outro tipo da empresa. */
+  private async nomeLivre(
+    empresa: ChavesDosModulos & { id: string },
+    digitado: string,
+    proprio?: TipoOcorrencia,
+  ): Promise<string> {
+    const nome = digitado.trim().replace(/\s+/g, ' ');
+    if (nome.length < 2) {
+      throw new ErroDeRegraDeNegocio('Dê um nome ao tipo de ocorrência');
+    }
+    const chave = nome.toLocaleLowerCase('pt-BR');
+    const repetido = (await tiposConhecidos(this.prisma, empresa.id)).some(
+      (t) => t.tipo !== proprio && t.nome.toLocaleLowerCase('pt-BR') === chave,
+    );
+    if (repetido) {
+      throw new ErroDeRegraDeNegocio('Já existe um tipo com esse nome');
+    }
+    return nome;
+  }
+
+  private async chavesParaPersonalizar(empresaId: string) {
+    const empresa = await this.chaves(empresaId);
+    if (!moduloLigado(empresa, 'FORMULARIO')) {
+      throw new ErroAcessoNegado(
+        'Ligue o módulo "Formulário personalizado" para alterar o formulário',
+      );
+    }
+    return empresa;
   }
 
   /** Padrões coerentes com o tipo de campo e com a lista de motivos. */

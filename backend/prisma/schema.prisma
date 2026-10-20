@@ -29,13 +29,6 @@ enum Area {
   OPERACIONAL
 }
 
-enum TipoOcorrencia {
-  REVERSAO
-  TROCA_PAGADOR
-  AJUSTE_FISCAL
-  OUTRO
-}
-
 enum StatusSolicitacao {
   NOVO
   EM_ANDAMENTO
@@ -279,7 +272,9 @@ model Solicitacao {
   /// número, então a duplicidade compara documento + filial.
   filialId      String? @map("filial_id")
 
-  tipo           TipoOcorrencia
+  /// Código do tipo: um dos do sistema (REVERSAO, TROCA_PAGADOR,
+  /// AJUSTE_FISCAL, OUTRO) ou um criado pela empresa (ConfiguracaoDoFormulario).
+  tipo           String
   /// O primeiro CTe e a primeira NF (o que aparece no cartão e no assunto
   /// do e-mail). A lista completa fica em `ctes` e `nfs`.
   cte            String?
@@ -391,18 +386,26 @@ model CausaDeErro {
   @@map("causas_de_erro")
 }
 
-/// O formulário de abertura de um tipo de ocorrência, como a empresa
-/// configurou. Sem linha aqui, vale o padrão do sistema (dominio/formulario.ts).
+/// Um tipo de ocorrência da empresa e o formulário de abertura dele. Os
+/// quatro tipos do sistema só ganham linha aqui quando a empresa os altera
+/// (sem linha, vale o padrão de dominio/formulario.ts); os criados pela
+/// empresa sempre têm.
 model ConfiguracaoDoFormulario {
   id        String         @id @default(uuid())
   empresaId String         @map("empresa_id")
-  tipo      TipoOcorrencia
+  /// Código fixo (não muda ao renomear): é o que fica na solicitação.
+  tipo      String
+  /// Nome que aparece nas telas. Nulo: o nome do sistema.
+  nome      String?
+  /// Criado pela empresa (pode ser excluído enquanto não tiver solicitação).
+  daEmpresa Boolean        @default(false) @map("da_empresa")
   ativo     Boolean        @default(true)
   /// Nulo: usa o padrão do tipo.
   exigirDocumento Boolean? @map("exigir_documento")
   /// { campo: { modo, padrao } } — só os campos que a empresa definiu.
   campos    Json           @default("{}")
   motivos   String[]       @default([])
+  criadoEm  DateTime       @default(now()) @map("criado_em")
   alteradoEm DateTime      @updatedAt @map("alterado_em")
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
@@ -418,7 +421,7 @@ model ItemDeVerificacao {
   empresaId String   @map("empresa_id")
   texto     String
   /// Tipos de ocorrência em que aparece; vazio = em todos.
-  tipos     TipoOcorrencia[] @default([])
+  tipos     String[] @default([])
   quemMarca QuemMarca @default(QUALQUER) @map("quem_marca")
   /// Sem ele marcado, a solicitação não pode ser resolvida.
   obrigatorioParaResolver Boolean @default(false) @map("obrigatorio_para_resolver")

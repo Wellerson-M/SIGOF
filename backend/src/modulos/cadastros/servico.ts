@@ -1,7 +1,12 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { ErroDeConflito, ErroNaoEncontrado } from '../../http/erros.js';
+import {
+  ErroDeConflito,
+  ErroDeRegraDeNegocio,
+  ErroNaoEncontrado,
+} from '../../http/erros.js';
 import { diferencas, registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
+import { tiposConhecidos } from '../configuracao/servico.js';
 
 export interface Filial {
   id: string;
@@ -41,8 +46,8 @@ const camposDaCausa = {
   ativa: true,
 } as const;
 
-export type TipoOcorrencia =
-  'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/** Código do tipo (um dos do sistema ou um criado pela empresa). */
+export type TipoOcorrencia = string;
 export type QuemMarca = 'SOLICITANTE' | 'EQUIPE' | 'QUALQUER';
 
 export interface ItemDeVerificacao {
@@ -318,11 +323,26 @@ export class ServicoDeCadastros {
     });
   }
 
+  /** Só tipos que a empresa tem (os do sistema e os que ela criou). */
+  private async conferirTipos(
+    empresaId: string,
+    tipos: TipoOcorrencia[] | undefined,
+  ): Promise<void> {
+    if (!tipos?.length) return;
+    const conhecidos = new Set(
+      (await tiposConhecidos(this.prisma, empresaId)).map((t) => t.tipo),
+    );
+    if (tipos.some((t) => !conhecidos.has(t))) {
+      throw new ErroDeRegraDeNegocio('Tipo de ocorrência desconhecido');
+    }
+  }
+
   async criarVerificacao(
     admin: UsuarioAutenticado,
     dados: DadosDaVerificacao,
     ip?: string,
   ): Promise<ItemDeVerificacao> {
+    await this.conferirTipos(admin.empresaId, dados.tipos);
     return this.prisma.$transaction(async (tx) => {
       const ultima = await tx.itemDeVerificacao.aggregate({
         where: { empresaId: admin.empresaId },
@@ -363,6 +383,7 @@ export class ServicoDeCadastros {
     if (!atual) {
       throw new ErroNaoEncontrado('Verificação não encontrada');
     }
+    await this.conferirTipos(admin.empresaId, alteracao.tipos);
     const novos = {
       texto: alteracao.texto?.trim(),
       tipos:
