@@ -114,4 +114,35 @@ describe('PainelDaPlataforma', () => {
     expect(await screen.findByText('Crie a sua senha')).toBeInTheDocument();
     expect(screen.queryByText('Transportadora Demo Ltda.')).toBeNull();
   });
+
+  it('libera e bloqueia os módulos de uma transportadora', async () => {
+    vi.spyOn(plataforma, 'eu').mockResolvedValue({
+      id: 'a',
+      nome: 'Dono',
+      email: 'dono@sigof.test',
+      trocarSenha: false,
+    });
+    vi.spyOn(plataforma, 'empresas').mockResolvedValue([
+      { ...EMPRESA, modulosLiberados: ['FILIAIS', 'EMAIL'] },
+    ]);
+    const alterar = vi
+      .spyOn(plataforma, 'alterarEmpresa')
+      .mockResolvedValue(EMPRESA);
+    render(<PainelDaPlataforma />);
+
+    const usuario = userEvent.setup();
+    await usuario.click(await screen.findByRole('button', { name: 'Módulos' }));
+    expect(screen.getByLabelText(/Filiais/)).toBeChecked();
+    expect(screen.getByLabelText(/Balanço por digitador/)).not.toBeChecked();
+    await usuario.click(screen.getByLabelText(/Avisos por e-mail/));
+    await usuario.click(screen.getByLabelText(/Balanço por digitador/));
+    await usuario.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(alterar).toHaveBeenCalledWith('e1', {
+      modulosLiberados: ['FILIAIS', 'BALANCO'],
+    });
+    expect(
+      await screen.findByText(/Módulos de Transportadora Demo Ltda. salvos/),
+    ).toBeInTheDocument();
+  });
 });

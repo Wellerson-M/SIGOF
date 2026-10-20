@@ -19,6 +19,7 @@ vi.mock('@/lib/avisos', async (original) => ({
 
 const sair = vi.fn().mockResolvedValue(undefined);
 let perfil: Perfil = 'SOLICITANTE';
+let modulos: string[] | undefined;
 vi.mock('@/lib/sessao', () => ({
   useSessao: () => ({
     usuario: {
@@ -30,6 +31,7 @@ vi.mock('@/lib/sessao', () => ({
       empresa: {
         razaoSocial: 'Transportadora Demo Ltda.',
         slug: 'transportadora-demo',
+        modulos,
       },
     },
     sair,
@@ -74,5 +76,13 @@ describe('Moldura', () => {
     render(<Moldura>x</Moldura>);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Sair' }));
     expect(sair).toHaveBeenCalled();
+  });
+
+  it('o registro rápido some com o módulo desligado', () => {
+    perfil = 'ANALISTA';
+    modulos = ['FILIAIS'];
+    render(<Moldura>x</Moldura>);
+    expect(screen.queryAllByText('Registro rápido')).toHaveLength(0);
+    modulos = undefined;
   });
 });

@@ -33,6 +33,8 @@ export interface Resumo {
   ctes: string[];
   nfs: string[];
   fatura: string | null;
+  /** Motivo escolhido na lista que a empresa configurou para o tipo. */
+  motivo?: string | null;
   descricao: string;
   status: Status;
   prioridade: Prioridade;
@@ -191,6 +193,7 @@ export interface DadosDeAbertura {
   nfs?: string[];
   fatura?: string;
   pagadorCorreto?: string;
+  motivo?: string;
   descricao: string;
   prioridade: Prioridade;
   filialId?: string;

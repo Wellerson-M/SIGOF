@@ -9,6 +9,7 @@ import {
   type CausaDeErro,
   type Filial,
 } from '@/lib/cadastros';
+import { usaModulo, useFormulario } from '@/lib/configuracao';
 import {
   ANEXO,
   NOME_DO_STATUS,
@@ -27,6 +28,8 @@ import { MarcacoesDaAbertura, useItensDaAbertura } from './Verificacoes';
 import { useSessao } from '@/lib/sessao';
 import { enviarAnexos } from './Anexos';
 import { CampoDoQual, temQual } from './CampoDoQual';
+import { AvisoSemFilial } from './AvisoSemFilial';
+import { usePadroesDoTipo } from './Padroes';
 
 const CAMPO =
   'h-10 rounded-md border border-borda bg-superficie px-3 text-sm text-texto';
@@ -48,16 +51,33 @@ function descreverMotivo(d: Duplicidade): string {
  * ficam, o resto limpa e o cursor volta para o CTe.
  */
 export function FormularioDeRegistro() {
-  const [tipo, setTipo] = useState<Tipo>('REVERSAO');
+  const formulario = useFormulario();
+  const tiposAtivos =
+    formulario.tipos && formulario.tipos.length > 0
+      ? formulario.tipos.map((t) => t.tipo)
+      : TIPOS;
+  const [tipoEscolhido, setTipo] = useState<Tipo>('REVERSAO');
+  const tipo = tiposAtivos.includes(tipoEscolhido)
+    ? tipoEscolhido
+    : tiposAtivos[0]!;
+  const config = formulario.doTipo(tipo);
+  const aparece = (campo: keyof typeof config.campos) =>
+    config.campos[campo].modo !== 'OCULTO';
   const [filiais, setFiliais] = useState<Filial[]>([]);
   const [filialId, setFilialId] = useState('');
+  const [avisoSemFilial, setAvisoSemFilial] = useState(false);
   const [cte, setCte] = useState('');
   const [nf, setNf] = useState('');
   const [fatura, setFatura] = useState('');
   const [marcados, setMarcados] = useState<string[]>([]);
   const { usuario } = useSessao();
-  const itensDaAbertura = useItensDaAbertura(tipo, usuario.perfil);
+  const itensDaAbertura = useItensDaAbertura(
+    tipo,
+    usuario.perfil,
+    usaModulo(usuario, 'VERIFICACOES'),
+  );
   const [pagadorCorreto, setPagadorCorreto] = useState('');
+  const [motivo, setMotivo] = useState('');
   const [oQueEra, setOQueEra] = useState('');
   const [oQueFoiFeito, setOQueFoiFeito] = useState('');
   const [causas, setCausas] = useState<CausaDeErro[]>([]);
@@ -70,33 +90,50 @@ export function FormularioDeRegistro() {
   const [duplicidades, setDuplicidades] = useState<Duplicidade[] | null>(null);
   const [registradas, setRegistradas] = useState<Resumo[]>([]);
   const campoCte = useRef<HTMLTextAreaElement>(null);
+  const pedeFilial = aparece('filial') && filiais.length > 0;
 
+  usePadroesDoTipo(config, {
+    pagadorCorreto: { valor: pagadorCorreto, mudar: setPagadorCorreto },
+    motivo: { valor: motivo, mudar: setMotivo },
+  });
+
+  const usaFiliais = usaModulo(usuario, 'FILIAIS');
+  const usaCausas = usaModulo(usuario, 'CAUSA_DO_ERRO');
   useEffect(() => {
     let cancelado = false;
-    cadastros.filiais().then(
-      (lista) => {
-        if (cancelado) return;
-        setFiliais(lista);
-        if (lista.length === 1) setFilialId(lista[0]!.id);
-      },
-      () => undefined,
-    );
-    cadastros.causas().then(
-      (lista) => {
-        if (!cancelado) setCausas(lista);
-      },
-      () => undefined,
-    );
+    if (usaFiliais) {
+      cadastros.filiais().then(
+        (lista) => {
+          if (cancelado) return;
+          setFiliais(lista);
+          if (lista.length === 1) setFilialId(lista[0]!.id);
+        },
+        () => undefined,
+      );
+    }
+    if (usaCausas) {
+      cadastros.causas().then(
+        (lista) => {
+          if (!cancelado) setCausas(lista);
+        },
+        () => undefined,
+      );
+    }
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [usaFiliais, usaCausas]);
 
   const causa = causas.find((c) => c.id === causaId);
 
-  async function registrar(confirmarDuplicidade = false) {
-    setEnviando(true);
+  async function registrar(confirmarDuplicidade = false, semFilial = false) {
     setErro(null);
+    if (pedeFilial && !filialId && !semFilial) {
+      setAvisoSemFilial(true);
+      return;
+    }
+    setAvisoSemFilial(false);
+    setEnviando(true);
     const anexaveis = arquivos.slice(0, ANEXO.porSolicitacao);
     const hashes = (await Promise.all(anexaveis.map(hashDoArquivo))).filter(
       (h): h is string => h !== null,
@@ -104,17 +141,18 @@ export function FormularioDeRegistro() {
     try {
       const nova = await api.abrir({
         tipo,
-        ...documentosDoFormulario(cte, nf, fatura),
+        ...documentosDoFormulario(
+          aparece('cte') ? cte : '',
+          aparece('nf') ? nf : '',
+          aparece('fatura') ? fatura : '',
+        ),
         ...(marcadosValidos(marcados, itensDaAbertura).length > 0
           ? { verificacoes: marcadosValidos(marcados, itensDaAbertura) }
           : {}),
-        ...(marcadosValidos(marcados, itensDaAbertura).length > 0
-          ? { verificacoes: marcadosValidos(marcados, itensDaAbertura) }
-          : {}),
-        pagadorCorreto:
-          tipo === 'TROCA_PAGADOR'
-            ? pagadorCorreto.trim() || undefined
-            : undefined,
+        pagadorCorreto: aparece('pagadorCorreto')
+          ? pagadorCorreto.trim() || undefined
+          : undefined,
+        motivo: aparece('motivo') ? motivo || undefined : undefined,
         descricao: oQueEra,
         prioridade: 'MEDIA',
         filialId: filialId || undefined,
@@ -143,7 +181,8 @@ export function FormularioDeRegistro() {
       setNf('');
       setFatura('');
       setMarcados([]);
-      setPagadorCorreto('');
+      setPagadorCorreto(config.campos.pagadorCorreto.padrao ?? '');
+      setMotivo(config.campos.motivo.padrao ?? '');
       setOQueEra('');
       setOQueFoiFeito('');
       setCausaId('');
@@ -184,22 +223,29 @@ export function FormularioDeRegistro() {
               onChange={(evento) => setTipo(evento.target.value as Tipo)}
               className={CAMPO}
             >
-              {TIPOS.map((t) => (
+              {tiposAtivos.map((t) => (
                 <option key={t} value={t}>
                   {NOME_DO_TIPO[t]}
                 </option>
               ))}
             </select>
           </label>
-          {filiais.length > 0 && (
+          {pedeFilial && (
             <label className={ROTULO}>
               Filial
               <select
                 value={filialId}
-                onChange={(evento) => setFilialId(evento.target.value)}
+                onChange={(evento) => {
+                  setFilialId(evento.target.value);
+                  setAvisoSemFilial(false);
+                }}
                 className={CAMPO}
               >
-                <option value="">Escolha a filial</option>
+                <option value="">
+                  {config.campos.filial.modo === 'OBRIGATORIO'
+                    ? 'Escolha a filial'
+                    : 'Escolha a filial (opcional)'}
+                </option>
                 {filiais.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.nome}
@@ -208,42 +254,65 @@ export function FormularioDeRegistro() {
               </select>
             </label>
           )}
-          <label className={ROTULO}>
-            CTe
-            <textarea
-              ref={campoCte}
-              value={cte}
-              onChange={(evento) => setCte(evento.target.value)}
-              rows={1}
-              maxLength={20000}
-              placeholder="Número ou chave; vários, um por linha"
-              className={`${CAMPO} min-h-10 resize-y py-2`}
-            />
-            <Contagem valor={cte} nome="CTe" />
-          </label>
-          <label className={ROTULO}>
-            NF
-            <textarea
-              value={nf}
-              onChange={(evento) => setNf(evento.target.value)}
-              rows={1}
-              maxLength={20000}
-              placeholder="Número ou chave; vários, um por linha"
-              className={`${CAMPO} min-h-10 resize-y py-2`}
-            />
-            <Contagem valor={nf} nome="NF" />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-            Fatura
-            <input
-              value={fatura}
-              onChange={(evento) => setFatura(evento.target.value)}
-              maxLength={40}
-              placeholder="Quando é a fatura inteira"
-              className={CAMPO}
-            />
-          </label>
-          {tipo === 'TROCA_PAGADOR' && (
+          {aparece('cte') && (
+            <label className={ROTULO}>
+              CTe
+              <textarea
+                ref={campoCte}
+                value={cte}
+                onChange={(evento) => setCte(evento.target.value)}
+                rows={1}
+                maxLength={20000}
+                placeholder="Número ou chave; vários, um por linha"
+                className={`${CAMPO} min-h-10 resize-y py-2`}
+              />
+              <Contagem valor={cte} nome="CTe" />
+            </label>
+          )}
+          {aparece('nf') && (
+            <label className={ROTULO}>
+              NF
+              <textarea
+                value={nf}
+                onChange={(evento) => setNf(evento.target.value)}
+                rows={1}
+                maxLength={20000}
+                placeholder="Número ou chave; vários, um por linha"
+                className={`${CAMPO} min-h-10 resize-y py-2`}
+              />
+              <Contagem valor={nf} nome="NF" />
+            </label>
+          )}
+          {aparece('fatura') && (
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+              Fatura
+              <input
+                value={fatura}
+                onChange={(evento) => setFatura(evento.target.value)}
+                maxLength={40}
+                placeholder="Quando é a fatura inteira"
+                className={CAMPO}
+              />
+            </label>
+          )}
+          {aparece('motivo') && (
+            <label className={ROTULO}>
+              Motivo
+              <select
+                value={motivo}
+                onChange={(evento) => setMotivo(evento.target.value)}
+                className={CAMPO}
+              >
+                <option value="">Escolha o motivo</option>
+                {config.motivos.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {aparece('pagadorCorreto') && (
             <label className={`${ROTULO} sm:col-span-2`}>
               Pagador correto
               <input
@@ -310,19 +379,21 @@ export function FormularioDeRegistro() {
               aoMudar={setMarcados}
             />
           </div>
-          <label className={`${ROTULO} sm:col-span-2`}>
-            Anexos
-            <input
-              key={chaveDoArquivo}
-              type="file"
-              multiple
-              accept={ANEXO.aceitos}
-              onChange={(evento) =>
-                setArquivos([...(evento.target.files ?? [])])
-              }
-              className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
-            />
-          </label>
+          {aparece('anexos') && (
+            <label className={`${ROTULO} sm:col-span-2`}>
+              Anexos
+              <input
+                key={chaveDoArquivo}
+                type="file"
+                multiple
+                accept={ANEXO.aceitos}
+                onChange={(evento) =>
+                  setArquivos([...(evento.target.files ?? [])])
+                }
+                className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
+              />
+            </label>
+          )}
         </div>
 
         {erro && (
@@ -334,7 +405,14 @@ export function FormularioDeRegistro() {
           </p>
         )}
 
-        {duplicidades ? (
+        {avisoSemFilial ? (
+          <AvisoSemFilial
+            acao="Registrar sem filial"
+            enviando={enviando}
+            aoConfirmar={() => void registrar(false, true)}
+            aoVoltar={() => setAvisoSemFilial(false)}
+          />
+        ) : duplicidades ? (
           <div
             role="alert"
             className="flex flex-col gap-3 rounded-md border border-atencao/50 bg-atencao/10 p-4"
@@ -361,7 +439,7 @@ export function FormularioDeRegistro() {
               <button
                 type="button"
                 disabled={enviando}
-                onClick={() => void registrar(true)}
+                onClick={() => void registrar(true, true)}
                 className="h-9 rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria disabled:opacity-50"
               >
                 Registrar mesmo assim

@@ -27,6 +27,7 @@ export function DialogoDeObservacao({
   titulo,
   pergunta,
   resolucao = false,
+  controlarCausa = true,
   exigirCausa = false,
   observacaoObrigatoria = true,
   aoConfirmar,
@@ -36,6 +37,8 @@ export function DialogoDeObservacao({
   pergunta: string;
   /** Mostra a causa do erro e os anexos (movimento para Resolvido). */
   resolucao?: boolean;
+  /** Módulo de causa do erro em uso na empresa. */
+  controlarCausa?: boolean;
   exigirCausa?: boolean;
   /** Resolver não exige texto; os outros movimentos pedem o motivo. */
   observacaoObrigatoria?: boolean;
@@ -60,7 +63,7 @@ export function DialogoDeObservacao({
   }, [aoFechar]);
 
   useEffect(() => {
-    if (!resolucao) return;
+    if (!resolucao || !controlarCausa) return;
     let cancelado = false;
     cadastros.causas().then(
       (lista) => {
@@ -71,7 +74,7 @@ export function DialogoDeObservacao({
     return () => {
       cancelado = true;
     };
-  }, [resolucao]);
+  }, [resolucao, controlarCausa]);
 
   const causa = causas.find((c) => c.id === causaId);
   const faltaCausa = resolucao && exigirCausa && causas.length > 0 && !causa;

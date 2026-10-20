@@ -9,6 +9,7 @@ import {
   type DragEvent,
 } from 'react';
 import { ErroDaApi } from '@/lib/api';
+import { usaModulo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 import {
   ACAO_PARA,
@@ -274,6 +275,7 @@ export function Quadro() {
           titulo={`${ACAO_PARA[pendente.para]} — ${pendente.item.protocolo}`}
           pergunta={PEDE_OBSERVACAO[pendente.para] ?? ''}
           resolucao={pendente.para === 'RESOLVIDO'}
+          controlarCausa={usaModulo(usuario, 'CAUSA_DO_ERRO')}
           exigirCausa={usuario.empresa.exigirCausaAoResolver ?? false}
           observacaoObrigatoria={pendente.para !== 'RESOLVIDO'}
           aoFechar={() => setPendente(null)}

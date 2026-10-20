@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ModulosLiberados } from './ModulosLiberados';
+import { MODULOS } from '@/lib/configuracao';
 import { Logo } from '@/components/Logo';
 import {
   Alerta,
@@ -42,6 +44,7 @@ export function PainelDaPlataforma() {
   const [eventos, setEventos] = useState<EventoDaPlataforma[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [modulosDe, setModulosDe] = useState<EmpresaNaPlataforma | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -263,6 +266,13 @@ export function PainelDaPlataforma() {
                           >
                             Novo administrador
                           </button>
+                          <button
+                            type="button"
+                            className={BOTAO_SECUNDARIO}
+                            onClick={() => setModulosDe(e)}
+                          >
+                            Módulos
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -270,6 +280,24 @@ export function PainelDaPlataforma() {
                 </tbody>
               </table>
             </div>
+
+            {modulosDe && (
+              <ModulosLiberados
+                empresa={modulosDe.razaoSocial}
+                liberados={
+                  modulosDe.modulosLiberados ?? MODULOS.map((m) => m.id)
+                }
+                aoFechar={() => setModulosDe(null)}
+                aoSalvar={(modulos) =>
+                  executar(async () => {
+                    await plataforma.alterarEmpresa(modulosDe.id, {
+                      modulosLiberados: modulos,
+                    });
+                    return `Módulos de ${modulosDe.razaoSocial} salvos.`;
+                  })
+                }
+              />
+            )}
 
             <details className="rounded-lg border border-borda bg-superficie p-4 text-sm">
               <summary className="cursor-pointer font-semibold text-texto">

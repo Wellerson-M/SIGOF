@@ -81,9 +81,10 @@ export function Filiais() {
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       <p className="text-sm text-texto-suave">
-        Cadastre as filiais que emitem CTe. Com filiais cadastradas, a
-        solicitação com CTe ou NF pede a filial, e o alerta de duplicidade só
-        compara documentos da mesma filial. Sem filiais, nada muda.
+        Cadastre as filiais que emitem CTe. Com filiais cadastradas, o
+        formulário de abertura pede a filial (obrigatória ou opcional, como
+        estiver na aba Formulário), e o alerta de duplicidade só compara
+        documentos da mesma filial. Sem filiais, nada muda.
       </p>
 
       <form onSubmit={criar} className="flex flex-wrap items-end gap-2">
