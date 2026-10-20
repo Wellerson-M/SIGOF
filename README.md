@@ -23,20 +23,26 @@ O MVP é validado com uma transportadora parceira (projeto de extensão). A arqu
 
 | Perfil | O que faz |
 |---|---|
-| **Solicitante** (comercial, financeiro, operacional) | Abre solicitações com CTe/NF obrigatórios, anexa documentos e acompanha o andamento |
+| **Solicitante** (comercial, financeiro, operacional) | Abre solicitações no formulário que a empresa montou para cada tipo (CTe, NF, fatura, motivo...), anexa documentos e acompanha o andamento |
 | **Analista** | Atende a fila ordenada por prioridade e SLA, conversa com o solicitante e resolve |
 | **Supervisor** | Reprioriza e reatribui solicitações e acompanha os indicadores |
-| **Administrador** | Cadastra os funcionários, ajusta expediente e SLA, configura o e-mail de avisos e consulta a auditoria |
+| **Administrador** | Cadastra funcionários e filiais, ajusta expediente e SLA, monta os tipos de ocorrência e o formulário de cada um, liga os módulos, configura o e-mail de avisos e consulta a auditoria |
+| **Administrador da plataforma** | Cadastra as empresas e libera os módulos de cada uma (login separado, sem acesso ao conteúdo das solicitações) |
 
 ## Situação atual
 
 Pronto e testado (staging atualizado a cada merge na `main`):
-- **Solicitações:** abertura com alerta de duplicidade e anexos, quadro kanban com arrastar, prioridade, responsável, conversa com notas internas e histórico.
-- **Anexos:** PDF, imagens e XML da NF-e/CTe, com checagem do tipo real do arquivo e download só para quem enxerga a solicitação.
-- **Avisos:** notificações no sistema (o sino) e e-mail a cada movimentação, com uma conversa por protocolo, enviados pela conta da própria empresa e configurados na tela.
-- **Indicadores** para o supervisor: em aberto, SLA vencido, atendidas no prazo, tempos médios, gráficos por dia, status, tipo e responsável, e exportação em CSV.
-- **Administração:** funcionários com senha provisória, perfis, desativação, expediente, SLA e trilha de auditoria imutável.
-- **Login** por empresa, e-mail e senha, com sessão em cookie protegido, bloqueio por tentativas, proteção contra CSRF e controle de acesso por perfil.
+- **Solicitações:** abertura com vários CTe e NF (ou a fatura inteira), alerta de duplicidade e anexos; quadro kanban com arrastar, prioridade, responsável (alocação manual ou pela fila), conversa com notas internas e histórico; registro rápido do que já foi resolvido por fora; exclusão das encerradas.
+- **Tipos de ocorrência da empresa:** os do sistema (reversão, troca de pagador, ajuste fiscal, outro) podem ser renomeados, e a empresa cria os seus. Cada tipo tem o próprio formulário: que campos aparecem, quais são obrigatórios, o que já vem preenchido e a lista de motivos.
+- **Duplicidade** pelo número do documento, pela filial e pelo próprio arquivo anexado (mesmo conteúdo com outro CTe ou NF).
+- **Verificações** configuráveis por empresa (ex.: conferir o desacordo fiscal do CTe), obrigatórias ou não para resolver.
+- **Ao finalizar:** de quem foi o erro (controle interno), digitador e anexo do encerramento; balanço mensal por digitador.
+- **Anexos:** PDF, imagens e XML da NF-e/CTe, separados por etapa, com checagem do tipo real do arquivo e download só para quem enxerga a solicitação.
+- **Avisos:** notificações no sistema (o sino) e e-mails agrupados, com o link de cada anexo, enviados pela conta da própria empresa para várias caixas centrais; a empresa escolhe o que gera e-mail.
+- **Indicadores** para o supervisor: em aberto, SLA vencido, atendidas no prazo, tempos médios, causas do erro, gráficos por dia, status, tipo e responsável, e exportação em CSV.
+- **Administração:** funcionários com senha provisória, perfis, filiais, módulos, expediente, SLA e trilha de auditoria imutável com filtros.
+- **Plataforma (SaaS):** administrador do sistema separado do administrador da empresa; libera os módulos de cada empresa.
+- **Login** por empresa, e-mail e senha, com sessão que dura um expediente (12 h no máximo, 2 h sem uso), cookie protegido, bloqueio por tentativas, proteção contra CSRF e controle de acesso por perfil.
 - **Protocolo** `SOL-AAAA-MM-NNNN`, sequencial por empresa e seguro sob concorrência.
 - **SLA em minutos úteis**, respeitando o expediente, o fuso e os dias úteis de cada empresa, com pausa enquanto aguarda documento.
 
