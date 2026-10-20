@@ -25,7 +25,6 @@ function appCom(renovar: () => Promise<never>) {
       servico: { renovar } as unknown as ServicoDeAutenticacao,
       prisma: {} as PrismaClient,
       jwtSecret: 'x'.repeat(32),
-      acessoMinutos: 15,
       cookieSeguro: false,
     }),
   );

@@ -106,6 +106,11 @@ export interface Resumo {
   registroRapido: boolean;
   criadoEm: Date;
   atualizadoEm: Date;
+  /**
+   * O último acontecimento visível a todos: mudança no histórico, mensagem
+   * da conversa ou anexo. É o que diz há quanto tempo ela está parada.
+   */
+  ultimaMovimentacaoEm: Date;
   slaVenceEm: Date | null;
   sla: IndicadorDeSla;
   /** Status para onde *este usuário* pode mover a solicitação agora. */
@@ -123,6 +128,8 @@ export interface AnexoDaSolicitacao {
   mensagemId: string | null;
   enviadoPor: Pessoa;
   criadoEm: Date;
+  /** Até quando *este usuário* pode excluir o anexo (null: não pode). */
+  podeExcluirAte: Date | null;
 }
 
 export interface EventoDoHistorico {
@@ -198,6 +205,8 @@ export interface Detalhe extends Resumo {
     comentarInterno: boolean;
     /** Registrar ou corrigir a causa do erro (resolvida, equipe). */
     classificar: boolean;
+    /** Excluir (só encerrada; supervisor e administrador). */
+    excluir: boolean;
   };
 }
 
@@ -253,16 +262,13 @@ export function inicioDoDia(dia: string, fusoHorario: string): Date {
   return new Date(2 * meiaNoiteUtc.getTime() - relogioLocal);
 }
 
-/** Encerradas há mais que isso saem do quadro (continuam no detalhe). */
-export const DIAS_NO_QUADRO_DEPOIS_DE_ENCERRAR = 30;
-
 const PERFIS_QUE_ABREM: readonly Perfil[] = [
   'SOLICITANTE',
   'ANALISTA',
   'SUPERVISOR',
 ];
 const PERFIS_QUE_PRIORIZAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
-const PERFIS_QUE_ATRIBUEM: readonly Perfil[] = ['SUPERVISOR'];
+const PERFIS_QUE_EXCLUEM: readonly Perfil[] = ['SUPERVISOR', 'ADMIN'];
 const PERFIS_RESPONSAVEIS: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
 const PERFIS_QUE_CLASSIFICAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
 const PERFIS_QUE_REGISTRAM: readonly Perfil[] = ['ANALISTA', 'SUPERVISOR'];
@@ -280,10 +286,20 @@ const NOME_DA_PRIORIDADE: Record<Prioridade, string> = {
 
 const pessoa = { select: { id: true, nome: true } } as const;
 
+const maisRecente = {
+  select: { criadoEm: true },
+  orderBy: { criadoEm: 'desc' },
+  take: 1,
+} as const;
+
 const incluirNoResumo = {
   solicitante: pessoa,
   responsavel: pessoa,
   filial: pessoa,
+  // Só o mais recente de cada um, para a "última movimentação"
+  historicos: maisRecente,
+  mensagens: { ...maisRecente, where: { interna: false } },
+  anexos: maisRecente,
   // Só as mensagens visíveis a todos: contar as notas internas revelaria ao
   // solicitante que elas existem
   _count: {
@@ -301,6 +317,28 @@ function ehInterno(perfil: Perfil): boolean {
   return perfil !== 'SOLICITANTE';
 }
 
+/**
+ * Quem passa a solicitação para alguém: o supervisor sempre; o analista,
+ * se a empresa deixar (vem ligado).
+ */
+function atribui(perfil: Perfil, empresa: { analistaAtribui: boolean }) {
+  return (
+    perfil === 'SUPERVISOR' ||
+    (perfil === 'ANALISTA' && empresa.analistaAtribui)
+  );
+}
+
+/** O acontecimento mais recente entre as listas (vazias contam nada). */
+function ultimaData(inicio: Date, ...listas: { criadoEm: Date }[][]): Date {
+  let ultima = inicio;
+  for (const lista of listas) {
+    for (const item of lista) {
+      if (item.criadoEm > ultima) ultima = item.criadoEm;
+    }
+  }
+  return ultima;
+}
+
 /** Quem marca: o solicitante, a equipe (analista e supervisor) ou ambos. */
 function marcaEsteItem(
   perfil: Perfil,
@@ -313,13 +351,21 @@ function marcaEsteItem(
     : perfil !== 'SOLICITANTE';
 }
 
-/** Solicitante só enxerga o que ele mesmo abriu; os internos, a empresa toda. */
+/**
+ * Solicitante só enxerga o que ele mesmo abriu; os internos, a empresa
+ * toda. A excluída não aparece para ninguém (fica só no banco e na
+ * auditoria).
+ */
 export function visiveisPara(
   usuario: UsuarioAutenticado,
 ): Prisma.SolicitacaoWhereInput {
   return usuario.perfil === 'SOLICITANTE'
-    ? { empresaId: usuario.empresaId, solicitanteId: usuario.id }
-    : { empresaId: usuario.empresaId };
+    ? {
+        empresaId: usuario.empresaId,
+        solicitanteId: usuario.id,
+        excluidaEm: null,
+      }
+    : { empresaId: usuario.empresaId, excluidaEm: null };
 }
 
 function estadoDoSla(s: {
@@ -574,10 +620,10 @@ export class ServicoDeSolicitacoes {
     const busca = filtros.busca?.trim();
     const digitos = busca ? normalizarDocumento(busca) : null;
 
-    const [empresa, solicitacoes] = await Promise.all([
-      this.prisma.empresa.findUniqueOrThrow({
-        where: { id: usuario.empresaId },
-      }),
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: usuario.empresaId },
+    });
+    const [solicitacoes] = await Promise.all([
       this.prisma.solicitacao.findMany({
         where: {
           AND: [
@@ -588,7 +634,8 @@ export class ServicoDeSolicitacoes {
                 {
                   atualizadoEm: {
                     gte: new Date(
-                      agora.getTime() - DIAS_NO_QUADRO_DEPOIS_DE_ENCERRAR * DIA,
+                      agora.getTime() -
+                        empresa.diasNoQuadroDepoisDeEncerrar * DIA,
                     ),
                   },
                 },
@@ -821,11 +868,21 @@ export class ServicoDeSolicitacoes {
         mensagemId: a.mensagemId,
         enviadoPor: a.enviadoPor,
         criadoEm: a.criadoEm,
+        podeExcluirAte: prazoParaExcluirAnexo(
+          usuario,
+          solicitacao.empresa,
+          a,
+          this.agora(),
+        ),
       })),
       pode: {
         mudarPrioridade:
           !encerrada && PERFIS_QUE_PRIORIZAM.includes(usuario.perfil),
-        atribuir: !encerrada && PERFIS_QUE_ATRIBUEM.includes(usuario.perfil),
+        atribuir: !encerrada && atribui(usuario.perfil, solicitacao.empresa),
+        excluir:
+          encerrada &&
+          moduloLigado(solicitacao.empresa, 'EXCLUSAO_DE_SOLICITACOES') &&
+          PERFIS_QUE_EXCLUEM.includes(usuario.perfil),
         comentarInterno: ehInterno(usuario.perfil),
         classificar:
           controlaCausa &&
@@ -880,8 +937,9 @@ export class ServicoDeSolicitacoes {
         data: {
           status: para,
           ...sla,
-          // Quem assume a solicitação da fila vira o responsável por ela
-          ...(de === 'NOVO' && para === 'EM_ANDAMENTO' && !atual.responsavelId
+          // Quem assume (ou retoma) uma solicitação sem responsável vira o
+          // responsável por ela; só analista e supervisor chegam aqui
+          ...(para === 'EM_ANDAMENTO' && !atual.responsavelId
             ? { responsavelId: usuario.id }
             : {}),
           resolvidoEm: para === 'RESOLVIDO' ? agora : null,
@@ -1071,18 +1129,46 @@ export class ServicoDeSolicitacoes {
     });
   }
 
+  /**
+   * Passa a solicitação para alguém (alocação manual) ou a devolve para a
+   * fila sem responsável (`null`).
+   */
   async atribuir(
     usuario: UsuarioAutenticado,
     id: string,
-    responsavelId: string,
+    responsavelId: string | null,
   ): Promise<Resumo> {
-    if (!PERFIS_QUE_ATRIBUEM.includes(usuario.perfil)) {
-      throw new ErroAcessoNegado('Só o supervisor reatribui solicitações');
-    }
-
     return this.prisma.$transaction(async (tx) => {
       const atual = await this.carregar(tx, usuario, id);
+      if (!atribui(usuario.perfil, atual.empresa)) {
+        throw new ErroAcessoNegado(
+          atual.empresa.analistaAtribui
+            ? 'Só analista e supervisor passam a solicitação para alguém'
+            : 'Só o supervisor passa a solicitação para alguém',
+        );
+      }
       this.barrarSeEncerrada(atual.status);
+
+      if (responsavelId === null) {
+        if (atual.responsavelId !== null) {
+          await tx.solicitacao.update({
+            where: { id: atual.id },
+            data: { responsavelId: null },
+          });
+          await this.registrarMovimentacao(
+            tx,
+            usuario,
+            atual,
+            'Responsável: ninguém (voltou para a fila)',
+          );
+        }
+        return this.resumirPorId(
+          tx,
+          usuario,
+          atual.id,
+          expedienteDaEmpresa(atual.empresa),
+        );
+      }
 
       // O responsável precisa ser da mesma empresa: um id de outra empresa
       // é tratado como inexistente
@@ -1176,7 +1262,64 @@ export class ServicoDeSolicitacoes {
     };
   }
 
-  /** Para quem o supervisor pode passar uma solicitação. */
+  /**
+   * Exclui uma solicitação encerrada (supervisor e administrador, com o
+   * módulo ligado). É exclusão lógica: some de todas as telas, dos
+   * indicadores e da duplicidade, mas continua no banco, com quem excluiu
+   * e o motivo na auditoria. O protocolo não volta a ser usado.
+   */
+  async excluir(
+    usuario: UsuarioAutenticado,
+    id: string,
+    motivo: string | undefined,
+    ip?: string,
+  ): Promise<void> {
+    if (!PERFIS_QUE_EXCLUEM.includes(usuario.perfil)) {
+      throw new ErroAcessoNegado(
+        'Só supervisor e administrador excluem solicitações',
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      const atual = await this.carregar(tx, usuario, id);
+      if (!moduloLigado(atual.empresa, 'EXCLUSAO_DE_SOLICITACOES')) {
+        throw new ErroDeRegraDeNegocio(
+          'A exclusão de solicitações está desligada na sua empresa',
+        );
+      }
+      if (!ehTerminal(atual.status)) {
+        throw new ErroDeRegraDeNegocio(
+          'Só dá para excluir solicitação resolvida ou cancelada',
+        );
+      }
+      const agora = this.agora();
+      const { count } = await tx.solicitacao.updateMany({
+        where: { id: atual.id, excluidaEm: null },
+        data: { excluidaEm: agora, excluidaPorId: usuario.id },
+      });
+      if (count === 0) {
+        throw new ErroNaoEncontrado('Solicitação não encontrada');
+      }
+      // Os avisos dela deixam de ser novidade no sino de todo mundo
+      await tx.notificacao.updateMany({
+        where: { solicitacaoId: atual.id, lida: false },
+        data: { lida: true },
+      });
+      await registrar(tx, {
+        empresaId: usuario.empresaId,
+        acao: 'SOLICITACAO_EXCLUIDA',
+        autorId: usuario.id,
+        detalhes: {
+          solicitacaoId: atual.id,
+          protocolo: atual.protocolo,
+          status: atual.status,
+          ...(motivo?.trim() ? { motivo: motivo.trim() } : {}),
+        },
+        ip,
+      });
+    });
+  }
+
+  /** Para quem a solicitação pode ser passada. */
   async responsaveis(usuario: UsuarioAutenticado): Promise<Pessoa[]> {
     if (!ehInterno(usuario.perfil)) {
       throw new ErroAcessoNegado();
@@ -1254,6 +1397,7 @@ export class ServicoDeSolicitacoes {
       where: {
         empresaId,
         status: { not: 'CANCELADO' },
+        excluidaEm: null,
         criadoEm: { gte: new Date(agora.getTime() - janelaDias * DIA) },
         OR: [
           ...(ctes.length > 0 ? [{ ctes: { hasSome: ctes } }] : []),
@@ -1628,10 +1772,36 @@ export class ServicoDeSolicitacoes {
       registroRapido: s.registroRapido,
       criadoEm: s.criadoEm,
       atualizadoEm: s.atualizadoEm,
+      ultimaMovimentacaoEm: ultimaData(
+        s.criadoEm,
+        s.historicos,
+        // No detalhe vêm todas as mensagens; nota interna não conta
+        s.mensagens.filter((m) => !('interna' in m) || !m.interna),
+        s.anexos,
+      ),
       slaVenceEm: s.slaVenceEm,
       sla: indicadorDeSla(s.status, estadoDoSla(s), agora, expediente),
       acoes: transicoesPermitidas(s.status, usuario.perfil).map((t) => t.para),
       totais: { anexos: s._count.anexos, mensagens: s._count.mensagens },
     };
   }
+}
+
+/**
+ * Quem enviou o anexo pode excluí-lo durante alguns minutos (a empresa
+ * decide quantos), para corrigir um arquivo trocado. Devolve até quando,
+ * ou null se este usuário não pode.
+ */
+export function prazoParaExcluirAnexo(
+  usuario: UsuarioAutenticado,
+  empresa: ChavesDosModulos & { minutosParaExcluirAnexo: number },
+  anexo: { criadoEm: Date; enviadoPor: { id: string } },
+  agora: Date,
+): Date | null {
+  if (!moduloLigado(empresa, 'EXCLUSAO_DE_ANEXOS')) return null;
+  if (anexo.enviadoPor.id !== usuario.id) return null;
+  const ate = new Date(
+    anexo.criadoEm.getTime() + empresa.minutosParaExcluirAnexo * 60_000,
+  );
+  return ate > agora ? ate : null;
 }

@@ -365,4 +365,90 @@ describe.skipIf(!temBanco)('anexos (integração, banco real)', () => {
       expect(vazia.status).toBe(400);
     });
   });
+
+  describe('excluir anexo', () => {
+    async function excluir(perfil: Perfil, id: string, anexoId: string) {
+      return request(app)
+        .delete(`/api/solicitacoes/${id}/anexos/${anexoId}`)
+        .set('Origin', FRONTEND)
+        .set('Cookie', await cookieDe(perfil));
+    }
+
+    it('quem enviou exclui dentro do prazo; fica no histórico e sai do armazenamento', async () => {
+      const id = await abrir();
+      const enviado = await enviar('SOLICITANTE', id, PDF, 'errado.pdf');
+      const chave = (
+        await prisma.anexo.findUniqueOrThrow({
+          where: { id: enviado.body.id },
+        })
+      ).chaveStorage;
+
+      // O detalhe diz até quando dá para excluir, só para quem enviou
+      const meu = await request(app)
+        .get(`/api/solicitacoes/${id}`)
+        .set('Cookie', await cookieDe('SOLICITANTE'));
+      expect(meu.body.anexos[0].podeExcluirAte).not.toBeNull();
+      const daEquipe = await request(app)
+        .get(`/api/solicitacoes/${id}`)
+        .set('Cookie', await cookieDe('ANALISTA'));
+      expect(daEquipe.body.anexos[0].podeExcluirAte).toBeNull();
+      expect((await excluir('ANALISTA', id, enviado.body.id)).status).toBe(403);
+
+      expect((await excluir('SOLICITANTE', id, enviado.body.id)).status).toBe(
+        204,
+      );
+      expect(armazenamento.arquivos.has(chave)).toBe(false);
+      const depois = await request(app)
+        .get(`/api/solicitacoes/${id}`)
+        .set('Cookie', await cookieDe('SOLICITANTE'));
+      expect(depois.body.anexos).toHaveLength(0);
+      expect(depois.body.historico.at(-1).observacao).toBe(
+        'Anexo excluído: errado.pdf',
+      );
+    });
+
+    it('depois do prazo, ou com o módulo desligado, não exclui', async () => {
+      const id = await abrir();
+      const enviado = await enviar('SOLICITANTE', id, PDF, 'velho.pdf');
+      await prisma.anexo.update({
+        where: { id: enviado.body.id },
+        data: { criadoEm: new Date(Date.now() - 16 * 60_000) },
+      });
+      const tarde = await excluir('SOLICITANTE', id, enviado.body.id);
+      expect(tarde.status).toBe(422);
+      expect(tarde.body.erro).toMatch(/15 min/);
+
+      const outro = await enviar('SOLICITANTE', id, PDF, 'novo.pdf');
+      await prisma.empresa.update({
+        where: { id: empresa.id },
+        data: { modulosAtivos: { set: [] } },
+      });
+      try {
+        expect((await excluir('SOLICITANTE', id, outro.body.id)).status).toBe(
+          422,
+        );
+      } finally {
+        await prisma.empresa.update({
+          where: { id: empresa.id },
+          data: {
+            modulosAtivos: (
+              await prisma.empresa.findUniqueOrThrow({
+                where: { id: empresa.id },
+              })
+            ).modulosLiberados,
+          },
+        });
+      }
+    });
+
+    it('anexo de outra empresa não existe', async () => {
+      const id = await abrir();
+      const enviado = await enviar('SOLICITANTE', id, PDF, 'meu.pdf');
+      const deFora = await request(app)
+        .delete(`/api/solicitacoes/${id}/anexos/${enviado.body.id}`)
+        .set('Origin', FRONTEND)
+        .set('Cookie', await cookieDe('SOLICITANTE', outra));
+      expect(deFora.status).toBe(404);
+    });
+  });
 });

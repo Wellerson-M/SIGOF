@@ -261,7 +261,7 @@ export class ServicoDaPlataforma {
     const [noMes, acessos] = await Promise.all([
       this.prisma.solicitacao.groupBy({
         by: ['empresaId'],
-        where: { criadoEm: { gte: inicioDoMes } },
+        where: { criadoEm: { gte: inicioDoMes }, excluidaEm: null },
         _count: { _all: true },
       }),
       this.prisma.usuario.groupBy({

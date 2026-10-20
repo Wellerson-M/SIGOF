@@ -433,7 +433,7 @@ describe.skipIf(!temBanco)('solicitações (integração, banco real)', () => {
       );
     });
 
-    it('supervisor reatribui só para analista ou supervisor da própria empresa', async () => {
+    it('supervisor e analista alocam só para analista ou supervisor da própria empresa', async () => {
       const criada = await abrir();
       const supervisor = await como('SUPERVISOR');
 
@@ -459,12 +459,54 @@ describe.skipIf(!temBanco)('solicitações (integração, banco real)', () => {
       );
       expect(deOutraEmpresa.status).toBe(422);
 
-      const porAnalista = await (
-        await como('ANALISTA')
-      ).post(`/api/solicitacoes/${criada.id}/atribuir`, {
-        responsavelId: empresa.usuarios.SUPERVISOR.id,
+      // O analista também aloca (a empresa pode desligar)
+      const analista = await como('ANALISTA');
+      const porAnalista = await analista.post(
+        `/api/solicitacoes/${criada.id}/atribuir`,
+        { responsavelId: empresa.usuarios.SUPERVISOR.id },
+      );
+      expect(porAnalista.status).toBe(200);
+      expect(porAnalista.body.responsavel.id).toBe(
+        empresa.usuarios.SUPERVISOR.id,
+      );
+
+      // null devolve para a fila, sem responsável
+      const semNinguem = await analista.post(
+        `/api/solicitacoes/${criada.id}/atribuir`,
+        { responsavelId: null },
+      );
+      expect(semNinguem.body.responsavel).toBeNull();
+      const detalhe = await analista.get(`/api/solicitacoes/${criada.id}`);
+      expect(detalhe.body.pode.atribuir).toBe(true);
+      expect(detalhe.body.historico.at(-1).observacao).toMatch(/ninguém/);
+
+      await prisma.empresa.update({
+        where: { id: empresa.id },
+        data: { analistaAtribui: false },
       });
-      expect(porAnalista.status).toBe(403);
+      try {
+        const barrado = await analista.post(
+          `/api/solicitacoes/${criada.id}/atribuir`,
+          { responsavelId: empresa.usuarios.ANALISTA.id },
+        );
+        expect(barrado.status).toBe(403);
+        expect(
+          (await analista.get(`/api/solicitacoes/${criada.id}`)).body.pode
+            .atribuir,
+        ).toBe(false);
+      } finally {
+        await prisma.empresa.update({
+          where: { id: empresa.id },
+          data: { analistaAtribui: true },
+        });
+      }
+
+      const porSolicitante = await (
+        await como('SOLICITANTE')
+      ).post(`/api/solicitacoes/${criada.id}/atribuir`, {
+        responsavelId: empresa.usuarios.ANALISTA.id,
+      });
+      expect(porSolicitante.status).toBe(403);
     });
 
     it('comentário interno não aparece para o solicitante', async () => {

@@ -13,7 +13,10 @@ import {
 export interface ConfigDeAutenticacao {
   jwtSecret: string;
   acessoMinutos: number;
-  sessaoDias: number;
+  /** Duração máxima do login (um expediente), mesmo com renovações. */
+  sessaoHoras: number;
+  /** Sem renovar por este tempo (navegador fechado), a sessão acaba. */
+  inatividadeMinutos: number;
 }
 
 export interface Credenciais {
@@ -50,7 +53,7 @@ export const SEGUNDOS_DE_RENOVACAO_CONCORRENTE = 30;
 export const RECUPERACOES_POR_FAMILIA = 5;
 
 const MINUTO = 60_000;
-const DIA = 24 * 60 * MINUTO;
+const HORA = 60 * MINUTO;
 
 /**
  * A mesma mensagem para empresa inexistente, e-mail inexistente, senha
@@ -215,6 +218,7 @@ export class ServicoDeAutenticacao {
       sessao.familia,
       contexto,
       sucessoraDescartada !== null,
+      sessao.inicioDaFamilia,
     );
 
     // Quem substituiu quem: é o que permite reconhecer, numa próxima vez,
@@ -395,15 +399,24 @@ export class ServicoDeAutenticacao {
     });
   }
 
+  /**
+   * A sessão vence no que vier primeiro: o fim do expediente contado do
+   * login (não se estende renovando) ou um período sem uso (a tela aberta
+   * renova sozinha; navegador fechado ou computador desligado, não).
+   */
   private async abrirSessao(
     usuario: UsuarioAutenticado,
     familia: string,
     contexto: Contexto,
     recuperada = false,
+    inicioDaFamilia: Date = this.agora(),
   ): Promise<Tokens & { sessaoId: string }> {
     const sessao = gerarTokenDeSessao();
     const sessaoExpiraEm = new Date(
-      this.agora().getTime() + this.config.sessaoDias * DIA,
+      Math.min(
+        inicioDaFamilia.getTime() + this.config.sessaoHoras * HORA,
+        this.agora().getTime() + this.config.inatividadeMinutos * MINUTO,
+      ),
     );
 
     const { id } = await this.prisma.sessao.create({
@@ -413,6 +426,7 @@ export class ServicoDeAutenticacao {
         familia,
         tokenHash: hashDoToken(sessao),
         expiraEm: sessaoExpiraEm,
+        inicioDaFamilia,
         recuperada,
         ip: contexto.ip ?? null,
         userAgent: contexto.userAgent?.slice(0, 255) ?? null,
@@ -421,7 +435,7 @@ export class ServicoDeAutenticacao {
     });
 
     const acesso = await emitirTokenDeAcesso(
-      usuario,
+      { ...usuario, familia },
       this.config.jwtSecret,
       this.config.acessoMinutos,
     );

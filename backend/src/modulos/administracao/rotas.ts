@@ -72,6 +72,14 @@ const esquemaAlteracaoDaEmpresa = z
       .optional(),
     janelaDuplicidadeDias: z.number().int().min(0).max(90).optional(),
     exigirCausaAoResolver: z.boolean().optional(),
+    diasNoQuadroDepoisDeEncerrar: z.number().int().min(0).max(90).optional(),
+    minutosParaExcluirAnexo: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .optional(),
+    analistaAtribui: z.boolean().optional(),
   })
   .strict();
 

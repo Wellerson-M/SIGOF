@@ -1,3 +1,4 @@
+import type { PrismaClient } from '@prisma/client';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { Perfil } from '../dominio/status.js';
 import {
@@ -33,6 +34,62 @@ export function autenticar(jwtSecret: string): RequestHandler {
     }
 
     req.usuario = usuario;
+    next();
+  };
+}
+
+/**
+ * Rotas que não exigem a sessão viva: entrar, renovar e sair cuidam da
+ * sessão elas mesmas, e a plataforma tem o próprio cookie.
+ */
+const SEM_CONFERENCIA_DE_SESSAO = [
+  '/auth/login',
+  '/auth/renovar',
+  '/auth/sair',
+  '/plataforma',
+];
+
+/**
+ * Antes de qualquer rota da API: se veio um token de acesso, a sessão que
+ * o emitiu precisa continuar valendo (não revogada nem vencida). Assim,
+ * desativar a pessoa, trocar o e-mail dela ou ela sair em outro lugar tira
+ * o acesso no próximo clique, e não 15 minutos depois. Sem token (ou com
+ * token inválido), segue: a rota decide se precisa de login.
+ *
+ * Montada em `/api`; o caminho visto aqui é relativo a ela.
+ */
+export function conferirSessaoViva(
+  prisma: PrismaClient,
+  jwtSecret: string,
+  agora: () => Date = () => new Date(),
+): RequestHandler {
+  return async (req: Request, _res: Response, next: NextFunction) => {
+    if (SEM_CONFERENCIA_DE_SESSAO.some((rota) => req.path.startsWith(rota))) {
+      return next();
+    }
+    const token: unknown = req.cookies?.[COOKIE_ACESSO];
+    const usuario =
+      typeof token === 'string'
+        ? await verificarTokenDeAcesso(token, jwtSecret)
+        : null;
+    if (!usuario) return next();
+
+    // Token sem sessão (emitido antes desta regra): a pessoa renova
+    if (!usuario.familia) {
+      throw new ErroNaoAutenticado('Sessão expirada');
+    }
+    const viva = await prisma.sessao.findFirst({
+      where: {
+        familia: usuario.familia,
+        usuarioId: usuario.id,
+        revogadaEm: null,
+        expiraEm: { gt: agora() },
+      },
+      select: { id: true },
+    });
+    if (!viva) {
+      throw new ErroNaoAutenticado('Sessão expirada');
+    }
     next();
   };
 }

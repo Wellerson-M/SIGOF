@@ -33,8 +33,16 @@ const esquemaEnv = z
       .min(32, 'JWT_SECRET deve ter no mínimo 32 caracteres'),
     /** Vida do token de acesso. Curta: se vazar, serve por pouco tempo. */
     ACESSO_MINUTOS: z.coerce.number().int().positive().default(15),
-    /** Vida da sessão (refresh token) sem uso. */
-    SESSAO_DIAS: z.coerce.number().int().positive().default(7),
+    /**
+     * Duração máxima de um login, em horas, mesmo com a tela aberta: cobre
+     * um expediente, e no dia seguinte a pessoa entra de novo.
+     */
+    SESSAO_HORAS: z.coerce.number().int().positive().default(12),
+    /**
+     * Sem nenhum uso por este tempo (navegador fechado, computador
+     * desligado), a sessão acaba. A tela aberta se renova sozinha.
+     */
+    SESSAO_INATIVIDADE_MINUTOS: z.coerce.number().int().positive().default(120),
 
     /**
      * Origem do frontend, a única autorizada a chamar a API com cookies.

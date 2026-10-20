@@ -12,7 +12,6 @@ import { ErroNaoAutenticado, ErroNaoEncontrado } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
 import { esquemaNovaSenha } from '../auth/rotas.js';
 import {
-  HORAS_DE_SESSAO,
   verificarTokenDaPlataforma,
   type AdministradorAutenticado,
   type ServicoDaPlataforma,
@@ -129,10 +128,8 @@ export function rotasDaPlataforma(opcoes: {
   rotas.post('/entrar', limite, async (req, res) => {
     const { email: endereco, senha } = validar(esquemaEntrada, req.body);
     const token = await servico.entrar(endereco, senha, req.ip);
-    res.cookie(COOKIE_DA_PLATAFORMA, token, {
-      ...cookie,
-      maxAge: HORAS_DE_SESSAO * 3_600_000,
-    });
+    // Some ao fechar o navegador; o token vence em HORAS_DE_SESSAO
+    res.cookie(COOKIE_DA_PLATAFORMA, token, cookie);
     res.status(204).end();
   });
 

@@ -38,6 +38,7 @@ import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
 import { rotasDeSolicitacoes } from '../modulos/solicitacoes/rotas.js';
 import { ServicoDeSolicitacoes } from '../modulos/solicitacoes/servico.js';
 import { Cifra } from '../seguranca/cifra.js';
+import { conferirSessaoViva } from './autenticacao.js';
 import { protecaoCsrf } from './csrf.js';
 import { tratadorDeErros } from './tratador-de-erros.js';
 
@@ -150,10 +151,13 @@ export function criarApp(modulos?: ModulosDaApp): Express {
 
   if (modulos) {
     const { prisma, env } = modulos;
+    app.use('/api', conferirSessaoViva(prisma, env.JWT_SECRET));
+
     const servico = new ServicoDeAutenticacao(prisma, {
       jwtSecret: env.JWT_SECRET,
       acessoMinutos: env.ACESSO_MINUTOS,
-      sessaoDias: env.SESSAO_DIAS,
+      sessaoHoras: env.SESSAO_HORAS,
+      inatividadeMinutos: env.SESSAO_INATIVIDADE_MINUTOS,
     });
 
     app.use(
@@ -162,7 +166,6 @@ export function criarApp(modulos?: ModulosDaApp): Express {
         servico,
         prisma,
         jwtSecret: env.JWT_SECRET,
-        acessoMinutos: env.ACESSO_MINUTOS,
         cookieSeguro:
           env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
         ...(modulos.limiteDeLoginPorMinuto === undefined
