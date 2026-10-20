@@ -860,10 +860,7 @@ export class ServicoDeSolicitacoes {
       const agora = this.agora();
       const expediente = expedienteDaEmpresa(atual.empresa);
       const sla = this.slaDepoisDaMudanca(atual, de, para, agora, expediente);
-      if (
-        para === 'RESOLVIDO' &&
-        moduloLigado(atual.empresa, 'VERIFICACOES')
-      ) {
+      if (para === 'RESOLVIDO' && moduloLigado(atual.empresa, 'VERIFICACOES')) {
         await this.barrarSemVerificacoesObrigatorias(tx, atual);
       }
       const causa =
