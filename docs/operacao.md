@@ -36,12 +36,15 @@ Staging e produção usam **a mesma imagem Docker**: o que vai para a produção
 
 Quem opera o SIGOF (cadastra transportadoras, ativa/desativa, cria administrador de empresa) entra por **`/plataforma/entrar`**, com login próprio, separado das empresas: outra tabela (`administradores_da_plataforma`), outro cookie (`sigof_plataforma`, só em `/api/plataforma`, SameSite=Strict) e trilha própria (`eventos_da_plataforma`, sem UPDATE). O administrador da plataforma vê cadastro e números de uso, nunca o conteúdo das solicitações.
 
-Não há tela para criar o primeiro administrador da plataforma, de propósito. Ele nasce no servidor:
+Não há tela para criar o primeiro administrador da plataforma, de propósito. Ele nasce no servidor. Como a VM não tem SSH, o comando vai pelo `az vm run-command` (precisa do `az login`), do próprio computador:
 
-```sh
-cd /opt/sigof
-docker compose exec api-staging npm run plataforma:criar-admin -- --nome "Seu nome" --email voce@exemplo.com
+```bash
+az vm run-command invoke -g rg-sigof -n vm-sigof --command-id RunShellScript   --scripts "cd /opt/sigof/repo/deploy && docker compose --env-file /opt/sigof/.env exec -T api-staging npm run plataforma:criar-admin -- --nome 'Seu nome' --email voce@exemplo.com"
 ```
+
+A resposta demora cerca de um minuto e traz, no campo `message`, o e-mail e a senha provisória.
+
+O nome vai entre aspas simples dentro do script: se tiver apóstrofo (D'Ávila), escreva sem ele. Rodar o mesmo comando de novo com o mesmo e-mail gera outra senha provisória e destrava a conta, para quando a primeira se perdeu.
 
 A senha provisória aparece uma vez; no primeiro acesso ela é trocada.
 

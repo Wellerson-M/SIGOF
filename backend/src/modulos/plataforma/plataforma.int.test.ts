@@ -51,10 +51,10 @@ describe.skipIf(!temBanco)('plataforma (integração, banco real)', () => {
     prisma = conectar();
     app = criarApp({ prisma, env: envDeTeste(), limiteDeLoginPorMinuto: 1000 });
     empresa = await criarEmpresaDeTeste(prisma);
-    senhaDoAdmin = await criarAdministradorDaPlataforma(prisma, {
+    ({ senha: senhaDoAdmin } = await criarAdministradorDaPlataforma(prisma, {
       nome: 'Dono do SIGOF',
       email: emailDoAdmin,
-    });
+    }));
   });
 
   afterAll(async () => {
@@ -82,6 +82,44 @@ describe.skipIf(!temBanco)('plataforma (integração, banco real)', () => {
       .set('Cookie', cookie)
       .send(corpo);
   };
+
+  it('rodar de novo com o mesmo e-mail troca a senha provisória e destrava', async () => {
+    const email = `reenvio-${randomUUID()}@sigof.test`;
+    const primeira = await criarAdministradorDaPlataforma(prisma, {
+      nome: 'Reenvio',
+      email,
+    });
+    await prisma.administradorDaPlataforma.update({
+      where: { email },
+      data: { falhasDeLogin: 5, bloqueadoAte: new Date(Date.now() + 60_000) },
+    });
+    const segunda = await criarAdministradorDaPlataforma(prisma, {
+      nome: 'Reenvio',
+      email: email.toUpperCase(),
+    });
+    expect(primeira.novo).toBe(true);
+    expect(segunda.novo).toBe(false);
+    expect(segunda.senha).not.toBe(primeira.senha);
+
+    const velha = await request(app)
+      .post('/api/plataforma/entrar')
+      .set('Origin', FRONTEND)
+      .send({ email, senha: primeira.senha });
+    expect(velha.status).toBe(401);
+    const nova = await request(app)
+      .post('/api/plataforma/entrar')
+      .set('Origin', FRONTEND)
+      .send({ email, senha: segunda.senha });
+    expect(nova.status).toBe(204);
+
+    const admin = await prisma.administradorDaPlataforma.findUniqueOrThrow({
+      where: { email },
+    });
+    await prisma.eventoDaPlataforma.deleteMany({
+      where: { administradorId: admin.id },
+    });
+    await prisma.administradorDaPlataforma.delete({ where: { id: admin.id } });
+  });
 
   it('senha errada é recusada; a certa abre a sessão num cookie próprio', async () => {
     const errada = await request(app)
