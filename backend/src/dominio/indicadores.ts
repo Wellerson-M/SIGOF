@@ -16,7 +16,8 @@ import { indicadorDeSla, type Prioridade } from './fila.js';
 import type { Expediente } from './sla.js';
 import type { Status } from './status.js';
 
-export type Tipo = 'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/** Código do tipo (um dos do sistema ou um criado pela empresa). */
+export type Tipo = string;
 
 export interface SolicitacaoParaIndicadores {
   status: Status;
@@ -147,7 +148,6 @@ export function balancoDoMes(
 
 const MINUTO = 60_000;
 const DIA = 24 * 60 * MINUTO;
-const TIPOS: Tipo[] = ['REVERSAO', 'TROCA_PAGADOR', 'AJUSTE_FISCAL', 'OUTRO'];
 const STATUS: Status[] = [
   'NOVO',
   'EM_ANDAMENTO',
@@ -229,10 +229,13 @@ export function calcularIndicadores(
     (s) => s.slaVenceEm === null || (s.assumidaEm as Date) <= s.slaVenceEm,
   );
 
-  const porTipo = TIPOS.map((tipo) => ({
-    tipo,
-    total: abertasNoPeriodo.filter((s) => s.tipo === tipo).length,
-  }))
+  // Os tipos que aparecem nos dados (a empresa pode ter criado os seus)
+  const tipos = [...new Set(solicitacoes.map((s) => s.tipo))];
+  const porTipo = tipos
+    .map((tipo) => ({
+      tipo,
+      total: abertasNoPeriodo.filter((s) => s.tipo === tipo).length,
+    }))
     .filter((t) => t.total > 0)
     .sort((a, b) => b.total - a.total);
 
@@ -323,23 +326,24 @@ export function calcularIndicadores(
   )
     .slice(0, 8)
     .map(([nome, total]) => ({ nome, total }));
-  const tempoAteResolverPorTipo = TIPOS.map((tipo) => {
-    const daqui = resolvidasNoPeriodo.filter(
-      (s) => s.tipo === tipo && !s.registroRapido,
-    );
-    return {
-      tipo,
-      resolvidas: daqui.length,
-      minutos:
-        media(
-          daqui.map(
-            (s) =>
-              ((s.resolvidoEm as Date).getTime() - s.criadoEm.getTime()) /
-              MINUTO,
-          ),
-        ) ?? 0,
-    };
-  })
+  const tempoAteResolverPorTipo = tipos
+    .map((tipo) => {
+      const daqui = resolvidasNoPeriodo.filter(
+        (s) => s.tipo === tipo && !s.registroRapido,
+      );
+      return {
+        tipo,
+        resolvidas: daqui.length,
+        minutos:
+          media(
+            daqui.map(
+              (s) =>
+                ((s.resolvidoEm as Date).getTime() - s.criadoEm.getTime()) /
+                MINUTO,
+            ),
+          ) ?? 0,
+      };
+    })
     .filter((t) => t.resolvidas > 0)
     .sort((a, b) => b.minutos - a.minutos);
 

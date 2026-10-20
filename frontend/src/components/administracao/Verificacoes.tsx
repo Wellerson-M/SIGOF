@@ -16,7 +16,9 @@ import {
   type QuemMarca,
   type TipoDeOcorrencia,
 } from '@/lib/cadastros';
-import { NOME_DO_TIPO, TIPOS, mensagemDoErro } from '@/lib/solicitacoes';
+import { nomeDoTipo, tiposDaEmpresa } from '@/lib/configuracao';
+import { useSessao } from '@/lib/sessao';
+import { mensagemDoErro } from '@/lib/solicitacoes';
 
 interface Formulario {
   texto: string;
@@ -38,6 +40,7 @@ const VAZIO: Formulario = {
  * aparece, quem marca e se é obrigatório para resolver.
  */
 export function Verificacoes() {
+  const { usuario } = useSessao();
   const [itens, setItens] = useState<ItemDeVerificacao[] | null>(null);
   const [novo, setNovo] = useState<Formulario>(VAZIO);
   const [editando, setEditando] = useState<string | null>(null);
@@ -146,7 +149,7 @@ export function Verificacoes() {
                       {item.tipos.length === 0
                         ? 'Todos os tipos'
                         : item.tipos
-                            .map((t) => NOME_DO_TIPO[t])
+                            .map((t) => nomeDoTipo(usuario, t))
                             .join(', ')}{' '}
                       · marca: {NOME_DE_QUEM_MARCA[item.quemMarca]}
                       {item.obrigatorioParaResolver &&
@@ -192,6 +195,7 @@ function CamposDoItem({
   valor: Formulario;
   aoMudar: (valor: Formulario) => void;
 }) {
+  const { usuario } = useSessao();
   return (
     <>
       <label className={ROTULO}>
@@ -208,7 +212,7 @@ function CamposDoItem({
         <legend className="mb-1 text-sm font-medium">
           Em quais tipos (nenhum marcado = em todos)
         </legend>
-        {TIPOS.map((tipo) => (
+        {tiposDaEmpresa(usuario).map(({ tipo, nome }) => (
           <label key={tipo} className="flex items-center gap-1.5">
             <input
               type="checkbox"
@@ -222,7 +226,7 @@ function CamposDoItem({
                 })
               }
             />
-            {NOME_DO_TIPO[tipo]}
+            {nome}
           </label>
         ))}
       </fieldset>

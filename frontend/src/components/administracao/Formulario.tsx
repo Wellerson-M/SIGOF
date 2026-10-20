@@ -19,9 +19,9 @@ import {
   type Modo,
   type NomeDoCampo,
 } from '@/lib/configuracao';
+import { useSessao } from '@/lib/sessao';
 import {
   NOME_DA_PRIORIDADE,
-  NOME_DO_TIPO,
   PRIORIDADES,
   mensagemDoErro,
   type Tipo,
@@ -45,6 +45,8 @@ const MODOS: Modo[] = ['OCULTO', 'OPCIONAL', 'OBRIGATORIO'];
 const DICA: Partial<Record<NomeDoCampo, string>> = {
   filial:
     'Opcional: se ficar em branco, quem abre recebe um aviso antes de confirmar.',
+  motivo:
+    'Não aparece: o formulário não pede motivo. Opcional ou obrigatório: quem abre escolhe um da lista abaixo.',
   prioridade:
     'Escondida: toda solicitação nasce com a prioridade padrão (a equipe muda depois).',
   anexos: 'Obrigatório: a tela não deixa abrir sem pelo menos um arquivo.',
@@ -59,11 +61,13 @@ function motivosDoTexto(texto: string): string[] {
 }
 
 /**
- * O formulário de abertura de cada tipo de ocorrência: que campos
- * aparecem, quais são obrigatórios, o que já vem preenchido e os motivos
- * para escolher (ex.: os motivos da reversão).
+ * Os tipos de ocorrência da empresa e o formulário de abertura de cada um:
+ * nome, que campos aparecem, quais são obrigatórios, o que já vem
+ * preenchido e os motivos para escolher (ex.: os motivos da reversão). A
+ * empresa também cria os seus tipos.
  */
 export function Formulario() {
+  const { atualizar } = useSessao();
   const [formulario, setFormulario] = useState<FormularioDaEmpresa | null>(
     null,
   );
@@ -73,6 +77,7 @@ export function Formulario() {
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [nomeDoNovo, setNomeDoNovo] = useState('');
 
   /** O rascunho recomeça do que está salvo para o tipo. */
   function editarTipo(config: ConfiguracaoDoTipo) {
@@ -134,6 +139,57 @@ export function Formulario() {
     );
     editarTipo(config);
     setSalvo(mensagem);
+    // Os nomes dos tipos aparecem no quadro, na lista e nos filtros
+    void atualizar().catch(() => undefined);
+  }
+
+  /** Trava a tela enquanto fala com a API e mostra o erro, se houver. */
+  async function executar(acao: () => Promise<void>) {
+    setSalvando(true);
+    setErro(null);
+    setSalvo(null);
+    try {
+      await acao();
+    } catch (falha) {
+      setErro(mensagemDoErro(falha));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function criar() {
+    void executar(async () => {
+      const criado = await configuracao.criarTipo(nomeDoNovo);
+      setFormulario((atual) =>
+        atual ? { ...atual, tipos: [...atual.tipos, criado] } : atual,
+      );
+      setNomeDoNovo('');
+      guardar(
+        criado,
+        'Tipo criado. Ajuste o formulário dele e salve; ele já aparece para quem abre.',
+      );
+    });
+  }
+
+  function excluir() {
+    if (!rascunho) return;
+    if (
+      !window.confirm(
+        `Excluir o tipo “${rascunho.nome}”? Só dá para excluir tipo que nunca foi usado.`,
+      )
+    ) {
+      return;
+    }
+    void executar(async () => {
+      await configuracao.excluirTipo(tipo);
+      const restantes = formulario?.tipos.filter((t) => t.tipo !== tipo) ?? [];
+      setFormulario((atual) =>
+        atual ? { ...atual, tipos: restantes } : atual,
+      );
+      if (restantes[0]) editarTipo(restantes[0]);
+      setSalvo('Tipo excluído.');
+      void atualizar().catch(() => undefined);
+    });
   }
 
   async function salvar() {
@@ -148,6 +204,7 @@ export function Formulario() {
         : { modo: rascunho.campos.motivo.modo };
       guardar(
         await configuracao.alterarFormulario(tipo, {
+          nome: rascunho.nome,
           ativo: rascunho.ativo,
           exigirDocumento: rascunho.exigirDocumento,
           campos: { ...rascunho.campos, motivo },
@@ -191,9 +248,10 @@ export function Formulario() {
   return (
     <div className="flex max-w-4xl flex-col gap-4">
       <p className="text-sm text-texto-suave">
-        Monte o formulário de abertura de cada tipo de ocorrência. O que já vem
-        preenchido pode ser trocado por quem abre; o que fica escondido não é
-        pedido. Vale para as próximas solicitações.
+        Dê nome aos tipos de ocorrência, crie os da sua empresa e monte o
+        formulário de abertura de cada um. O que já vem preenchido pode ser
+        trocado por quem abre; o que fica escondido não é pedido. Vale para as
+        próximas solicitações.
       </p>
       {!formulario.personalizavel && (
         <Aviso>
@@ -220,16 +278,56 @@ export function Formulario() {
             }}
             className="h-8 rounded-md border border-borda px-3 text-sm text-texto aria-selected:border-primaria aria-selected:bg-primaria aria-selected:text-sobre-primaria"
           >
-            {NOME_DO_TIPO[t.tipo]}
+            {t.nome}
             {!t.ativo && ' (desligado)'}
           </button>
         ))}
       </div>
 
+      {formulario.personalizavel && (
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            criar();
+          }}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <label className={ROTULO}>
+            <span>Novo tipo de ocorrência</span>
+            <input
+              value={nomeDoNovo}
+              onChange={(evento) => setNomeDoNovo(evento.target.value)}
+              maxLength={60}
+              placeholder="Ex.: Cobrança em duplicidade"
+              className={`${CAMPO} w-72`}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={salvando || nomeDoNovo.trim().length < 2}
+            className={BOTAO_SECUNDARIO}
+          >
+            Criar tipo
+          </button>
+        </form>
+      )}
+
       <fieldset
         disabled={!editavel}
         className="flex flex-col gap-4 rounded-md border border-borda bg-superficie p-4"
       >
+        <label className={ROTULO}>
+          <span>Nome do tipo</span>
+          <input
+            value={rascunho.nome}
+            onChange={(evento) => {
+              setSalvo(null);
+              setRascunho({ ...rascunho, nome: evento.target.value });
+            }}
+            maxLength={60}
+            className={`${CAMPO} w-72`}
+          />
+        </label>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <label className="flex items-center gap-2 text-sm text-texto">
             <input
@@ -341,14 +439,25 @@ export function Formulario() {
           >
             {salvando ? 'Salvando…' : 'Salvar formulário'}
           </button>
-          <button
-            type="button"
-            disabled={salvando}
-            onClick={() => void restaurar()}
-            className={BOTAO_SECUNDARIO}
-          >
-            Voltar ao padrão
-          </button>
+          {rascunho.doSistema ? (
+            <button
+              type="button"
+              disabled={salvando}
+              onClick={() => void restaurar()}
+              className={BOTAO_SECUNDARIO}
+            >
+              Voltar ao padrão
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={salvando}
+              onClick={excluir}
+              className={BOTAO_SECUNDARIO}
+            >
+              Excluir tipo
+            </button>
+          )}
         </div>
       )}
     </div>

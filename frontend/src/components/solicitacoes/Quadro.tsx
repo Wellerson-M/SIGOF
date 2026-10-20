@@ -10,13 +10,12 @@ import {
 } from 'react';
 import { flushSync } from 'react-dom';
 import { ErroDaApi } from '@/lib/api';
-import { usaModulo } from '@/lib/configuracao';
+import { usaModulo, useNomeDoTipo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 import {
   ACAO_PARA,
   COLUNAS,
   NOME_DO_STATUS,
-  NOME_DO_TIPO,
   PEDE_OBSERVACAO,
   api,
   dataCurta,
@@ -426,6 +425,7 @@ function Cartao({
   aoComecar: () => void;
   aoTerminar: () => void;
 }) {
+  const nomeDoTipo = useNomeDoTipo();
   const movel = item.acoes.length > 0;
   const docs = documentos(item);
 
@@ -455,7 +455,7 @@ function Cartao({
         <EtiquetaDePrioridade prioridade={item.prioridade} />
       </div>
       <p className="text-xs font-medium text-texto-suave">
-        {NOME_DO_TIPO[item.tipo]}
+        {nomeDoTipo(item.tipo)}
         {docs && ` · ${docs}`}
       </p>
       <p className="line-clamp-2 text-sm text-texto">{item.descricao}</p>

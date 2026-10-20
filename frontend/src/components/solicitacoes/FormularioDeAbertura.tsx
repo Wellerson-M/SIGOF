@@ -15,7 +15,6 @@ import { usePadroesDoTipo } from './Padroes';
 import {
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
-  NOME_DO_TIPO,
   PRIORIDADES,
   ANEXO,
   TIPOS,
@@ -255,7 +254,7 @@ export function FormularioDeAbertura() {
           >
             {tiposAtivos.map((t) => (
               <option key={t} value={t}>
-                {NOME_DO_TIPO[t]}
+                {formulario.doTipo(t).nome}
               </option>
             ))}
           </select>

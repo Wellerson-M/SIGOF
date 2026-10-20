@@ -26,6 +26,8 @@ export interface UsuarioLogado {
     modulos?: Modulo[];
     /** Encerradas ficam no quadro por estes dias. */
     diasNoQuadroDepoisDeEncerrar?: number;
+    /** Todos os tipos que a empresa já teve, com o nome de agora. */
+    tipos?: { tipo: string; nome: string }[];
   };
 }
 

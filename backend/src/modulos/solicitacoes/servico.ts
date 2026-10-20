@@ -41,8 +41,8 @@ import type { ServicoDeAvisos } from '../avisos/avisos.js';
 import type { Ocorrido } from '../avisos/modelos.js';
 import { configuracaoDoTipo } from '../configuracao/servico.js';
 
-export type TipoOcorrencia =
-  'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/** Código do tipo (um dos do sistema ou um criado pela empresa). */
+export type TipoOcorrencia = string;
 
 export interface DadosDeAbertura {
   tipo: TipoOcorrencia;
@@ -433,6 +433,9 @@ export class ServicoDeSolicitacoes {
       // O formulário do tipo, como a empresa configurou: campo escondido
       // é ignorado (ou recebe o valor padrão), o resto é conferido
       const config = await configuracaoDoTipo(tx, empresa, dados.tipo);
+      if (!config) {
+        throw new ErroDeRegraDeNegocio('Escolha o tipo de ocorrência');
+      }
       if (!config.ativo) {
         throw new ErroDeRegraDeNegocio(
           'Este tipo de ocorrência está desativado na sua empresa',

@@ -16,6 +16,7 @@ import {
 import { ErroNaoAutenticado, ErroNaoEncontrado } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
 import { modulosLigados } from '../../dominio/modulos.js';
+import { tiposConhecidos } from '../configuracao/servico.js';
 import type { ServicoDeAutenticacao, Tokens } from './servico.js';
 
 /**
@@ -197,6 +198,8 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
       empresa: {
         ...empresa,
         modulos: modulosLigados({ modulosLiberados, modulosAtivos }),
+        // Nomes dos tipos (a empresa renomeia e cria os seus)
+        tipos: await tiposConhecidos(prisma, empresaId),
       },
     });
   });

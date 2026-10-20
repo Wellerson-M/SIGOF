@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
+import { nomeDoTipo } from '../../dominio/formulario.js';
 import { moduloLigado } from '../../dominio/modulos.js';
+import { nomesDosTipos } from '../configuracao/servico.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
 import {
   linhaDaNotificacao,
@@ -187,6 +189,7 @@ export class ServicoDeAvisos {
         id: s.id,
         protocolo: s.protocolo,
         tipo: s.tipo,
+        tipoNome: nomeDoTipo(s.tipo, await nomesDosTipos(tx, s.empresaId)),
         cte: s.cte,
         nf: s.nf,
         ctes: s.ctes,

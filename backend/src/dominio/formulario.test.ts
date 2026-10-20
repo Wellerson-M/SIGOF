@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  codigoParaTipo,
   configuracaoPadrao,
   mesclarConfiguracao,
+  nomeDoTipo,
   problemaNaAbertura,
   type DadosDoFormulario,
 } from './formulario.js';
@@ -135,5 +137,39 @@ describe('módulos', () => {
       'FILIAIS',
       'EMAIL',
     ]);
+  });
+});
+
+describe('tipos criados pela empresa', () => {
+  it('o código sai do nome, sem acento, e não repete', () => {
+    expect(codigoParaTipo('Cobrança em duplicidade', [])).toBe(
+      'COBRANCA_EM_DUPLICIDADE',
+    );
+    expect(codigoParaTipo('Avaria', ['AVARIA', 'AVARIA_2'])).toBe('AVARIA_3');
+    // Nunca o código de um tipo do sistema
+    expect(codigoParaTipo('Reversão', [])).toBe('REVERSAO_2');
+    expect(codigoParaTipo('!!!', [])).toBe('TIPO');
+  });
+
+  it('o nome: o que a empresa deu, o do sistema ou o código', () => {
+    const nomes = new Map([['AJUSTE_FISCAL', 'Correção fiscal']]);
+    expect(nomeDoTipo('AJUSTE_FISCAL', nomes)).toBe('Correção fiscal');
+    expect(nomeDoTipo('REVERSAO', nomes)).toBe('Reversão');
+    expect(nomeDoTipo('SUMIU')).toBe('SUMIU');
+  });
+
+  it('tipo novo começa com o formulário comum', () => {
+    const config = configuracaoPadrao('AVARIA');
+    expect(config).toMatchObject({ doSistema: false, exigirDocumento: true });
+    expect(config.campos.motivo.modo).toBe('OCULTO');
+    expect(
+      mesclarConfiguracao('AVARIA', {
+        nome: 'Avaria na entrega',
+        ativo: true,
+        exigirDocumento: null,
+        campos: {},
+        motivos: [],
+      }).nome,
+    ).toBe('Avaria na entrega');
   });
 });
