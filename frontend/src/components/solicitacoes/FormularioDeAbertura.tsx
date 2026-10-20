@@ -4,10 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ErroDaApi } from '@/lib/api';
 import { cadastros, hashDoArquivo, type Filial } from '@/lib/cadastros';
+import { usaModulo, useFormulario } from '@/lib/configuracao';
 import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
 import { MarcacoesDaAbertura, useItensDaAbertura } from './Verificacoes';
 import { useSessao } from '@/lib/sessao';
 import { enviarAnexos } from './Anexos';
+import { AvisoSemFilial, textoDosDocumentos } from './AvisoSemFilial';
+import { usePadroesDoTipo } from './Padroes';
 import {
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
@@ -41,14 +44,31 @@ function descreverMotivo(d: Duplicidade): string {
   return `${d.documento === 'CTE' ? 'CTe' : 'NF'} ${d.valor}`;
 }
 export function FormularioDeAbertura() {
-  const [tipo, setTipo] = useState<Tipo>('REVERSAO');
+  const formulario = useFormulario();
+  const tiposAtivos =
+    formulario.tipos && formulario.tipos.length > 0
+      ? formulario.tipos.map((t) => t.tipo)
+      : TIPOS;
+  const [tipoEscolhido, setTipo] = useState<Tipo>('REVERSAO');
+  // Se o tipo escolhido foi desligado pela empresa, fica o primeiro ativo
+  const tipo = tiposAtivos.includes(tipoEscolhido)
+    ? tipoEscolhido
+    : tiposAtivos[0]!;
+  const config = formulario.doTipo(tipo);
+  const aparece = (campo: keyof typeof config.campos) =>
+    config.campos[campo].modo !== 'OCULTO';
   const [cte, setCte] = useState('');
   const [nf, setNf] = useState('');
   const [fatura, setFatura] = useState('');
   const [marcados, setMarcados] = useState<string[]>([]);
   const { usuario } = useSessao();
-  const itensDaAbertura = useItensDaAbertura(tipo, usuario.perfil);
+  const itensDaAbertura = useItensDaAbertura(
+    tipo,
+    usuario.perfil,
+    usaModulo(usuario, 'VERIFICACOES'),
+  );
   const [pagadorCorreto, setPagadorCorreto] = useState('');
+  const [motivo, setMotivo] = useState('');
   const [prioridade, setPrioridade] = useState<Prioridade>('MEDIA');
   const [descricao, setDescricao] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -59,10 +79,24 @@ export function FormularioDeAbertura() {
   const [errosDosAnexos, setErrosDosAnexos] = useState<string[]>([]);
   const [filiais, setFiliais] = useState<Filial[]>([]);
   const [filialId, setFilialId] = useState('');
+  const [avisoSemFilial, setAvisoSemFilial] = useState(false);
+  const pedeFilial = aparece('filial') && filiais.length > 0;
+
+  usePadroesDoTipo(config, {
+    pagadorCorreto: { valor: pagadorCorreto, mudar: setPagadorCorreto },
+    motivo: { valor: motivo, mudar: setMotivo },
+    prioridade: {
+      valor: prioridade,
+      mudar: (valor) => setPrioridade(valor as Prioridade),
+    },
+    descricao: { valor: descricao, mudar: setDescricao },
+  });
 
   // Sem filiais cadastradas, o campo nem aparece; se a lista falhar, a API
   // ainda confere e responde com a mensagem certa
+  const usaFiliais = usaModulo(usuario, 'FILIAIS');
   useEffect(() => {
+    if (!usaFiliais) return;
     let cancelado = false;
     cadastros.filiais().then(
       (lista) => {
@@ -75,25 +109,40 @@ export function FormularioDeAbertura() {
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [usaFiliais]);
 
-  async function enviar(confirmarDuplicidade = false) {
-    setEnviando(true);
+  async function enviar(confirmarDuplicidade = false, semFilial = false) {
     setErro(null);
+    if (config.campos.anexos.modo === 'OBRIGATORIO' && arquivos.length === 0) {
+      setErro('Anexe pelo menos um arquivo');
+      return;
+    }
+    // Filial opcional em branco: avisa antes, porque sem ela a duplicidade
+    // não separa documentos de mesmo número de filiais diferentes
+    if (pedeFilial && !filialId && !semFilial) {
+      setAvisoSemFilial(true);
+      return;
+    }
+    setAvisoSemFilial(false);
+    setEnviando(true);
     const anexaveis = arquivos.slice(0, ANEXO.porSolicitacao);
     const hashes = (await Promise.all(anexaveis.map(hashDoArquivo))).filter(
       (h): h is string => h !== null,
     );
     const dados: DadosDeAbertura = {
       tipo,
-      ...documentosDoFormulario(cte, nf, fatura),
+      ...documentosDoFormulario(
+        aparece('cte') ? cte : '',
+        aparece('nf') ? nf : '',
+        aparece('fatura') ? fatura : '',
+      ),
       ...(marcadosValidos(marcados, itensDaAbertura).length > 0
         ? { verificacoes: marcadosValidos(marcados, itensDaAbertura) }
         : {}),
-      pagadorCorreto:
-        tipo === 'TROCA_PAGADOR'
-          ? pagadorCorreto.trim() || undefined
-          : undefined,
+      pagadorCorreto: aparece('pagadorCorreto')
+        ? pagadorCorreto.trim() || undefined
+        : undefined,
+      motivo: aparece('motivo') ? motivo || undefined : undefined,
       descricao,
       prioridade,
       filialId: filialId || undefined,
@@ -133,9 +182,12 @@ export function FormularioDeAbertura() {
     setNf('');
     setFatura('');
     setMarcados([]);
-    setPagadorCorreto('');
-    setDescricao('');
-    setPrioridade('MEDIA');
+    setPagadorCorreto(config.campos.pagadorCorreto.padrao ?? '');
+    setMotivo(config.campos.motivo.padrao ?? '');
+    setDescricao(config.campos.descricao.padrao ?? '');
+    setPrioridade(
+      (config.campos.prioridade.padrao as Prioridade | undefined) ?? 'MEDIA',
+    );
     setArquivos([]);
     setErrosDosAnexos([]);
     setCriada(null);
@@ -200,38 +252,47 @@ export function FormularioDeAbertura() {
             onChange={(evento) => setTipo(evento.target.value as Tipo)}
             className={CAMPO}
           >
-            {TIPOS.map((t) => (
+            {tiposAtivos.map((t) => (
               <option key={t} value={t}>
                 {NOME_DO_TIPO[t]}
               </option>
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-          Prioridade
-          <select
-            value={prioridade}
-            onChange={(evento) =>
-              setPrioridade(evento.target.value as Prioridade)
-            }
-            className={CAMPO}
-          >
-            {PRIORIDADES.map((p) => (
-              <option key={p} value={p}>
-                {NOME_DA_PRIORIDADE[p]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {filiais.length > 0 && (
+        {aparece('prioridade') && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+            Prioridade
+            <select
+              value={prioridade}
+              onChange={(evento) =>
+                setPrioridade(evento.target.value as Prioridade)
+              }
+              className={CAMPO}
+            >
+              {PRIORIDADES.map((p) => (
+                <option key={p} value={p}>
+                  {NOME_DA_PRIORIDADE[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {pedeFilial && (
           <label className="flex flex-col gap-1.5 text-sm font-medium text-texto sm:col-span-2">
             Filial que emitiu o documento
             <select
               value={filialId}
-              onChange={(evento) => setFilialId(evento.target.value)}
+              onChange={(evento) => {
+                setFilialId(evento.target.value);
+                setAvisoSemFilial(false);
+              }}
               className={CAMPO}
             >
-              <option value="">Escolha a filial</option>
+              <option value="">
+                {config.campos.filial.modo === 'OBRIGATORIO'
+                  ? 'Escolha a filial'
+                  : 'Escolha a filial (opcional)'}
+              </option>
               {filiais.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.nome}
@@ -240,41 +301,68 @@ export function FormularioDeAbertura() {
             </select>
           </label>
         )}
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-          Número do CTe
-          <textarea
-            value={cte}
-            onChange={(evento) => setCte(evento.target.value)}
-            rows={1}
-            maxLength={20000}
-            placeholder="Número ou chave; vários, um por linha"
-            className={`${CAMPO} min-h-10 resize-y py-2`}
-          />
-          <Contagem valor={cte} nome="CTe" />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-          Número da NF
-          <textarea
-            value={nf}
-            onChange={(evento) => setNf(evento.target.value)}
-            rows={1}
-            maxLength={20000}
-            placeholder="Número ou chave; vários, um por linha"
-            className={`${CAMPO} min-h-10 resize-y py-2`}
-          />
-          <Contagem valor={nf} nome="NF" />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-          Fatura
-          <input
-            value={fatura}
-            onChange={(evento) => setFatura(evento.target.value)}
-            maxLength={40}
-            placeholder="Quando é a fatura inteira"
-            className={CAMPO}
-          />
-        </label>
-        {tipo === 'TROCA_PAGADOR' && (
+        {aparece('cte') && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+            Número do CTe
+            <textarea
+              value={cte}
+              onChange={(evento) => setCte(evento.target.value)}
+              rows={1}
+              maxLength={20000}
+              placeholder="Número ou chave; vários, um por linha"
+              className={`${CAMPO} min-h-10 resize-y py-2`}
+            />
+            <Contagem valor={cte} nome="CTe" />
+          </label>
+        )}
+        {aparece('nf') && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+            Número da NF
+            <textarea
+              value={nf}
+              onChange={(evento) => setNf(evento.target.value)}
+              rows={1}
+              maxLength={20000}
+              placeholder="Número ou chave; vários, um por linha"
+              className={`${CAMPO} min-h-10 resize-y py-2`}
+            />
+            <Contagem valor={nf} nome="NF" />
+          </label>
+        )}
+        {aparece('fatura') && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+            Fatura
+            <input
+              value={fatura}
+              onChange={(evento) => setFatura(evento.target.value)}
+              maxLength={40}
+              placeholder="Quando é a fatura inteira"
+              className={CAMPO}
+            />
+          </label>
+        )}
+        {aparece('motivo') && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+            Motivo
+            <select
+              value={motivo}
+              onChange={(evento) => setMotivo(evento.target.value)}
+              className={CAMPO}
+            >
+              <option value="">
+                {config.campos.motivo.modo === 'OBRIGATORIO'
+                  ? 'Escolha o motivo'
+                  : 'Escolha o motivo (opcional)'}
+              </option>
+              {config.motivos.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {aparece('pagadorCorreto') && (
           <label className="flex flex-col gap-1.5 text-sm font-medium text-texto sm:col-span-2">
             Pagador correto
             <input
@@ -288,8 +376,7 @@ export function FormularioDeAbertura() {
         )}
       </div>
       <p className="-mt-2 text-xs text-texto-suave">
-        Informe o CTe, a NF ou a fatura (só “Outro” pode ficar sem documento).
-        Fatura inteira? Cole os CTe, um por linha.
+        {textoDosDocumentos(config)}
       </p>
 
       <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
@@ -311,20 +398,24 @@ export function FormularioDeAbertura() {
           aoMudar={setMarcados}
         />
       </div>
-      <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-        Anexos (opcional)
-        <input
-          type="file"
-          multiple
-          accept={ANEXO.aceitos}
-          onChange={(evento) => setArquivos([...(evento.target.files ?? [])])}
-          className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
-        />
-        <span className="text-xs font-normal text-texto-suave">
-          PDF, imagem ou XML da nota, até 5 MB cada e no máximo{' '}
-          {ANEXO.porSolicitacao} arquivos.
-        </span>
-      </label>
+      {aparece('anexos') && (
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
+          {config.campos.anexos.modo === 'OBRIGATORIO'
+            ? 'Anexos'
+            : 'Anexos (opcional)'}
+          <input
+            type="file"
+            multiple
+            accept={ANEXO.aceitos}
+            onChange={(evento) => setArquivos([...(evento.target.files ?? [])])}
+            className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
+          />
+          <span className="text-xs font-normal text-texto-suave">
+            PDF, imagem ou XML da nota, até 5 MB cada e no máximo{' '}
+            {ANEXO.porSolicitacao} arquivos.
+          </span>
+        </label>
+      )}
 
       {erro && (
         <p
@@ -335,7 +426,14 @@ export function FormularioDeAbertura() {
         </p>
       )}
 
-      {duplicidades ? (
+      {avisoSemFilial ? (
+        <AvisoSemFilial
+          acao="Abrir sem filial"
+          enviando={enviando}
+          aoConfirmar={() => void enviar(false, true)}
+          aoVoltar={() => setAvisoSemFilial(false)}
+        />
+      ) : duplicidades ? (
         <div
           role="alert"
           className="flex flex-col gap-3 rounded-md border border-atencao/50 bg-atencao/10 p-4"
@@ -365,7 +463,7 @@ export function FormularioDeAbertura() {
             <button
               type="button"
               disabled={enviando}
-              onClick={() => void enviar(true)}
+              onClick={() => void enviar(true, true)}
               className="h-9 rounded-md bg-primaria px-4 text-sm font-semibold text-sobre-primaria disabled:opacity-50"
             >
               Abrir mesmo assim

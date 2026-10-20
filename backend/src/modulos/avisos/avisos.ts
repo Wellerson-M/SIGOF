@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
+import { moduloLigado } from '../../dominio/modulos.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
 import {
   linhaDaNotificacao,
@@ -33,14 +34,30 @@ export const EVENTOS_DE_EMAIL = [
   'RESPONSAVEL',
 ] as const;
 
-/** Quem recebe e-mail: a empresa configurou e ligou o envio. */
+/**
+ * Quem recebe e-mail: a empresa configurou e ligou o envio (e, quando os
+ * módulos vêm junto, o módulo de e-mail está em uso).
+ */
 export function emailConfigurado(empresa: {
   emailAtivo: boolean;
   smtpServidor: string | null;
   smtpUsuario: string | null;
   smtpSenhaCifrada: string | null;
+  modulosLiberados?: string[];
+  modulosAtivos?: string[];
 }): boolean {
+  const moduloEmUso =
+    empresa.modulosLiberados === undefined ||
+    empresa.modulosAtivos === undefined ||
+    moduloLigado(
+      {
+        modulosLiberados: empresa.modulosLiberados,
+        modulosAtivos: empresa.modulosAtivos,
+      },
+      'EMAIL',
+    );
   return Boolean(
+    moduloEmUso &&
     empresa.emailAtivo &&
     empresa.smtpServidor &&
     empresa.smtpUsuario &&

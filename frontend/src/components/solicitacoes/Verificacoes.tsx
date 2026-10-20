@@ -18,9 +18,12 @@ import {
 export function useItensDaAbertura(
   tipo: TipoDeOcorrencia,
   perfil: Perfil,
+  /** Módulo de verificações em uso na empresa. */
+  ligado = true,
 ): ItemDeVerificacao[] {
   const [itens, setItens] = useState<ItemDeVerificacao[]>([]);
   useEffect(() => {
+    if (!ligado) return;
     let cancelado = false;
     cadastros.verificacoes().then(
       (lista) => {
@@ -31,7 +34,8 @@ export function useItensDaAbertura(
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [ligado]);
+  if (!ligado) return [];
   return itens.filter((item) => marcaNaAbertura(item, tipo, perfil));
 }
 

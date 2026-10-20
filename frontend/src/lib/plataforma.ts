@@ -4,6 +4,7 @@
  * 401 significa entrar de novo na tela da plataforma.
  */
 import { ErroDaApi } from './api';
+import type { Modulo } from './configuracao';
 
 export interface AdministradorDaPlataforma {
   id: string;
@@ -23,6 +24,8 @@ export interface EmpresaNaPlataforma {
   solicitacoesEmAberto: number;
   solicitacoesNoMes: number;
   ultimoAcessoEm: string | null;
+  /** O que a transportadora pode usar (ela liga o que quiser destes). */
+  modulosLiberados?: Modulo[];
 }
 
 export interface NovaEmpresa {
@@ -99,7 +102,11 @@ export const plataforma = {
     ),
   alterarEmpresa: (
     id: string,
-    alteracao: { ativa?: boolean; razaoSocial?: string },
+    alteracao: {
+      ativa?: boolean;
+      razaoSocial?: string;
+      modulosLiberados?: Modulo[];
+    },
   ) =>
     chamar<EmpresaNaPlataforma>(`/empresas/${id}`, {
       method: 'PATCH',

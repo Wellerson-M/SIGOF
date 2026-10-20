@@ -7,6 +7,7 @@ import {
 } from 'express';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
+import { MODULOS } from '../../dominio/modulos.js';
 import { ErroNaoAutenticado, ErroNaoEncontrado } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
 import { esquemaNovaSenha } from '../auth/rotas.js';
@@ -56,6 +57,10 @@ const esquemaAlteracao = z
   .object({
     razaoSocial: z.string().trim().min(2).max(200).optional(),
     ativa: z.boolean().optional(),
+    modulosLiberados: z
+      .array(z.enum(MODULOS, { message: 'Módulo desconhecido' }))
+      .max(30)
+      .optional(),
   })
   .strict();
 const esquemaNovoAdmin = z.object({

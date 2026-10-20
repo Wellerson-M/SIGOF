@@ -201,7 +201,8 @@ describe.skipIf(!temBanco)('solicitações (integração, banco real)', () => {
         tipo: 'OUTRO',
         descricao: 'curta',
       });
-      expect(curta.status).toBe(400);
+      expect(curta.status).toBe(422);
+      expect(curta.body.erro).toMatch(/10 caracteres/);
     });
 
     it('administrador não abre solicitação', async () => {

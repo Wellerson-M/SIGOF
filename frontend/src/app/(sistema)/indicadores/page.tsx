@@ -10,6 +10,7 @@ import {
   type Indicadores,
   type Periodo,
 } from '@/lib/indicadores';
+import { usaModulo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 import {
   COLUNAS,
@@ -226,7 +227,7 @@ export default function PaginaDeIndicadores() {
             />
           </Cartao>
 
-          <BalancoDoMes />
+          {usaModulo(usuario, 'BALANCO') && <BalancoDoMes />}
 
           <Cartao>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">

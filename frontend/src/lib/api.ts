@@ -5,6 +5,7 @@
  * cookies de sessão vão sozinhos em cada pedido: o JavaScript da página
  * nunca vê nem guarda token nenhum.
  */
+import type { Modulo } from './configuracao';
 
 export type Perfil = 'SOLICITANTE' | 'ANALISTA' | 'SUPERVISOR' | 'ADMIN';
 
@@ -21,6 +22,8 @@ export interface UsuarioLogado {
     slug: string;
     /** Ao resolver, a causa do erro é obrigatória (a empresa decide). */
     exigirCausaAoResolver?: boolean;
+    /** Módulos em uso (liberados pela plataforma e ligados pela empresa). */
+    modulos?: Modulo[];
   };
 }
 

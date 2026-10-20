@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormularioDeRegistro } from '@/components/solicitacoes/FormularioDeRegistro';
+import { usaModulo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 
 export default function PaginaDeRegistroRapido() {
@@ -23,7 +24,11 @@ export default function PaginaDeRegistroRapido() {
           direto como resolvida, sem prazo e sem avisar ninguém.
         </p>
       </div>
-      {podeRegistrar ? (
+      {!usaModulo(usuario, 'REGISTRO_RAPIDO') ? (
+        <p className="text-sm text-texto">
+          O registro rápido está desligado na sua empresa.
+        </p>
+      ) : podeRegistrar ? (
         <FormularioDeRegistro />
       ) : (
         <p className="text-sm text-texto">

@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest';
+import {
+  configuracaoPadrao,
+  mesclarConfiguracao,
+  problemaNaAbertura,
+  type DadosDoFormulario,
+} from './formulario.js';
+import { moduloLigado, modulosLigados, normalizarModulos } from './modulos.js';
+
+const vazio: DadosDoFormulario = {
+  ctes: [],
+  nfs: [],
+  fatura: null,
+  filialId: null,
+  pagadorCorreto: null,
+  motivo: null,
+  descricao: 'Descrição com tamanho suficiente.',
+};
+
+describe('formulário de abertura', () => {
+  it('o padrão mantém as regras de antes (documento e pagador)', () => {
+    expect(problemaNaAbertura(configuracaoPadrao('REVERSAO'), vazio)).toMatch(
+      /CTe, a NF ou a fatura/,
+    );
+    expect(
+      problemaNaAbertura(configuracaoPadrao('TROCA_PAGADOR'), {
+        ...vazio,
+        ctes: ['1'],
+      }),
+    ).toMatch(/pagador/);
+    expect(problemaNaAbertura(configuracaoPadrao('OUTRO'), vazio)).toBeNull();
+  });
+
+  it('a filial começa opcional e a reversão traz motivos prontos', () => {
+    const reversao = configuracaoPadrao('REVERSAO');
+    expect(reversao.campos.filial.modo).toBe('OPCIONAL');
+    expect(reversao.campos.motivo.modo).toBe('OPCIONAL');
+    expect(reversao.motivos.length).toBeGreaterThan(0);
+  });
+
+  it('descrição curta: 10 caracteres na abertura, 3 no registro rápido', () => {
+    const config = configuracaoPadrao('OUTRO');
+    expect(
+      problemaNaAbertura(config, { ...vazio, descricao: 'curta' }),
+    ).toMatch(/10 caracteres/);
+    expect(
+      problemaNaAbertura(config, { ...vazio, descricao: 'curta' }, true),
+    ).toBeNull();
+    expect(
+      problemaNaAbertura(config, { ...vazio, descricao: 'oi' }, true),
+    ).toMatch(/Diga/);
+  });
+
+  it('campo escondido não é cobrado nem conta como documento', () => {
+    const config = mesclarConfiguracao('REVERSAO', {
+      ativo: true,
+      exigirDocumento: true,
+      campos: { cte: { modo: 'OCULTO' }, fatura: { modo: 'OCULTO' } },
+      motivos: [],
+    });
+    expect(problemaNaAbertura(config, { ...vazio, ctes: ['1'] })).toBe(
+      'Informe a NF',
+    );
+    expect(problemaNaAbertura(config, { ...vazio, nfs: ['9'] })).toBeNull();
+  });
+
+  it('cobra o obrigatório e confere o motivo contra a lista', () => {
+    const config = mesclarConfiguracao('OUTRO', {
+      ativo: true,
+      exigirDocumento: null,
+      campos: {
+        fatura: { modo: 'OBRIGATORIO' },
+        motivo: { modo: 'OBRIGATORIO' },
+      },
+      motivos: ['A', 'B'],
+    });
+    expect(problemaNaAbertura(config, vazio)).toBe('Informe a fatura');
+    const comFatura = { ...vazio, fatura: 'F1' };
+    expect(problemaNaAbertura(config, comFatura)).toBe('Escolha o motivo');
+    expect(problemaNaAbertura(config, { ...comFatura, motivo: 'C' })).toMatch(
+      /lista/,
+    );
+    expect(
+      problemaNaAbertura(config, { ...comFatura, motivo: 'B' }),
+    ).toBeNull();
+  });
+
+  it('ignora lixo gravado e nunca esconde a descrição', () => {
+    const config = mesclarConfiguracao('AJUSTE_FISCAL', {
+      ativo: false,
+      exigirDocumento: null,
+      campos: {
+        cte: { modo: 'TALVEZ' },
+        descricao: { modo: 'OCULTO' },
+        pagadorCorreto: { modo: 'OPCIONAL', padrao: '  ' },
+        prioridade: { modo: 'OCULTO', padrao: 'ALTA' },
+      },
+      motivos: [],
+    });
+    expect(config.ativo).toBe(false);
+    expect(config.exigirDocumento).toBe(true);
+    expect(config.campos.cte.modo).toBe('OPCIONAL');
+    expect(config.campos.descricao.modo).toBe('OPCIONAL');
+    expect(config.campos.pagadorCorreto).toEqual({ modo: 'OPCIONAL' });
+    expect(config.campos.prioridade).toEqual({
+      modo: 'OCULTO',
+      padrao: 'ALTA',
+    });
+    expect(
+      mesclarConfiguracao('OUTRO', {
+        ativo: true,
+        exigirDocumento: null,
+        campos: null,
+        motivos: [],
+      }).campos,
+    ).toEqual(configuracaoPadrao('OUTRO').campos);
+  });
+});
+
+describe('módulos', () => {
+  const empresa = {
+    modulosLiberados: ['FILIAIS', 'EMAIL'],
+    modulosAtivos: ['EMAIL', 'BALANCO'],
+  };
+
+  it('só vale o que está liberado e ligado', () => {
+    expect(moduloLigado(empresa, 'EMAIL')).toBe(true);
+    expect(moduloLigado(empresa, 'FILIAIS')).toBe(false);
+    expect(moduloLigado(empresa, 'BALANCO')).toBe(false);
+    expect(modulosLigados(empresa)).toEqual(['EMAIL']);
+  });
+
+  it('normaliza: só nomes conhecidos, sem repetir, na ordem do catálogo', () => {
+    expect(normalizarModulos(['EMAIL', 'X', 'FILIAIS', 'EMAIL'])).toEqual([
+      'FILIAIS',
+      'EMAIL',
+    ]);
+  });
+});

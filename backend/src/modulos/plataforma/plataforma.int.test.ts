@@ -237,6 +237,7 @@ describe.skipIf(!temBanco)('plataforma (integração, banco real)', () => {
         'cnpj',
         'criadoEm',
         'id',
+        'modulosLiberados',
         'razaoSocial',
         'slug',
         'solicitacoesEmAberto',
@@ -281,6 +282,33 @@ describe.skipIf(!temBanco)('plataforma (integração, banco real)', () => {
 
     await enviar('patch', `/api/plataforma/empresas/${empresa.id}`, {
       ativa: true,
+    });
+  });
+
+  it('libera e bloqueia módulos; a empresa só usa o que está liberado', async () => {
+    const bloqueado = await enviar(
+      'patch',
+      `/api/plataforma/empresas/${empresa.id}`,
+      { modulosLiberados: ['EMAIL', 'FILIAIS', 'EMAIL'] },
+    );
+    expect(bloqueado.status).toBe(200);
+    expect(bloqueado.body.modulosLiberados).toEqual(['FILIAIS', 'EMAIL']);
+    const registrada = await prisma.empresa.findUniqueOrThrow({
+      where: { id: empresa.id },
+    });
+    // O que a empresa tinha ligado fica guardado; só deixa de valer
+    expect(registrada.modulosAtivos).toContain('BALANCO');
+
+    expect(
+      (
+        await enviar('patch', `/api/plataforma/empresas/${empresa.id}`, {
+          modulosLiberados: ['INVENTADO'],
+        })
+      ).status,
+    ).toBe(400);
+
+    await enviar('patch', `/api/plataforma/empresas/${empresa.id}`, {
+      modulosLiberados: registrada.modulosAtivos,
     });
   });
 

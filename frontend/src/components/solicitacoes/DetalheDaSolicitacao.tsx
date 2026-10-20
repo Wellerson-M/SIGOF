@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { EVENTO_NOTIFICACOES_LIDAS } from '@/components/Sino';
 import { ErroDaApi } from '@/lib/api';
+import { usaModulo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 import { COR_DA_SITUACAO, NOME_DA_SITUACAO, notificacoes } from '@/lib/avisos';
 import {
@@ -277,6 +278,7 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
             </h2>
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Dado nome="Tipo">{NOME_DO_TIPO[detalhe.tipo]}</Dado>
+              {detalhe.motivo && <Dado nome="Motivo">{detalhe.motivo}</Dado>}
               {detalhe.filial && (
                 <Dado nome="Filial">{detalhe.filial.nome}</Dado>
               )}
@@ -443,6 +445,7 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
           titulo={`${ACAO_PARA[pendente]} — ${detalhe.protocolo}`}
           pergunta={PEDE_OBSERVACAO[pendente] ?? ''}
           resolucao={pendente === 'RESOLVIDO'}
+          controlarCausa={usaModulo(usuario, 'CAUSA_DO_ERRO')}
           exigirCausa={usuario.empresa.exigirCausaAoResolver ?? false}
           observacaoObrigatoria={pendente !== 'RESOLVIDO'}
           aoFechar={() => setPendente(null)}

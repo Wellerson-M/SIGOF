@@ -1,8 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
 import { cadastros } from '@/lib/cadastros';
+import {
+  configuracao,
+  configuracaoLivre,
+  type ConfiguracaoDoTipo,
+} from '@/lib/configuracao';
 import { api, type Resumo } from '@/lib/solicitacoes';
 import { FormularioDeAbertura } from './FormularioDeAbertura';
 
@@ -286,5 +291,109 @@ describe('FormularioDeAbertura', () => {
     expect(abrir).toHaveBeenCalledWith(
       expect.objectContaining({ verificacoes: ['desacordo'] }),
     );
+  });
+
+  describe('formulário configurado pela empresa', () => {
+    function configurar(mudanca: Partial<ConfiguracaoDoTipo>) {
+      vi.spyOn(configuracao, 'formulario').mockResolvedValue({
+        personalizavel: true,
+        tipos: [
+          { ...configuracaoLivre('REVERSAO'), ...mudanca },
+          configuracaoLivre('OUTRO'),
+        ],
+      });
+    }
+
+    it('só mostra os tipos e campos em uso, com motivo e padrões', async () => {
+      configurar({
+        campos: {
+          ...configuracaoLivre('REVERSAO').campos,
+          nf: { modo: 'OCULTO' },
+          prioridade: { modo: 'OCULTO', padrao: 'ALTA' },
+          motivo: { modo: 'OBRIGATORIO', padrao: 'Mercadoria devolvida' },
+          descricao: { modo: 'OBRIGATORIO', padrao: 'Cliente: ' },
+        },
+        motivos: ['Erro de emissão', 'Mercadoria devolvida'],
+      });
+      const abrir = vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+      render(<FormularioDeAbertura />);
+
+      const motivo = await screen.findByLabelText('Motivo');
+      // Os padrões entram logo depois de a configuração chegar
+      await waitFor(() => expect(motivo).toHaveValue('Mercadoria devolvida'));
+      expect(screen.getByLabelText('O que precisa ser corrigido')).toHaveValue(
+        'Cliente: ',
+      );
+      expect(screen.queryByLabelText('Número da NF')).toBeNull();
+      expect(screen.queryByLabelText('Prioridade')).toBeNull();
+      expect(
+        screen.getAllByRole('option').map((o) => o.textContent),
+      ).not.toContain('Troca de pagador');
+
+      const usuario = userEvent.setup();
+      await usuario.type(screen.getByLabelText('Número do CTe'), '777');
+      await usuario.type(
+        screen.getByLabelText('O que precisa ser corrigido'),
+        'Joaquim, emitir reversão',
+      );
+      await usuario.selectOptions(motivo, 'Erro de emissão');
+      await usuario.click(
+        screen.getByRole('button', { name: 'Abrir solicitação' }),
+      );
+      expect(abrir).toHaveBeenCalledWith(
+        expect.objectContaining({
+          motivo: 'Erro de emissão',
+          descricao: 'Cliente: Joaquim, emitir reversão',
+          prioridade: 'ALTA',
+        }),
+      );
+    });
+
+    it('filial opcional em branco: avisa antes e deixa abrir sem', async () => {
+      configurar({});
+      vi.spyOn(cadastros, 'filiais').mockResolvedValue([
+        { id: 'cwb', nome: 'Curitiba', ativa: true },
+        { id: 'jve', nome: 'Joinville', ativa: true },
+      ]);
+      const abrir = vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+      render(<FormularioDeAbertura />);
+      await screen.findByLabelText('Filial que emitiu o documento');
+      const usuario = await preencher();
+      await usuario.click(
+        screen.getByRole('button', { name: 'Abrir solicitação' }),
+      );
+
+      expect(
+        await screen.findByText('Você não escolheu a filial.'),
+      ).toBeInTheDocument();
+      expect(abrir).not.toHaveBeenCalled();
+
+      await usuario.click(
+        screen.getByRole('button', { name: 'Abrir sem filial' }),
+      );
+      expect(abrir).toHaveBeenCalledWith(
+        expect.objectContaining({ filialId: undefined }),
+      );
+    });
+
+    it('anexo obrigatório: não abre sem arquivo', async () => {
+      configurar({
+        campos: {
+          ...configuracaoLivre('REVERSAO').campos,
+          anexos: { modo: 'OBRIGATORIO' },
+        },
+      });
+      const abrir = vi.spyOn(api, 'abrir').mockResolvedValue(criada);
+      render(<FormularioDeAbertura />);
+      await screen.findByText('Anexos');
+      const usuario = await preencher();
+      await usuario.click(
+        screen.getByRole('button', { name: 'Abrir solicitação' }),
+      );
+      expect(
+        await screen.findByText('Anexe pelo menos um arquivo'),
+      ).toBeInTheDocument();
+      expect(abrir).not.toHaveBeenCalled();
+    });
   });
 });

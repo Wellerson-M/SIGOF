@@ -7,6 +7,7 @@ import { Logo } from '@/components/Logo';
 import { Sino } from '@/components/Sino';
 import { VersaoDoSistema } from '@/components/VersaoDoSistema';
 import { NOME_DO_PERFIL, type Perfil } from '@/lib/api';
+import { usaModulo, type Modulo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 
 interface ItemDoMenu {
@@ -15,6 +16,8 @@ interface ItemDoMenu {
   /** Ainda não implementado: aparece no menu, mas desabilitado. */
   emBreve?: boolean;
   perfis?: Perfil[];
+  /** Só aparece com o módulo em uso na empresa. */
+  modulo?: Modulo;
 }
 
 const MENU: ItemDoMenu[] = [
@@ -29,6 +32,7 @@ const MENU: ItemDoMenu[] = [
     rotulo: 'Registro rápido',
     href: '/solicitacoes/registro',
     perfis: ['ANALISTA', 'SUPERVISOR'],
+    modulo: 'REGISTRO_RAPIDO',
   },
   {
     rotulo: 'Indicadores',
@@ -65,7 +69,9 @@ export function Moldura({ children }: { children: ReactNode }) {
       caminho !== '/solicitacoes/nova' &&
       caminho !== '/solicitacoes/registro');
   const itens = MENU.filter(
-    (item) => !item.perfis || item.perfis.includes(usuario.perfil),
+    (item) =>
+      (!item.perfis || item.perfis.includes(usuario.perfil)) &&
+      (!item.modulo || usaModulo(usuario, item.modulo)),
   );
 
   return (

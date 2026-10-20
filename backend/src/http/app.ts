@@ -25,6 +25,8 @@ import { rotasDeAnexos } from '../modulos/anexos/rotas.js';
 import { ServicoDeAnexos } from '../modulos/anexos/servico.js';
 import { rotasDeAutenticacao } from '../modulos/auth/rotas.js';
 import { rotasDeCadastros } from '../modulos/cadastros/rotas.js';
+import { rotasDeConfiguracao } from '../modulos/configuracao/rotas.js';
+import { ServicoDeConfiguracao } from '../modulos/configuracao/servico.js';
 import { rotasDaPlataforma } from '../modulos/plataforma/rotas.js';
 import { ServicoDaPlataforma } from '../modulos/plataforma/servico.js';
 import { ServicoDeCadastros } from '../modulos/cadastros/servico.js';
@@ -217,6 +219,14 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       '/api/cadastros',
       rotasDeCadastros({
         servico: new ServicoDeCadastros(prisma),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/configuracao',
+      rotasDeConfiguracao({
+        servico: new ServicoDeConfiguracao(prisma),
         jwtSecret: env.JWT_SECRET,
       }),
     );

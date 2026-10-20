@@ -173,15 +173,34 @@ describe.skipIf(!temBanco)(
         descricao: 'Mercadoria recusada, emitir reversão.',
       };
 
-      it('com filiais cadastradas, CTe sem filial é recusado', async () => {
-        const resposta = await (
-          await como('SOLICITANTE')
-        ).post('/api/solicitacoes', {
+      it('a filial é opcional por padrão; obrigatória se a empresa quiser', async () => {
+        const solicitante = await como('SOLICITANTE');
+        const semFilial = await solicitante.post('/api/solicitacoes', {
           ...base,
-          cte: '81001',
+          cte: '81000',
         });
-        expect(resposta.status).toBe(422);
-        expect(resposta.body.erro).toMatch(/filial/);
+        expect(semFilial.status).toBe(201);
+        expect(semFilial.body.filial).toBeNull();
+
+        await prisma.configuracaoDoFormulario.create({
+          data: {
+            empresaId: empresa.id,
+            tipo: 'REVERSAO',
+            campos: { filial: { modo: 'OBRIGATORIO' } },
+          },
+        });
+        try {
+          const resposta = await solicitante.post('/api/solicitacoes', {
+            ...base,
+            cte: '81001',
+          });
+          expect(resposta.status).toBe(422);
+          expect(resposta.body.erro).toMatch(/filial/);
+        } finally {
+          await prisma.configuracaoDoFormulario.deleteMany({
+            where: { empresaId: empresa.id },
+          });
+        }
       });
 
       it('filial de outra empresa é recusada', async () => {
