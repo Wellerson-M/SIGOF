@@ -45,6 +45,8 @@ export interface Resumo {
   registroRapido: boolean;
   criadoEm: string;
   atualizadoEm: string;
+  /** Último acontecimento visível (histórico, mensagem ou anexo). */
+  ultimaMovimentacaoEm?: string;
   slaVenceEm: string | null;
   sla: { situacao: SituacaoDoSla; minutosRestantes: number | null };
   acoes: Status[];
@@ -64,6 +66,8 @@ export interface Anexo {
   mensagemId: string | null;
   enviadoPor: Pessoa;
   criadoEm: string;
+  /** Até quando quem está logado pode excluir (só quem enviou, por pouco tempo). */
+  podeExcluirAte?: string | null;
 }
 
 export interface Mensagem {
@@ -115,6 +119,8 @@ export interface Detalhe extends Resumo {
     atribuir: boolean;
     comentarInterno: boolean;
     classificar: boolean;
+    /** Excluir a encerrada (supervisor e administrador). */
+    excluir?: boolean;
   };
 }
 
@@ -242,7 +248,8 @@ export const api = {
       method: 'PATCH',
       ...json({ prioridade }),
     }),
-  atribuir: (id: string, responsavelId: string) =>
+  /** `null` devolve para a fila, sem responsável. */
+  atribuir: (id: string, responsavelId: string | null) =>
     pedir<Resumo>(`/solicitacoes/${id}/atribuir`, {
       method: 'POST',
       ...json({ responsavelId }),
@@ -258,6 +265,13 @@ export const api = {
       ...json({ conteudo, interna, ...(comAnexos ? { comAnexos } : {}) }),
     }),
   responsaveis: () => pedir<Pessoa[]>('/solicitacoes/responsaveis'),
+  excluir: (id: string, motivo?: string) =>
+    pedir<void>(`/solicitacoes/${id}/excluir`, {
+      method: 'POST',
+      ...json(motivo ? { motivo } : {}),
+    }),
+  excluirAnexo: (id: string, anexoId: string) =>
+    pedir<void>(`/solicitacoes/${id}/anexos/${anexoId}`, { method: 'DELETE' }),
   anexar: (id: string, arquivo: File, opcoes: OpcoesDoAnexo = {}) => {
     const formulario = new FormData();
     // Os campos vão antes do arquivo: o servidor lê o formulário em ordem
@@ -411,6 +425,17 @@ const FORMATO_DATA = new Intl.DateTimeFormat('pt-BR', {
 
 export function dataCurta(iso: string): string {
   return FORMATO_DATA.format(new Date(iso));
+}
+
+/** "agora", "há 12 min", "há 3 h", "há 2 dias" */
+export function tempoDesde(iso: string, agora: number = Date.now()): string {
+  const minutos = Math.max(0, Math.floor((agora - Date.parse(iso)) / 60_000));
+  if (minutos < 1) return 'agora';
+  if (minutos < 60) return `há ${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `há ${horas} h`;
+  const dias = Math.floor(horas / 24);
+  return `há ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
 }
 
 /** "CTe 12345 · NF 998877" */

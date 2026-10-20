@@ -64,6 +64,9 @@ export interface ParametrosDaEmpresa {
   slaAtendimentoMinutos: number;
   janelaDuplicidadeDias: number;
   exigirCausaAoResolver: boolean;
+  diasNoQuadroDepoisDeEncerrar: number;
+  minutosParaExcluirAnexo: number;
+  analistaAtribui: boolean;
 }
 
 export type AlteracaoDaEmpresa = {
@@ -122,6 +125,9 @@ const camposDaEmpresa = {
   slaAtendimentoMinutos: true,
   janelaDuplicidadeDias: true,
   exigirCausaAoResolver: true,
+  diasNoQuadroDepoisDeEncerrar: true,
+  minutosParaExcluirAnexo: true,
+  analistaAtribui: true,
 } satisfies Prisma.EmpresaSelect;
 
 /**
@@ -222,9 +228,10 @@ export class ServicoDeAdministracao {
       return this.apresentar(atual);
     }
 
-    // Perfil novo ou conta desativada: as sessões abertas caem, para a
-    // pessoa não continuar com o acesso antigo até a sessão vencer
-    const derrubarSessoes = 'perfil' in mudou || 'ativo' in mudou;
+    // Perfil novo, e-mail novo ou conta desativada: as sessões abertas
+    // caem na hora, para ninguém seguir com o acesso antigo
+    const derrubarSessoes =
+      'perfil' in mudou || 'ativo' in mudou || 'email' in mudou;
 
     const alterado = await this.semEmailRepetido(() =>
       this.prisma.$transaction(async (tx) => {

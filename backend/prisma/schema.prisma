@@ -69,6 +69,8 @@ enum AcaoDeAuditoria {
   MODULOS_ALTERADOS
   /// Formulário de um tipo de ocorrência configurado.
   FORMULARIO_ALTERADO
+  /// Solicitação encerrada excluída (exclusão lógica).
+  SOLICITACAO_EXCLUIDA
 }
 
 /// Em que momento o arquivo entrou: o detalhe mostra cada grupo separado.
@@ -154,8 +156,17 @@ model Empresa {
   // --- Módulos (ver dominio/modulos.ts) ---
   // A plataforma libera; a empresa liga os liberados que quer usar.
 
-  modulosLiberados String[] @default(["FILIAIS", "CAUSA_DO_ERRO", "VERIFICACOES", "REGISTRO_RAPIDO", "EMAIL", "BALANCO", "FORMULARIO"]) @map("modulos_liberados")
-  modulosAtivos    String[] @default(["FILIAIS", "CAUSA_DO_ERRO", "VERIFICACOES", "REGISTRO_RAPIDO", "EMAIL", "BALANCO", "FORMULARIO"]) @map("modulos_ativos")
+  modulosLiberados String[] @default(["FILIAIS", "CAUSA_DO_ERRO", "VERIFICACOES", "REGISTRO_RAPIDO", "EMAIL", "BALANCO", "FORMULARIO", "EXCLUSAO_DE_SOLICITACOES", "EXCLUSAO_DE_ANEXOS"]) @map("modulos_liberados")
+  modulosAtivos    String[] @default(["FILIAIS", "CAUSA_DO_ERRO", "VERIFICACOES", "REGISTRO_RAPIDO", "EMAIL", "BALANCO", "FORMULARIO", "EXCLUSAO_DE_SOLICITACOES", "EXCLUSAO_DE_ANEXOS"]) @map("modulos_ativos")
+
+  // --- Quadro e atendimento ---
+
+  /// Encerradas ficam no quadro por estes dias (depois, só na lista).
+  diasNoQuadroDepoisDeEncerrar Int     @default(30) @map("dias_no_quadro_depois_de_encerrar")
+  /// Quem enviou um anexo pode excluí-lo durante estes minutos.
+  minutosParaExcluirAnexo      Int     @default(15) @map("minutos_para_excluir_anexo")
+  /// Além do supervisor, o analista também passa a solicitação para alguém.
+  analistaAtribui              Boolean @default(true) @map("analista_atribui")
 
   usuarios     Usuario[]
   solicitacoes Solicitacao[]
@@ -239,6 +250,9 @@ model Sessao {
   substituidaPorId String? @map("substituida_por_id")
   /// Nasceu de uma resposta perdida: há um teto por família.
   recuperada    Boolean   @default(false)
+  /// Quando a pessoa entrou (o login que começou a família). A sessão
+  /// não passa de um expediente a partir daqui, mesmo com renovações.
+  inicioDaFamilia DateTime @default(now()) @map("inicio_da_familia")
   ip            String?
   userAgent     String?   @map("user_agent")
   criadoEm      DateTime  @default(now()) @map("criado_em")
@@ -306,6 +320,12 @@ model Solicitacao {
   /// telefone) e só registra para ter o histórico. Nasce resolvida, sem
   /// SLA e sem avisos; fica fora do tempo médio de resolução.
   registroRapido Boolean @default(false) @map("registro_rapido")
+
+  /// Exclusão lógica (só de encerradas): some do quadro, da lista, dos
+  /// indicadores e da duplicidade, mas o registro fica no banco e na
+  /// auditoria, e o protocolo não é reaproveitado.
+  excluidaEm    DateTime? @map("excluida_em")
+  excluidaPorId String?   @map("excluida_por_id")
 
   empresa     Empresa  @relation(fields: [empresaId], references: [id])
   solicitante Usuario  @relation("SolicitacoesAbertas", fields: [solicitanteId], references: [id])

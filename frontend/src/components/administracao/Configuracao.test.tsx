@@ -41,7 +41,7 @@ describe('Módulos', () => {
     });
     expect(balanco).toBeDisabled();
     expect(balanco).not.toBeChecked();
-    expect(screen.getAllByText(/Não liberado/)).toHaveLength(4);
+    expect(screen.getAllByText(/Não liberado/)).toHaveLength(6);
 
     const botao = screen.getByRole('button', { name: 'Salvar módulos' });
     expect(botao).toBeDisabled();

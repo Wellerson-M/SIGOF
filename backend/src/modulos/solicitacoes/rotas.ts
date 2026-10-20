@@ -81,7 +81,12 @@ const esquemaPrioridade = z.object({
 });
 
 const esquemaAtribuicao = z.object({
-  responsavelId: z.string().uuid('Responsável inválido'),
+  // null: devolve para a fila, sem responsável
+  responsavelId: z.string().uuid('Responsável inválido').nullable(),
+});
+
+const esquemaExclusao = z.object({
+  motivo: z.string().trim().max(500).optional(),
 });
 
 const esquemaMensagem = z
@@ -220,6 +225,12 @@ export function rotasDeSolicitacoes(opcoes: {
   rotas.post('/:id/atribuir', async (req, res) => {
     const { responsavelId } = validar(esquemaAtribuicao, req.body);
     res.json(await servico.atribuir(usuarioDa(req), idDa(req), responsavelId));
+  });
+
+  rotas.post('/:id/excluir', async (req, res) => {
+    const { motivo } = validar(esquemaExclusao, req.body ?? {});
+    await servico.excluir(usuarioDa(req), idDa(req), motivo, req.ip);
+    res.status(204).end();
   });
 
   rotas.post('/:id/mensagens', async (req, res) => {

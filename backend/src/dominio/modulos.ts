@@ -18,6 +18,8 @@ export const MODULOS = [
   'EMAIL',
   'BALANCO',
   'FORMULARIO',
+  'EXCLUSAO_DE_SOLICITACOES',
+  'EXCLUSAO_DE_ANEXOS',
 ] as const;
 
 export type Modulo = (typeof MODULOS)[number];

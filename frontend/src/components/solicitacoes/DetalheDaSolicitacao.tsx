@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { BOTAO_SECUNDARIO, CAMPO, Janela, ROTULO } from '@/components/Janela';
 import { EVENTO_NOTIFICACOES_LIDAS } from '@/components/Sino';
 import { ErroDaApi } from '@/lib/api';
 import { usaModulo } from '@/lib/configuracao';
@@ -9,7 +10,6 @@ import { useSessao } from '@/lib/sessao';
 import { COR_DA_SITUACAO, NOME_DA_SITUACAO, notificacoes } from '@/lib/avisos';
 import {
   ACAO_PARA,
-  ANEXO,
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
   NOME_DO_TIPO,
@@ -25,6 +25,7 @@ import {
   type Status,
 } from '@/lib/solicitacoes';
 import { Anexos, abrirAnexo, enviarAnexos } from './Anexos';
+import { EscolhaDeArquivos } from './EscolhaDeArquivos';
 import { CausaDoErro } from './CausaDoErro';
 import { VerificacoesDaSolicitacao } from './Verificacoes';
 import {
@@ -49,6 +50,8 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
   const [ocupado, setOcupado] = useState(false);
   const [pendente, setPendente] = useState<Status | null>(null);
   const [responsaveis, setResponsaveis] = useState<Pessoa[]>([]);
+  const [excluindo, setExcluindo] = useState(false);
+  const [excluida, setExcluida] = useState(false);
 
   const falhaAoCarregar = useCallback((falha: unknown) => {
     if (falha instanceof ErroDaApi && falha.status === 404) {
@@ -140,6 +143,23 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
     }
   }
 
+  if (excluida) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-3" role="status">
+        <h1 className="text-xl font-semibold text-texto">
+          Solicitação excluída
+        </h1>
+        <p className="text-sm text-texto-suave">
+          Ela não aparece mais no quadro, na lista nem nos indicadores. Fica
+          registrada na auditoria.
+        </p>
+        <Link href="/solicitacoes" className="text-sm text-primaria underline">
+          Voltar ao quadro
+        </Link>
+      </div>
+    );
+  }
+
   if (naoExiste) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-3">
@@ -198,7 +218,8 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
 
       {(detalhe.acoes.length > 0 ||
         detalhe.pode.mudarPrioridade ||
-        detalhe.pode.atribuir) && (
+        detalhe.pode.atribuir ||
+        detalhe.pode.excluir) && (
         <section className="flex flex-wrap items-end gap-4 rounded-lg border border-borda bg-superficie p-4">
           {detalhe.acoes.length > 0 && (
             <div className="flex flex-col gap-1.5">
@@ -251,14 +272,13 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
                 value={detalhe.responsavel?.id ?? ''}
                 disabled={ocupado}
                 onChange={(evento) => {
-                  const responsavelId = evento.target.value;
-                  if (responsavelId) {
-                    void executar(() => api.atribuir(id, responsavelId));
-                  }
+                  // "Ninguém" devolve para a fila
+                  const responsavelId = evento.target.value || null;
+                  void executar(() => api.atribuir(id, responsavelId));
                 }}
                 className={SELECAO}
               >
-                <option value="">Ninguém</option>
+                <option value="">Ninguém (na fila)</option>
                 {responsaveis.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nome}
@@ -267,7 +287,34 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
               </select>
             </label>
           )}
+          {detalhe.pode.excluir && (
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => setExcluindo(true)}
+              className="ml-auto h-9 rounded-md border border-critico/50 px-3 text-sm font-semibold text-critico disabled:opacity-50"
+            >
+              Excluir solicitação
+            </button>
+          )}
         </section>
+      )}
+
+      {excluindo && (
+        <ConfirmarExclusao
+          protocolo={detalhe.protocolo}
+          aoFechar={() => setExcluindo(false)}
+          aoConfirmar={async (motivo) => {
+            try {
+              await api.excluir(id, motivo || undefined);
+              setExcluida(true);
+            } catch (falha) {
+              setErro(mensagemDoErro(falha));
+            } finally {
+              setExcluindo(false);
+            }
+          }}
+        />
       )}
 
       <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
@@ -497,7 +544,6 @@ function Conversa({
   const [interna, setInterna] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [arquivos, setArquivos] = useState<File[]>([]);
-  const [chaveDoArquivo, setChaveDoArquivo] = useState(0);
   const [erroAoAbrir, setErroAoAbrir] = useState<string | null>(null);
   const podeEnviar = texto.trim() !== '' || arquivos.length > 0;
 
@@ -511,7 +557,6 @@ function Conversa({
     if (enviada) {
       setTexto('');
       setArquivos([]);
-      setChaveDoArquivo((n) => n + 1);
     }
   }
 
@@ -581,14 +626,12 @@ function Conversa({
           placeholder="Escreva uma mensagem"
           className="rounded-md border border-borda bg-fundo px-3 py-2 text-sm text-texto"
         />
-        <input
-          key={chaveDoArquivo}
-          type="file"
-          multiple
-          accept={ANEXO.aceitos}
-          aria-label="Anexar arquivos à mensagem"
-          onChange={(evento) => setArquivos([...(evento.target.files ?? [])])}
-          className="text-sm text-texto file:mr-3 file:h-8 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
+        <EscolhaDeArquivos
+          rotulo={<span className="sr-only">Arquivos da mensagem</span>}
+          rotuloDoCampo="Anexar arquivos à mensagem"
+          arquivos={arquivos}
+          aoMudar={setArquivos}
+          tamanho="compacto"
         />
         {erroAoAbrir && (
           <p role="alert" className="text-sm text-critico">
@@ -618,5 +661,59 @@ function Conversa({
         </div>
       </form>
     </section>
+  );
+}
+
+/** Confirma a exclusão e pede o motivo (vai para a auditoria). */
+function ConfirmarExclusao({
+  protocolo,
+  aoFechar,
+  aoConfirmar,
+}: {
+  protocolo: string;
+  aoFechar: () => void;
+  aoConfirmar: (motivo: string) => Promise<void>;
+}) {
+  const [motivo, setMotivo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  return (
+    <Janela titulo={`Excluir ${protocolo}?`} aoFechar={aoFechar}>
+      <form
+        onSubmit={(evento) => {
+          evento.preventDefault();
+          setEnviando(true);
+          void aoConfirmar(motivo.trim());
+        }}
+        className="flex flex-col gap-3"
+      >
+        <p className="text-sm text-texto-suave">
+          Ela some do quadro, da lista, dos indicadores e do alerta de
+          duplicidade. Não dá para desfazer pela tela; o registro continua na
+          auditoria.
+        </p>
+        <label className={ROTULO}>
+          Motivo (opcional)
+          <input
+            value={motivo}
+            onChange={(evento) => setMotivo(evento.target.value)}
+            maxLength={500}
+            placeholder="Ex.: aberta em duplicidade"
+            className={CAMPO}
+          />
+        </label>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={aoFechar} className={BOTAO_SECUNDARIO}>
+            Voltar
+          </button>
+          <button
+            type="submit"
+            disabled={enviando}
+            className="h-9 rounded-md bg-critico px-4 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {enviando ? 'Excluindo…' : 'Excluir'}
+          </button>
+        </div>
+      </form>
+    </Janela>
   );
 }

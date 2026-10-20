@@ -154,6 +154,7 @@ export class ServicoDeIndicadores {
       this.prisma.solicitacao.findMany({
         where: {
           empresaId: usuario.empresaId,
+          excluidaEm: null,
           status: 'RESOLVIDO',
           resolvidoEm: { gte: de, lt: ate },
           causaDetalhe: { not: null },
@@ -253,6 +254,7 @@ export class ServicoDeIndicadores {
       this.prisma.solicitacao.findMany({
         where: {
           empresaId: usuario.empresaId,
+          excluidaEm: null,
           OR: [
             { status: { notIn: ['RESOLVIDO', 'CANCELADO'] } },
             { criadoEm: { gte: de } },

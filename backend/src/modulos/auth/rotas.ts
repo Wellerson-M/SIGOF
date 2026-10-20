@@ -45,7 +45,6 @@ export interface OpcoesDasRotasDeAuth {
   servico: ServicoDeAutenticacao;
   prisma: PrismaClient;
   jwtSecret: string;
-  acessoMinutos: number;
   /** `true` fora do desenvolvimento: cookie só trafega em HTTPS. */
   cookieSeguro: boolean;
   /** Tentativas de login por minuto por IP + e-mail. */
@@ -53,7 +52,7 @@ export interface OpcoesDasRotasDeAuth {
 }
 
 export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
-  const { servico, prisma, jwtSecret, acessoMinutos, cookieSeguro } = opcoes;
+  const { servico, prisma, jwtSecret, cookieSeguro } = opcoes;
   const rotas = Router();
 
   // HttpOnly: o JavaScript da página não lê o cookie (protege contra XSS).
@@ -69,15 +68,11 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
   const opcoesSessao: CookieOptions = { ...base, path: '/api/auth' };
 
   function gravarCookies(res: Response, tokens: Tokens): void {
-    res.cookie(COOKIE_ACESSO, tokens.acesso, {
-      ...base,
-      path: '/',
-      maxAge: acessoMinutos * 60_000,
-    });
-    res.cookie(COOKIE_SESSAO, tokens.sessao, {
-      ...opcoesSessao,
-      expires: tokens.sessaoExpiraEm,
-    });
+    // Cookies "de sessão" (sem data de validade): o navegador os apaga ao
+    // fechar. Quem vale de verdade é o servidor, que confere a validade do
+    // token e da sessão; fechar o navegador só garante que não sobra nada
+    res.cookie(COOKIE_ACESSO, tokens.acesso, { ...base, path: '/' });
+    res.cookie(COOKIE_SESSAO, tokens.sessao, opcoesSessao);
   }
 
   function limparCookies(res: Response): void {
@@ -184,6 +179,7 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
             razaoSocial: true,
             slug: true,
             exigirCausaAoResolver: true,
+            diasNoQuadroDepoisDeEncerrar: true,
             modulosLiberados: true,
             modulosAtivos: true,
           },

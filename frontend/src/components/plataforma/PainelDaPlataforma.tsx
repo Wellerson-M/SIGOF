@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeSenha } from '@/components/CampoDeSenha';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ModulosLiberados } from './ModulosLiberados';
@@ -464,8 +465,7 @@ function TrocaDeSenha({
       </p>
       <label className={ROTULO}>
         Senha provisória
-        <input
-          type="password"
+        <CampoDeSenha
           value={atual}
           onChange={(e) => setAtual(e.target.value)}
           autoComplete="current-password"
@@ -475,8 +475,7 @@ function TrocaDeSenha({
       </label>
       <label className={ROTULO}>
         Nova senha (8 ou mais, com letra e número)
-        <input
-          type="password"
+        <CampoDeSenha
           value={nova}
           onChange={(e) => setNova(e.target.value)}
           autoComplete="new-password"

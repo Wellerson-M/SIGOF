@@ -95,3 +95,41 @@ body {
   outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
+
+/*
+ * Quadro: o cartão desliza de uma coluna para a outra (View Transitions) e
+ * dá um brilho curto ao chegar. Sutil e rápido; some para quem pediu menos
+ * movimento no sistema.
+ */
+::view-transition-group(cartao-movido) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* O resto da tela troca na hora: só o cartão se mexe */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+@keyframes cartao-chegou {
+  from {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--destaque) 45%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.cartao-chegou {
+  animation: cartao-chegou 900ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  .cartao-chegou {
+    animation: none;
+  }
+}

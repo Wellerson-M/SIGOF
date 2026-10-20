@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeSenha } from '@/components/CampoDeSenha';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import {
@@ -74,8 +75,7 @@ export default function PaginaDaConta() {
         </h2>
         <label className={ROTULO}>
           {obrigatorio ? 'Senha provisória' : 'Senha atual'}
-          <input
-            type="password"
+          <CampoDeSenha
             autoComplete="current-password"
             value={atual}
             onChange={(e) => setAtual(e.target.value)}
@@ -85,8 +85,7 @@ export default function PaginaDaConta() {
         </label>
         <label className={ROTULO}>
           Nova senha
-          <input
-            type="password"
+          <CampoDeSenha
             autoComplete="new-password"
             value={nova}
             onChange={(e) => setNova(e.target.value)}
@@ -101,8 +100,7 @@ export default function PaginaDaConta() {
         </label>
         <label className={ROTULO}>
           Repita a nova senha
-          <input
-            type="password"
+          <CampoDeSenha
             autoComplete="new-password"
             value={confirmacao}
             onChange={(e) => setConfirmacao(e.target.value)}

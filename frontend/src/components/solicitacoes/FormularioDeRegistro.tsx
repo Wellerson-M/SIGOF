@@ -27,6 +27,7 @@ import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
 import { MarcacoesDaAbertura, useItensDaAbertura } from './Verificacoes';
 import { useSessao } from '@/lib/sessao';
 import { enviarAnexos } from './Anexos';
+import { EscolhaDeArquivos } from './EscolhaDeArquivos';
 import { CampoDoQual, temQual } from './CampoDoQual';
 import { AvisoSemFilial } from './AvisoSemFilial';
 import { usePadroesDoTipo } from './Padroes';
@@ -84,7 +85,6 @@ export function FormularioDeRegistro() {
   const [causaId, setCausaId] = useState('');
   const [detalhe, setDetalhe] = useState('');
   const [arquivos, setArquivos] = useState<File[]>([]);
-  const [chaveDoArquivo, setChaveDoArquivo] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [duplicidades, setDuplicidades] = useState<Duplicidade[] | null>(null);
@@ -188,7 +188,6 @@ export function FormularioDeRegistro() {
       setCausaId('');
       setDetalhe('');
       setArquivos([]);
-      setChaveDoArquivo((n) => n + 1);
       if (errosDosAnexos.length > 0) {
         setErro(
           `${nova.protocolo} registrada, mas alguns arquivos não foram: ${errosDosAnexos.join('; ')}`,
@@ -380,19 +379,13 @@ export function FormularioDeRegistro() {
             />
           </div>
           {aparece('anexos') && (
-            <label className={`${ROTULO} sm:col-span-2`}>
-              Anexos
-              <input
-                key={chaveDoArquivo}
-                type="file"
-                multiple
-                accept={ANEXO.aceitos}
-                onChange={(evento) =>
-                  setArquivos([...(evento.target.files ?? [])])
-                }
-                className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
+            <div className="sm:col-span-2">
+              <EscolhaDeArquivos
+                rotulo="Anexos"
+                arquivos={arquivos}
+                aoMudar={setArquivos}
               />
-            </label>
+            </div>
           )}
         </div>
 

@@ -352,6 +352,117 @@ describe.skipIf(!temBanco)('autenticação (integração, banco real)', () => {
     });
   });
 
+  describe('sessão do tamanho de um expediente', () => {
+    const MINUTO = 60_000;
+    const HORA = 60 * MINUTO;
+
+    function eu(cookies: Record<string, string>) {
+      return request(app)
+        .get('/api/auth/eu')
+        .set('Cookie', comCookies(cookies));
+    }
+
+    it('os cookies não têm validade: somem ao fechar o navegador', async () => {
+      const resposta = await login(
+        empresa.slug,
+        empresa.usuarios.ANALISTA.email,
+      );
+      const linhas = resposta.headers['set-cookie'] as unknown as string[];
+      expect(linhas).toHaveLength(2);
+      for (const linha of linhas) {
+        expect(linha).not.toMatch(/Expires=|Max-Age=/i);
+      }
+    });
+
+    it('vence em 2 h sem uso e não passa de 12 h desde a entrada', async () => {
+      const antes = Date.now();
+      const cookies = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.ANALISTA.email),
+      );
+      const sessao = await prisma.sessao.findUniqueOrThrow({
+        where: { tokenHash: hashDoToken(cookies.sigof_sessao!) },
+      });
+      const semUso = sessao.expiraEm.getTime() - antes;
+      expect(semUso).toBeGreaterThanOrEqual(120 * MINUTO - 5_000);
+      expect(semUso).toBeLessThanOrEqual(120 * MINUTO + 5_000);
+
+      // Entrou há quase 12 h: renovar não estica além das 12 h
+      const entrada = new Date(Date.now() - 11 * HORA - 30 * MINUTO);
+      await prisma.sessao.update({
+        where: { id: sessao.id },
+        data: { inicioDaFamilia: entrada },
+      });
+      const renovada = cookiesDa(
+        await request(app)
+          .post('/api/auth/renovar')
+          .set('Origin', FRONTEND)
+          .set('Cookie', `sigof_sessao=${cookies.sigof_sessao}`),
+      );
+      const nova = await prisma.sessao.findUniqueOrThrow({
+        where: { tokenHash: hashDoToken(renovada.sigof_sessao!) },
+      });
+      expect(nova.inicioDaFamilia).toEqual(entrada);
+      expect(nova.expiraEm.getTime()).toBe(entrada.getTime() + 12 * HORA);
+    });
+
+    it('sessão vencida tira o acesso no próximo pedido, mesmo com o token de 15 min', async () => {
+      const cookies = cookiesDa(
+        await login(empresa.slug, empresa.usuarios.SUPERVISOR.email),
+      );
+      expect((await eu(cookies)).status).toBe(200);
+      await prisma.sessao.updateMany({
+        where: { tokenHash: hashDoToken(cookies.sigof_sessao!) },
+        data: { expiraEm: new Date(Date.now() - 1000) },
+      });
+      expect((await eu(cookies)).status).toBe(401);
+    });
+
+    it('trocar o e-mail ou desativar derruba a pessoa na hora', async () => {
+      const alvo = outra.usuarios.ANALISTA;
+      const dela = cookiesDa(await login(outra.slug, alvo.email));
+      const admin = cookiesDa(
+        await login(outra.slug, outra.usuarios.ADMIN.email),
+      );
+      const alterar = (corpo: object) =>
+        request(app)
+          .patch(`/api/admin/usuarios/${alvo.id}`)
+          .set('Origin', FRONTEND)
+          .set('Cookie', comCookies(admin))
+          .send(corpo);
+
+      expect((await eu(dela)).status).toBe(200);
+      const novoEmail = `novo-${alvo.email}`;
+      expect((await alterar({ email: novoEmail })).status).toBe(200);
+      expect((await eu(dela)).status).toBe(401);
+      const renovar = await request(app)
+        .post('/api/auth/renovar')
+        .set('Origin', FRONTEND)
+        .set('Cookie', `sigof_sessao=${dela.sigof_sessao}`);
+      expect(renovar.status).toBe(401);
+
+      const deNovo = cookiesDa(await login(outra.slug, novoEmail));
+      expect((await eu(deNovo)).status).toBe(200);
+      expect((await alterar({ ativo: false })).status).toBe(200);
+      expect((await eu(deNovo)).status).toBe(401);
+
+      await alterar({ ativo: true, email: alvo.email });
+    });
+
+    it('token antigo, sem a sessão dentro, precisa ser renovado', async () => {
+      const { emitirTokenDeAcesso } = await import('./tokens.js');
+      const antigo = await emitirTokenDeAcesso(
+        {
+          id: empresa.usuarios.ANALISTA.id,
+          empresaId: empresa.id,
+          perfil: 'ANALISTA',
+        },
+        envDeTeste().JWT_SECRET,
+        15,
+      );
+      expect((await eu({ sigof_acesso: antigo })).status).toBe(401);
+    });
+  });
+
   it('tentativas erradas simultâneas somam todas e bloqueiam a conta', async () => {
     const { email, id } = outra.usuarios.SUPERVISOR;
 

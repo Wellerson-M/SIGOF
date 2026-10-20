@@ -9,6 +9,7 @@ import { Contagem, documentosDoFormulario } from './CamposDeDocumentos';
 import { MarcacoesDaAbertura, useItensDaAbertura } from './Verificacoes';
 import { useSessao } from '@/lib/sessao';
 import { enviarAnexos } from './Anexos';
+import { EscolhaDeArquivos } from './EscolhaDeArquivos';
 import { AvisoSemFilial, textoDosDocumentos } from './AvisoSemFilial';
 import { usePadroesDoTipo } from './Padroes';
 import {
@@ -399,22 +400,16 @@ export function FormularioDeAbertura() {
         />
       </div>
       {aparece('anexos') && (
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-texto">
-          {config.campos.anexos.modo === 'OBRIGATORIO'
-            ? 'Anexos'
-            : 'Anexos (opcional)'}
-          <input
-            type="file"
-            multiple
-            accept={ANEXO.aceitos}
-            onChange={(evento) => setArquivos([...(evento.target.files ?? [])])}
-            className="text-sm text-texto file:mr-3 file:h-9 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
-          />
-          <span className="text-xs font-normal text-texto-suave">
-            PDF, imagem ou XML da nota, até 5 MB cada e no máximo{' '}
-            {ANEXO.porSolicitacao} arquivos.
-          </span>
-        </label>
+        <EscolhaDeArquivos
+          rotulo={
+            config.campos.anexos.modo === 'OBRIGATORIO'
+              ? 'Anexos'
+              : 'Anexos (opcional)'
+          }
+          arquivos={arquivos}
+          aoMudar={setArquivos}
+          dica={`PDF, imagem ou XML da nota, até 5 MB cada e no máximo ${ANEXO.porSolicitacao} arquivos. Esqueceu um? Use “Adicionar mais”: os já escolhidos continuam.`}
+        />
       )}
 
       {erro && (

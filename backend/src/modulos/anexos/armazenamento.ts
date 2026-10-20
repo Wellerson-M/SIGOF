@@ -1,5 +1,6 @@
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -17,6 +18,7 @@ import { ErroDeAplicacao } from '../../http/erros.js';
 export interface Armazenamento {
   guardar(chave: string, conteudo: Buffer, tipoMime: string): Promise<void>;
   abrir(chave: string): Promise<Readable>;
+  apagar(chave: string): Promise<void>;
 }
 
 export interface ConfigS3 {
@@ -62,6 +64,11 @@ export class ArmazenamentoS3 implements Armazenamento {
     );
     return resposta.Body as Readable;
   }
+  async apagar(chave: string): Promise<void> {
+    await this.cliente.send(
+      new DeleteObjectCommand({ Bucket: this.config.bucket, Key: chave }),
+    );
+  }
 
   /** Cria o bucket na primeira vez (servidor novo). */
   private garantirBucket(): Promise<void> {
@@ -101,6 +108,10 @@ export class ArmazenamentoIndisponivel implements Armazenamento {
   async abrir(): Promise<Readable> {
     this.erro();
   }
+
+  async apagar(): Promise<void> {
+    this.erro();
+  }
 }
 
 /** Para testes: guarda na memória do processo. */
@@ -117,5 +128,9 @@ export class ArmazenamentoEmMemoria implements Armazenamento {
       throw new Error(`Arquivo não encontrado: ${chave}`);
     }
     return Readable.from(conteudo);
+  }
+
+  async apagar(chave: string): Promise<void> {
+    this.arquivos.delete(chave);
   }
 }

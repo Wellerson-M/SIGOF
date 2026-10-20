@@ -101,6 +101,15 @@ export function rotasDeAnexos(opcoes: {
       );
   });
 
+  rotas.delete('/:anexoId', async (req, res) => {
+    await servico.excluir(
+      usuarioDa(req),
+      uuidDo(req, 'id', 'Anexo não encontrado'),
+      uuidDo(req, 'anexoId', 'Anexo não encontrado'),
+    );
+    res.status(204).end();
+  });
+
   rotas.get('/:anexoId', async (req, res) => {
     const arquivo = await servico.baixar(
       usuarioDa(req),

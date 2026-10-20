@@ -8,10 +8,17 @@ import {
   extensaoDe,
   nomeSeguro,
 } from '../../dominio/tipo-de-arquivo.js';
-import { ErroDeRegraDeNegocio, ErroNaoEncontrado } from '../../http/erros.js';
+import {
+  ErroAcessoNegado,
+  ErroDeRegraDeNegocio,
+  ErroNaoEncontrado,
+} from '../../http/erros.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
 import type { ServicoDeAvisos } from '../avisos/avisos.js';
-import { visiveisPara } from '../solicitacoes/servico.js';
+import {
+  prazoParaExcluirAnexo,
+  visiveisPara,
+} from '../solicitacoes/servico.js';
 import type { Armazenamento } from './armazenamento.js';
 
 /**
@@ -169,6 +176,71 @@ export class ServicoDeAnexos {
       }
       return this.resumir(anexo);
     });
+  }
+
+  /**
+   * Quem enviou exclui o próprio anexo durante alguns minutos (arquivo
+   * errado). Fica no histórico; o arquivo sai do armazenamento.
+   */
+  async excluir(
+    usuario: UsuarioAutenticado,
+    solicitacaoId: string,
+    anexoId: string,
+    agora: Date = new Date(),
+  ): Promise<void> {
+    const anexo = await this.prisma.anexo.findFirst({
+      where: {
+        id: anexoId,
+        solicitacaoId,
+        empresaId: usuario.empresaId,
+        solicitacao: visiveisPara(usuario),
+      },
+      include: {
+        solicitacao: { select: { status: true } },
+        empresa: {
+          select: {
+            modulosLiberados: true,
+            modulosAtivos: true,
+            minutosParaExcluirAnexo: true,
+          },
+        },
+      },
+    });
+    if (!anexo) {
+      throw new ErroNaoEncontrado('Anexo não encontrado');
+    }
+    if (anexo.enviadoPorId !== usuario.id) {
+      throw new ErroAcessoNegado('Só quem enviou pode excluir o anexo');
+    }
+    const ate = prazoParaExcluirAnexo(
+      usuario,
+      anexo.empresa,
+      { criadoEm: anexo.criadoEm, enviadoPor: { id: anexo.enviadoPorId } },
+      agora,
+    );
+    if (ate === null) {
+      throw new ErroDeRegraDeNegocio(
+        `O prazo para excluir este anexo (${anexo.empresa.minutosParaExcluirAnexo} min depois do envio) já passou, ou a exclusão está desligada`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.anexo.delete({ where: { id: anexo.id } });
+      await tx.statusHistorico.create({
+        data: {
+          empresaId: usuario.empresaId,
+          solicitacaoId: anexo.solicitacaoId,
+          autorId: usuario.id,
+          statusAnterior: anexo.solicitacao.status,
+          statusNovo: anexo.solicitacao.status,
+          observacao: `Anexo excluído: ${anexo.nomeArquivo}`,
+          criadoEm: agora,
+        },
+      });
+    });
+    // Depois de gravar: se o armazenamento falhar agora, sobra um arquivo
+    // que ninguém alcança (sem registro), e não um registro sem arquivo
+    await this.armazenamento.apagar(anexo.chaveStorage).catch(() => undefined);
   }
 
   async baixar(

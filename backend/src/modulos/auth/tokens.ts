@@ -15,6 +15,13 @@ export interface UsuarioAutenticado {
   id: string;
   empresaId: string;
   perfil: Perfil;
+  /**
+   * A sessão (família de refresh tokens) que emitiu o token. Com ela, cada
+   * pedido confere se a sessão ainda vale: desativar a pessoa, trocar o
+   * e-mail ou sair em outro lugar derruba o acesso na hora, sem esperar
+   * os 15 minutos do token.
+   */
+  familia?: string | undefined;
 }
 
 const EMISSOR = 'sigof';
@@ -34,7 +41,11 @@ export function emitirTokenDeAcesso(
   segredo: string,
   minutos: number,
 ): Promise<string> {
-  return new SignJWT({ emp: usuario.empresaId, perfil: usuario.perfil })
+  return new SignJWT({
+    emp: usuario.empresaId,
+    perfil: usuario.perfil,
+    ...(usuario.familia ? { fam: usuario.familia } : {}),
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(usuario.id)
     .setIssuer(EMISSOR)
@@ -54,7 +65,7 @@ export async function verificarTokenDeAcesso(
       algorithms: ['HS256'],
     });
 
-    const { sub, emp, perfil } = payload;
+    const { sub, emp, perfil, fam } = payload;
     if (
       typeof sub !== 'string' ||
       typeof emp !== 'string' ||
@@ -64,7 +75,12 @@ export async function verificarTokenDeAcesso(
       return null;
     }
 
-    return { id: sub, empresaId: emp, perfil: perfil as Perfil };
+    return {
+      id: sub,
+      empresaId: emp,
+      perfil: perfil as Perfil,
+      ...(typeof fam === 'string' ? { familia: fam } : {}),
+    };
   } catch {
     return null;
   }

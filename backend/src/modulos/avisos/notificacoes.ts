@@ -19,7 +19,12 @@ export class ServicoDeNotificacoes {
   async listar(
     usuario: UsuarioAutenticado,
   ): Promise<{ naoLidas: number; itens: Notificacao[] }> {
-    const minhas = { empresaId: usuario.empresaId, usuarioId: usuario.id };
+    // A notificação de uma solicitação excluída não leva a lugar nenhum
+    const minhas = {
+      empresaId: usuario.empresaId,
+      usuarioId: usuario.id,
+      solicitacao: { excluidaEm: null },
+    };
     const [naoLidas, itens] = await Promise.all([
       this.prisma.notificacao.count({ where: { ...minhas, lida: false } }),
       this.prisma.notificacao.findMany({
