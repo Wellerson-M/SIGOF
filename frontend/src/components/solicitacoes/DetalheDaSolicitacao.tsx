@@ -5,14 +5,13 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { BOTAO_SECUNDARIO, CAMPO, Janela, ROTULO } from '@/components/Janela';
 import { EVENTO_NOTIFICACOES_LIDAS } from '@/components/Sino';
 import { ErroDaApi } from '@/lib/api';
-import { usaModulo } from '@/lib/configuracao';
+import { usaModulo, nomeDoTipo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
 import { COR_DA_SITUACAO, NOME_DA_SITUACAO, notificacoes } from '@/lib/avisos';
 import {
   ACAO_PARA,
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
-  NOME_DO_TIPO,
   PEDE_OBSERVACAO,
   PRIORIDADES,
   api,
@@ -324,7 +323,7 @@ export function DetalheDaSolicitacao({ id }: { id: string }) {
               Ocorrência
             </h2>
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <Dado nome="Tipo">{NOME_DO_TIPO[detalhe.tipo]}</Dado>
+              <Dado nome="Tipo">{nomeDoTipo(usuario, detalhe.tipo)}</Dado>
               {detalhe.motivo && <Dado nome="Motivo">{detalhe.motivo}</Dado>}
               {detalhe.filial && (
                 <Dado nome="Filial">{detalhe.filial.nome}</Dado>

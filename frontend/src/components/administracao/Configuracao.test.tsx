@@ -75,7 +75,11 @@ describe('Formulário', () => {
     });
     const salvar = vi
       .spyOn(configuracao, 'alterarFormulario')
-      .mockImplementation(async (t, dados) => ({ tipo: t, ...dados }));
+      .mockImplementation(async (t, dados) => ({
+        tipo: t,
+        doSistema: true,
+        ...dados,
+      }));
     render(<Formulario />);
 
     const usuario = userEvent.setup();
@@ -132,7 +136,11 @@ describe('Formulário', () => {
     });
     const salvar = vi
       .spyOn(configuracao, 'alterarFormulario')
-      .mockImplementation(async (t, dados) => ({ tipo: t, ...dados }));
+      .mockImplementation(async (t, dados) => ({
+        tipo: t,
+        doSistema: true,
+        ...dados,
+      }));
     const restaurar = vi
       .spyOn(configuracao, 'restaurarFormulario')
       .mockResolvedValue(tipo('OUTRO', { exigirDocumento: false }));
@@ -193,5 +201,60 @@ describe('Formulário', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Cadastre pelo menos um motivo',
     );
+  });
+
+  it('cria, renomeia e exclui um tipo da empresa', async () => {
+    vi.spyOn(configuracao, 'formulario').mockResolvedValue({
+      personalizavel: true,
+      tipos: [tipo('REVERSAO')],
+    });
+    const avaria = tipo('AVARIA', { nome: 'Avaria', doSistema: false });
+    const criar = vi.spyOn(configuracao, 'criarTipo').mockResolvedValue(avaria);
+    const salvar = vi
+      .spyOn(configuracao, 'alterarFormulario')
+      .mockImplementation(async (t, dados) => ({
+        tipo: t,
+        doSistema: false,
+        ...dados,
+      }));
+    const excluir = vi.spyOn(configuracao, 'excluirTipo').mockResolvedValue();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<Formulario />);
+
+    const usuario = userEvent.setup();
+    await usuario.type(
+      await screen.findByLabelText('Novo tipo de ocorrência'),
+      'Avaria',
+    );
+    await usuario.click(screen.getByRole('button', { name: 'Criar tipo' }));
+    expect(criar).toHaveBeenCalledWith('Avaria');
+    expect(
+      await screen.findByRole('tab', { name: 'Avaria', selected: true }),
+    ).toBeInTheDocument();
+    // Tipo criado pela empresa não tem padrão para voltar: é excluído
+    expect(
+      screen.queryByRole('button', { name: 'Voltar ao padrão' }),
+    ).toBeNull();
+
+    const nome = screen.getByLabelText('Nome do tipo');
+    await usuario.clear(nome);
+    await usuario.type(nome, 'Avaria na entrega');
+    await usuario.click(
+      screen.getByRole('button', { name: 'Salvar formulário' }),
+    );
+    expect(salvar).toHaveBeenCalledWith(
+      'AVARIA',
+      expect.objectContaining({ nome: 'Avaria na entrega' }),
+    );
+    expect(
+      await screen.findByRole('tab', { name: 'Avaria na entrega' }),
+    ).toBeInTheDocument();
+    // Os nomes novos chegam às outras telas pela sessão
+    expect(atualizar).toHaveBeenCalled();
+
+    await usuario.click(screen.getByRole('button', { name: 'Excluir tipo' }));
+    expect(excluir).toHaveBeenCalledWith('AVARIA');
+    expect(await screen.findByText('Tipo excluído.')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Avaria/ })).toBeNull();
   });
 });

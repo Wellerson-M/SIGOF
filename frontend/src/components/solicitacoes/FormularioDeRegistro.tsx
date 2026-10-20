@@ -9,11 +9,10 @@ import {
   type CausaDeErro,
   type Filial,
 } from '@/lib/cadastros';
-import { usaModulo, useFormulario } from '@/lib/configuracao';
+import { usaModulo, useFormulario, nomeDoTipo } from '@/lib/configuracao';
 import {
   ANEXO,
   NOME_DO_STATUS,
-  NOME_DO_TIPO,
   TIPOS,
   api,
   dataCurta,
@@ -224,7 +223,7 @@ export function FormularioDeRegistro() {
             >
               {tiposAtivos.map((t) => (
                 <option key={t} value={t}>
-                  {NOME_DO_TIPO[t]}
+                  {formulario.doTipo(t).nome}
                 </option>
               ))}
             </select>
@@ -476,7 +475,7 @@ export function FormularioDeRegistro() {
                 >
                   {r.protocolo}
                 </Link>{' '}
-                — {NOME_DO_TIPO[r.tipo]}
+                — {nomeDoTipo(usuario, r.tipo)}
                 {documentos(r) ? `, ${documentos(r)}` : ''}
               </li>
             ))}

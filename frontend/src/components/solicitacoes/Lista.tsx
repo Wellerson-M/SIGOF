@@ -4,13 +4,12 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Alerta, BOTAO_SECUNDARIO } from '@/components/Janela';
 import { useSessao } from '@/lib/sessao';
+import { nomeDoTipo, tiposDaEmpresa } from '@/lib/configuracao';
 import {
   COLUNAS,
   NOME_DA_PRIORIDADE,
   NOME_DO_STATUS,
-  NOME_DO_TIPO,
   PRIORIDADES,
-  TIPOS,
   api,
   dataCurta,
   documentos,
@@ -142,7 +141,7 @@ export function Lista() {
         <Seletor
           rotulo="Tipo"
           valor={filtros.tipo?.[0]}
-          opcoes={TIPOS.map((t) => [t, NOME_DO_TIPO[t]])}
+          opcoes={tiposDaEmpresa(usuario).map((t) => [t.tipo, t.nome])}
           aoMudar={(v) => filtrar({ tipo: v ? [v] : undefined })}
         />
         <label className="flex flex-col gap-1 text-xs font-medium text-texto-suave">
@@ -240,7 +239,7 @@ export function Lista() {
                     </td>
                     <td className="max-w-80 px-3 py-2">
                       <p className="text-xs text-texto-suave">
-                        {NOME_DO_TIPO[s.tipo]}
+                        {nomeDoTipo(usuario, s.tipo)}
                         {documentos(s) && ` · ${documentos(s)}`}
                       </p>
                       <p className="truncate text-texto">{s.descricao}</p>

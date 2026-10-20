@@ -10,14 +10,9 @@ import {
   type Indicadores,
   type Periodo,
 } from '@/lib/indicadores';
-import { usaModulo } from '@/lib/configuracao';
+import { usaModulo, nomeDoTipo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
-import {
-  COLUNAS,
-  NOME_DO_STATUS,
-  NOME_DO_TIPO,
-  mensagemDoErro,
-} from '@/lib/solicitacoes';
+import { COLUNAS, NOME_DO_STATUS, mensagemDoErro } from '@/lib/solicitacoes';
 
 const PERIODOS: Periodo[] = [7, 30, 90];
 
@@ -187,7 +182,7 @@ export default function PaginaDeIndicadores() {
               <Barras
                 titulo="Abertas no período, por tipo"
                 itens={dados.porTipo.map((t) => ({
-                  nome: NOME_DO_TIPO[t.tipo],
+                  nome: nomeDoTipo(usuario, t.tipo),
                   valor: t.total,
                 }))}
               />
@@ -219,7 +214,7 @@ export default function PaginaDeIndicadores() {
             <Barras
               titulo="Tempo médio até resolver, por tipo"
               itens={(dados.tempoAteResolverPorTipo ?? []).map((t) => ({
-                nome: NOME_DO_TIPO[t.tipo],
+                nome: nomeDoTipo(usuario, t.tipo),
                 valor: t.minutos,
               }))}
               formatar={duracao}

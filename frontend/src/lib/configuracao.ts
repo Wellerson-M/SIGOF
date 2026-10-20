@@ -8,7 +8,8 @@
  */
 import { useEffect, useState } from 'react';
 import { pedir, type UsuarioLogado } from './api';
-import type { Tipo } from './solicitacoes';
+import { useSessao } from './sessao';
+import { NOME_DO_TIPO, TIPOS, type Tipo } from './solicitacoes';
 
 export type Modulo =
   | 'FILIAIS'
@@ -114,6 +115,10 @@ export interface Campo {
 
 export interface ConfiguracaoDoTipo {
   tipo: Tipo;
+  /** Como aparece nas telas (a empresa pode renomear). */
+  nome: string;
+  /** Um dos quatro do sistema: volta ao padrão, mas não é excluído. */
+  doSistema: boolean;
   ativo: boolean;
   /** Pelo menos um entre CTe, NF e fatura. */
   exigirDocumento: boolean;
@@ -165,7 +170,10 @@ export const configuracao = {
     pedir<FormularioDaEmpresa>(
       `/configuracao/formulario${todos ? '?todos=1' : ''}`,
     ),
-  alterarFormulario: (tipo: Tipo, dados: Omit<ConfiguracaoDoTipo, 'tipo'>) =>
+  alterarFormulario: (
+    tipo: Tipo,
+    dados: Omit<ConfiguracaoDoTipo, 'tipo' | 'doSistema'>,
+  ) =>
     pedir<ConfiguracaoDoTipo>(`/configuracao/formulario/${tipo}`, {
       method: 'PUT',
       ...json(dados),
@@ -174,7 +182,41 @@ export const configuracao = {
     pedir<ConfiguracaoDoTipo>(`/configuracao/formulario/${tipo}`, {
       method: 'DELETE',
     }),
+  criarTipo: (nome: string) =>
+    pedir<ConfiguracaoDoTipo>('/configuracao/tipos', {
+      method: 'POST',
+      ...json({ nome }),
+    }),
+  excluirTipo: (tipo: Tipo) =>
+    pedir<void>(`/configuracao/tipos/${tipo}`, { method: 'DELETE' }),
 };
+
+/** Os tipos da empresa (do sistema e criados por ela), com o nome de agora. */
+export function tiposDaEmpresa(
+  usuario: UsuarioLogado | null | undefined,
+): { tipo: Tipo; nome: string }[] {
+  return (
+    usuario?.empresa.tipos ??
+    TIPOS.map((tipo) => ({ tipo, nome: NOME_DO_TIPO[tipo] ?? tipo }))
+  );
+}
+
+/** O nome do tipo: o que a empresa deu, o do sistema ou, por fim, o código. */
+export function nomeDoTipo(
+  usuario: UsuarioLogado | null | undefined,
+  tipo: Tipo,
+): string {
+  return (
+    usuario?.empresa.tipos?.find((t) => t.tipo === tipo)?.nome ??
+    NOME_DO_TIPO[tipo] ??
+    tipo
+  );
+}
+
+export function useNomeDoTipo(): (tipo: Tipo) => string {
+  const { usuario } = useSessao();
+  return (tipo) => nomeDoTipo(usuario, tipo);
+}
 
 /**
  * Quando a configuração não carrega (sem conexão por um instante), o
@@ -185,6 +227,8 @@ export function configuracaoLivre(tipo: Tipo): ConfiguracaoDoTipo {
   const opcional: Campo = { modo: 'OPCIONAL' };
   return {
     tipo,
+    nome: NOME_DO_TIPO[tipo] ?? tipo,
+    doSistema: TIPOS.includes(tipo),
     ativo: true,
     exigirDocumento: false,
     campos: {

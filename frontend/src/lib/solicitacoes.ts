@@ -14,7 +14,11 @@ export type Status =
   | 'RESOLVIDO'
   | 'CANCELADO';
 export type Prioridade = 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
-export type Tipo = 'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/**
+ * Código do tipo de ocorrência: um dos quatro do sistema ou um criado pela
+ * empresa. O nome que aparece vem de `useNomeDoTipo` (a empresa renomeia).
+ */
+export type Tipo = string;
 export type SituacaoDoSla =
   'NO_PRAZO' | 'ATENCAO' | 'VENCIDO' | 'PAUSADO' | 'ENCERRADO';
 
@@ -364,13 +368,15 @@ export const NOME_DA_PRIORIDADE: Record<Prioridade, string> = {
 
 export const PRIORIDADES: Prioridade[] = ['URGENTE', 'ALTA', 'MEDIA', 'BAIXA'];
 
-export const NOME_DO_TIPO: Record<Tipo, string> = {
+/** Nomes dos tipos do sistema (a empresa pode trocar; ver useNomeDoTipo). */
+export const NOME_DO_TIPO: Readonly<Record<string, string>> = {
   REVERSAO: 'Reversão',
   TROCA_PAGADOR: 'Troca de pagador',
   AJUSTE_FISCAL: 'Ajuste fiscal',
   OUTRO: 'Outro',
 };
 
+/** Os tipos do sistema, na ordem das telas. */
 export const TIPOS: Tipo[] = [
   'REVERSAO',
   'TROCA_PAGADOR',

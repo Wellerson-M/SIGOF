@@ -29,8 +29,8 @@ export interface DadosDaCausa {
   ativa?: boolean;
 }
 
-export type TipoDeOcorrencia =
-  'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
+/** Código do tipo (um dos do sistema ou um criado pela empresa). */
+export type TipoDeOcorrencia = string;
 export type QuemMarca = 'SOLICITANTE' | 'EQUIPE' | 'QUALQUER';
 
 /** Item que a empresa pede para marcar (ex.: "Desacordo fiscal feito"). */
