@@ -15,6 +15,7 @@ import {
 } from '../../http/autenticacao.js';
 import { ErroNaoAutenticado, ErroNaoEncontrado } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
+import { modulosLigados } from '../../dominio/modulos.js';
 import type { ServicoDeAutenticacao, Tokens } from './servico.js';
 
 /**
@@ -183,6 +184,8 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
             razaoSocial: true,
             slug: true,
             exigirCausaAoResolver: true,
+            modulosLiberados: true,
+            modulosAtivos: true,
           },
         },
       },
@@ -191,7 +194,15 @@ export function rotasDeAutenticacao(opcoes: OpcoesDasRotasDeAuth): Router {
     if (!usuario) {
       throw new ErroNaoEncontrado('Usuário não encontrado');
     }
-    res.json(usuario);
+    // As telas só precisam saber o que está em uso
+    const { modulosLiberados, modulosAtivos, ...empresa } = usuario.empresa;
+    res.json({
+      ...usuario,
+      empresa: {
+        ...empresa,
+        modulos: modulosLigados({ modulosLiberados, modulosAtivos }),
+      },
+    });
   });
 
   return rotas;

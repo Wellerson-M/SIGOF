@@ -10,6 +10,8 @@ import {
   type IndicadorDeSla,
   type Prioridade,
 } from '../../dominio/fila.js';
+import { problemaNaAbertura } from '../../dominio/formulario.js';
+import { moduloLigado, type ChavesDosModulos } from '../../dominio/modulos.js';
 import { competenciaDe, formatarProtocolo } from '../../dominio/protocolo.js';
 import {
   expedienteDaEmpresa,
@@ -37,6 +39,7 @@ import { registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
 import type { ServicoDeAvisos } from '../avisos/avisos.js';
 import type { Ocorrido } from '../avisos/modelos.js';
+import { configuracaoDoTipo } from '../configuracao/servico.js';
 
 export type TipoOcorrencia =
   'REVERSAO' | 'TROCA_PAGADOR' | 'AJUSTE_FISCAL' | 'OUTRO';
@@ -50,9 +53,11 @@ export interface DadosDeAbertura {
   nfs?: string[] | undefined;
   fatura?: string | undefined;
   pagadorCorreto?: string | undefined;
+  /** Um dos motivos que a empresa configurou para o tipo. */
+  motivo?: string | undefined;
   descricao: string;
   prioridade?: Prioridade | undefined;
-  /** Filial que emitiu o documento (obrigatória se a empresa tem filiais). */
+  /** Filial que emitiu o documento (a empresa decide se é obrigatória). */
   filialId?: string | undefined;
   /**
    * SHA-256 dos arquivos que vão ser anexados logo depois de abrir. Só
@@ -91,6 +96,7 @@ export interface Resumo {
   ctes: string[];
   nfs: string[];
   fatura: string | null;
+  motivo: string | null;
   descricao: string;
   status: Status;
   prioridade: Prioridade;
@@ -363,32 +369,70 @@ export class ServicoDeSolicitacoes {
     }
     const acaoTomada = registro?.acaoTomada?.trim() || null;
 
-    const ctes = [...numeros(dados.cte, dados.ctes)];
-    const nfs = [...numeros(dados.nf, dados.nfs)];
-    const cte = ctes[0] ?? null;
-    const nf = nfs[0] ?? null;
-    const fatura = dados.fatura?.trim().toUpperCase() || null;
-    const pagadorCorreto = dados.pagadorCorreto?.trim() || null;
-
-    if (dados.tipo !== 'OUTRO' && cte === null && nf === null && !fatura) {
-      throw new ErroDeRegraDeNegocio('Informe o CTe, a NF ou a fatura');
-    }
-    if (dados.tipo === 'TROCA_PAGADOR' && pagadorCorreto === null) {
-      throw new ErroDeRegraDeNegocio(
-        'Na troca de pagador, informe quem é o pagador correto',
-      );
-    }
+    const todosOsCtes = [...numeros(dados.cte, dados.ctes)];
+    const todasAsNfs = [...numeros(dados.nf, dados.nfs)];
+    const faturaDigitada = dados.fatura?.trim().toUpperCase() || null;
 
     const criada = await this.emTransacaoComRepeticao(async (tx) => {
       const agora = this.agora();
       const empresa = await tx.empresa.findUniqueOrThrow({
         where: { id: usuario.empresaId },
       });
+      if (registro && !moduloLigado(empresa, 'REGISTRO_RAPIDO')) {
+        throw new ErroDeRegraDeNegocio(
+          'O registro rápido está desligado na sua empresa',
+        );
+      }
+
+      // O formulário do tipo, como a empresa configurou: campo escondido
+      // é ignorado (ou recebe o valor padrão), o resto é conferido
+      const config = await configuracaoDoTipo(tx, empresa, dados.tipo);
+      if (!config.ativo) {
+        throw new ErroDeRegraDeNegocio(
+          'Este tipo de ocorrência está desativado na sua empresa',
+        );
+      }
+      const valor = (
+        nome: 'pagadorCorreto' | 'motivo',
+        digitado: string | undefined,
+      ) =>
+        config.campos[nome].modo === 'OCULTO'
+          ? (config.campos[nome].padrao ?? null)
+          : digitado?.trim() || null;
+      const visivel = (nome: 'cte' | 'nf' | 'fatura') =>
+        config.campos[nome].modo !== 'OCULTO';
+      const ctes = visivel('cte') ? todosOsCtes : [];
+      const nfs = visivel('nf') ? todasAsNfs : [];
+      const cte = ctes[0] ?? null;
+      const nf = nfs[0] ?? null;
+      const fatura = visivel('fatura') ? faturaDigitada : null;
+      const pagadorCorreto = valor('pagadorCorreto', dados.pagadorCorreto);
+      const motivo = valor('motivo', dados.motivo);
+      const prioridade =
+        config.campos.prioridade.modo === 'OCULTO' || !dados.prioridade
+          ? ((config.campos.prioridade.padrao as Prioridade | undefined) ??
+            'MEDIA')
+          : dados.prioridade;
+      const problema = problemaNaAbertura(
+        config,
+        {
+          ctes,
+          nfs,
+          fatura,
+          filialId: dados.filialId ?? null,
+          pagadorCorreto,
+          motivo,
+          descricao: dados.descricao.trim(),
+        },
+        Boolean(registro),
+      );
+      if (problema) throw new ErroDeRegraDeNegocio(problema);
+
       const filialId = await this.conferirFilial(
         tx,
         usuario.empresaId,
         dados.filialId,
-        cte !== null || nf !== null || fatura !== null,
+        config.campos.filial.modo,
       );
 
       if (!dados.confirmarDuplicidade) {
@@ -423,8 +467,8 @@ export class ServicoDeSolicitacoes {
         ? await this.conferirClassificacao(
             tx,
             usuario,
+            empresa,
             registro.classificacao,
-            empresa.exigirCausaAoResolver,
           )
         : {};
 
@@ -441,8 +485,9 @@ export class ServicoDeSolicitacoes {
           nfs,
           fatura,
           pagadorCorreto,
+          motivo,
           descricao: dados.descricao.trim(),
-          prioridade: dados.prioridade ?? 'MEDIA',
+          prioridade,
           criadoEm: agora,
           ...(registro
             ? {
@@ -493,7 +538,10 @@ export class ServicoDeSolicitacoes {
       }
 
       // Itens que quem abriu já marcou (ex.: "desacordo feito")
-      for (const itemId of new Set(dados.verificacoes ?? [])) {
+      const marcados = moduloLigado(empresa, 'VERIFICACOES')
+        ? new Set(dados.verificacoes ?? [])
+        : new Set<string>();
+      for (const itemId of marcados) {
         const item = await this.itemQueOUsuarioMarca(
           tx,
           usuario,
@@ -722,6 +770,7 @@ export class ServicoDeSolicitacoes {
     }
 
     const encerrada = ehTerminal(solicitacao.status);
+    const controlaCausa = moduloLigado(solicitacao.empresa, 'CAUSA_DO_ERRO');
     return {
       ...this.resumir(
         solicitacao,
@@ -731,7 +780,7 @@ export class ServicoDeSolicitacoes {
       pagadorCorreto: solicitacao.pagadorCorreto,
       resolvidoEm: solicitacao.resolvidoEm,
       causa:
-        ehInterno(usuario.perfil) && solicitacao.causa
+        ehInterno(usuario.perfil) && controlaCausa && solicitacao.causa
           ? {
               ...solicitacao.causa,
               detalhe: solicitacao.causaDetalhe,
@@ -755,12 +804,14 @@ export class ServicoDeSolicitacoes {
         anexos: m.anexos,
       })),
       emails: solicitacao.emails,
-      verificacoes: await this.verificacoesDa(
-        usuario,
-        solicitacao.tipo,
-        ehTerminal(solicitacao.status),
-        solicitacao.marcacoes,
-      ),
+      verificacoes: moduloLigado(solicitacao.empresa, 'VERIFICACOES')
+        ? await this.verificacoesDa(
+            usuario,
+            solicitacao.tipo,
+            ehTerminal(solicitacao.status),
+            solicitacao.marcacoes,
+          )
+        : [],
       anexos: solicitacao.anexos.map((a) => ({
         id: a.id,
         nomeArquivo: a.nomeArquivo,
@@ -777,6 +828,7 @@ export class ServicoDeSolicitacoes {
         atribuir: !encerrada && PERFIS_QUE_ATRIBUEM.includes(usuario.perfil),
         comentarInterno: ehInterno(usuario.perfil),
         classificar:
+          controlaCausa &&
           solicitacao.status === 'RESOLVIDO' &&
           PERFIS_QUE_CLASSIFICAM.includes(usuario.perfil),
       },
@@ -808,7 +860,10 @@ export class ServicoDeSolicitacoes {
       const agora = this.agora();
       const expediente = expedienteDaEmpresa(atual.empresa);
       const sla = this.slaDepoisDaMudanca(atual, de, para, agora, expediente);
-      if (para === 'RESOLVIDO') {
+      if (
+        para === 'RESOLVIDO' &&
+        moduloLigado(atual.empresa, 'VERIFICACOES')
+      ) {
         await this.barrarSemVerificacoesObrigatorias(tx, atual);
       }
       const causa =
@@ -816,8 +871,8 @@ export class ServicoDeSolicitacoes {
           ? await this.conferirClassificacao(
               tx,
               usuario,
+              atual.empresa,
               classificacao,
-              atual.empresa.exigirCausaAoResolver,
             )
           : {};
 
@@ -882,6 +937,11 @@ export class ServicoDeSolicitacoes {
     }
     return this.prisma.$transaction(async (tx) => {
       const atual = await this.carregar(tx, usuario, id);
+      if (!moduloLigado(atual.empresa, 'CAUSA_DO_ERRO')) {
+        throw new ErroDeRegraDeNegocio(
+          'O controle de causa do erro está desligado na sua empresa',
+        );
+      }
       if (atual.status !== 'RESOLVIDO') {
         throw new ErroDeRegraDeNegocio(
           'A causa do erro é registrada em solicitação resolvida',
@@ -890,8 +950,8 @@ export class ServicoDeSolicitacoes {
       const dados = await this.conferirClassificacao(
         tx,
         usuario,
+        { ...atual.empresa, exigirCausaAoResolver: true },
         classificacao,
-        true,
       );
       const salva = await tx.solicitacao.update({
         where: { id: atual.id },
@@ -921,6 +981,11 @@ export class ServicoDeSolicitacoes {
     await this.prisma.$transaction(async (tx) => {
       const atual = await this.carregar(tx, usuario, id);
       this.barrarSeEncerrada(atual.status);
+      if (!moduloLigado(atual.empresa, 'VERIFICACOES')) {
+        throw new ErroDeRegraDeNegocio(
+          'As verificações estão desligadas na sua empresa',
+        );
+      }
       const item = await this.itemQueOUsuarioMarca(
         tx,
         usuario,
@@ -1133,16 +1198,18 @@ export class ServicoDeSolicitacoes {
   // ------------------------------------------------------------ Internos
 
   /**
-   * Com filiais cadastradas, quem informa CTe ou NF precisa dizer de qual
-   * filial é: sem isso, a duplicidade não sabe se o número é o mesmo
-   * documento. A filial tem de ser ativa e da mesma empresa.
+   * A filial que emitiu o documento: a duplicidade usa para saber se dois
+   * CTe de mesmo número são o mesmo documento. A empresa decide se é
+   * obrigatória (com filiais cadastradas), opcional ou escondida. Quando
+   * vem, tem de ser ativa e da mesma empresa.
    */
   private async conferirFilial(
     tx: Transacao,
     empresaId: string,
     filialId: string | undefined,
-    temDocumento: boolean,
+    modo: 'OCULTO' | 'OPCIONAL' | 'OBRIGATORIO',
   ): Promise<string | null> {
+    if (modo === 'OCULTO') return null;
     if (filialId) {
       const filial = await tx.filial.findFirst({
         where: { id: filialId, empresaId, ativa: true },
@@ -1154,7 +1221,7 @@ export class ServicoDeSolicitacoes {
       return filial.id;
     }
     if (
-      temDocumento &&
+      modo === 'OBRIGATORIO' &&
       (await tx.filial.count({ where: { empresaId, ativa: true } })) > 0
     ) {
       throw new ErroDeRegraDeNegocio('Escolha a filial que emitiu o documento');
@@ -1299,15 +1366,19 @@ export class ServicoDeSolicitacoes {
   private async conferirClassificacao(
     tx: Transacao,
     usuario: UsuarioAutenticado,
+    empresa: ChavesDosModulos & { exigirCausaAoResolver: boolean },
     classificacao: Classificacao | undefined,
-    obrigatoria: boolean,
   ): Promise<{
     causaId?: string | null;
     causaDetalhe?: string | null;
     causaComentario?: string | null;
   }> {
+    // Módulo desligado: a causa nem é pedida (e o que vier é ignorado)
+    if (!moduloLigado(empresa, 'CAUSA_DO_ERRO')) {
+      return {};
+    }
     if (!classificacao) {
-      if (obrigatoria) {
+      if (empresa.exigirCausaAoResolver) {
         throw new ErroDeRegraDeNegocio('Informe de quem foi o erro');
       }
       return {};
@@ -1550,6 +1621,7 @@ export class ServicoDeSolicitacoes {
       ctes: s.ctes,
       nfs: s.nfs,
       fatura: s.fatura,
+      motivo: s.motivo,
       descricao: s.descricao,
       status: s.status,
       prioridade: s.prioridade,

@@ -65,6 +65,10 @@ enum AcaoDeAuditoria {
   EMAIL_CONFIGURADO
   /// Cadastro auxiliar da empresa (filial, causa de erro...) criado ou alterado.
   CADASTRO_ALTERADO
+  /// Módulos ligados ou desligados pelo administrador da empresa.
+  MODULOS_ALTERADOS
+  /// Formulário de um tipo de ocorrência configurado.
+  FORMULARIO_ALTERADO
 }
 
 /// Em que momento o arquivo entrou: o detalhe mostra cada grupo separado.
@@ -147,6 +151,12 @@ model Empresa {
   /// Quais acontecimentos geram e-mail (os outros ficam só no sino).
   emailEventos        String[] @default(["ABERTA", "STATUS", "MENSAGEM", "ANEXO"]) @map("email_eventos")
 
+  // --- Módulos (ver dominio/modulos.ts) ---
+  // A plataforma libera; a empresa liga os liberados que quer usar.
+
+  modulosLiberados String[] @default(["FILIAIS", "CAUSA_DO_ERRO", "VERIFICACOES", "REGISTRO_RAPIDO", "EMAIL", "BALANCO", "FORMULARIO"]) @map("modulos_liberados")
+  modulosAtivos    String[] @default(["FILIAIS", "CAUSA_DO_ERRO", "VERIFICACOES", "REGISTRO_RAPIDO", "EMAIL", "BALANCO", "FORMULARIO"]) @map("modulos_ativos")
+
   usuarios     Usuario[]
   solicitacoes Solicitacao[]
   sequencias   SequenciaProtocolo[]
@@ -162,6 +172,7 @@ model Empresa {
   verificacoes ItemDeVerificacao[]
   producao     ProducaoDoDigitador[]
   marcacoes    MarcacaoDeVerificacao[]
+  formularios  ConfiguracaoDoFormulario[]
 
   @@map("empresas")
 }
@@ -265,6 +276,8 @@ model Solicitacao {
   /// Número da fatura, quando a correção é da fatura inteira.
   fatura         String?
   pagadorCorreto String?        @map("pagador_correto")
+  /// Motivo escolhido na lista que a empresa configurou para o tipo.
+  motivo         String?
   descricao      String
 
   status     StatusSolicitacao @default(NOVO)
@@ -356,6 +369,26 @@ model CausaDeErro {
 
   @@unique([empresaId, nome])
   @@map("causas_de_erro")
+}
+
+/// O formulário de abertura de um tipo de ocorrência, como a empresa
+/// configurou. Sem linha aqui, vale o padrão do sistema (dominio/formulario.ts).
+model ConfiguracaoDoFormulario {
+  id        String         @id @default(uuid())
+  empresaId String         @map("empresa_id")
+  tipo      TipoOcorrencia
+  ativo     Boolean        @default(true)
+  /// Nulo: usa o padrão do tipo.
+  exigirDocumento Boolean? @map("exigir_documento")
+  /// { campo: { modo, padrao } } — só os campos que a empresa definiu.
+  campos    Json           @default("{}")
+  motivos   String[]       @default([])
+  alteradoEm DateTime      @updatedAt @map("alterado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  @@unique([empresaId, tipo])
+  @@map("configuracoes_do_formulario")
 }
 
 /// Item de verificação que a empresa pede nas solicitações (ex.: "O

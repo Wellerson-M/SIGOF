@@ -40,7 +40,9 @@ const esquemaAbertura = z
       .optional(),
     fatura: opcional(40),
     pagadorCorreto: opcional(200),
-    descricao: z.string().trim().min(3, 'Diga o que era').max(5000),
+    motivo: opcional(80),
+    // O mínimo depende do formulário que a empresa configurou
+    descricao: z.string().trim().max(5000).default(''),
     prioridade: z.enum(PRIORIDADES).optional(),
     filialId: z.string().uuid('Filial inválida').optional(),
     hashesDosAnexos: z
@@ -61,17 +63,6 @@ const esquemaAbertura = z
           .optional(),
       })
       .optional(),
-  })
-  .superRefine((dados, contexto) => {
-    // Quem abre para a equipe precisa explicar; no registro rápido, que já
-    // foi resolvido, basta dizer o que era
-    if (!dados.registro && dados.descricao.length < 10) {
-      contexto.addIssue({
-        code: 'custom',
-        path: ['descricao'],
-        message: 'Descreva o problema com pelo menos 10 caracteres',
-      });
-    }
   });
 
 const esquemaClassificacao = z.object({

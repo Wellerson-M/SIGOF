@@ -9,6 +9,7 @@ import {
 } from '../../http/erros.js';
 import { gerarHashDeSenha, verificarSenha } from '../../seguranca/senha.js';
 import { gerarSenhaProvisoria } from '../administracao/senha-provisoria.js';
+import { normalizarModulos, type Modulo } from '../../dominio/modulos.js';
 import { CAUSAS_PADRAO } from '../cadastros/servico.js';
 
 /**
@@ -38,6 +39,8 @@ export interface ResumoDaEmpresa {
   solicitacoesEmAberto: number;
   solicitacoesNoMes: number;
   ultimoAcessoEm: Date | null;
+  /** O que a empresa pode usar (ela liga o que quiser dentre estes). */
+  modulosLiberados: Modulo[];
 }
 
 export interface NovaEmpresa {
@@ -244,6 +247,7 @@ export class ServicoDaPlataforma {
         slug: true,
         ativa: true,
         criadoEm: true,
+        modulosLiberados: true,
         _count: {
           select: {
             usuarios: { where: { ativo: true } },
@@ -278,6 +282,7 @@ export class ServicoDaPlataforma {
         noMes.find((n) => n.empresaId === e.id)?._count._all ?? 0,
       ultimoAcessoEm:
         acessos.find((a) => a.empresaId === e.id)?._max.ultimoAcessoEm ?? null,
+      modulosLiberados: normalizarModulos(e.modulosLiberados),
     }));
   }
 
@@ -343,8 +348,10 @@ export class ServicoDaPlataforma {
   }
 
   /**
-   * Muda o nome ou ativa/desativa. Desativar derruba as sessões de todos
-   * os usuários da empresa na hora; os dados ficam guardados.
+   * Muda o nome, ativa/desativa ou libera módulos. Desativar derruba as
+   * sessões de todos os usuários da empresa na hora; os dados ficam
+   * guardados. Bloquear um módulo desliga o uso dele na empresa, mas não
+   * apaga o que ela tinha configurado.
    */
   async alterarEmpresa(
     admin: AdministradorAutenticado,
@@ -352,6 +359,7 @@ export class ServicoDaPlataforma {
     alteracao: {
       razaoSocial?: string | undefined;
       ativa?: boolean | undefined;
+      modulosLiberados?: string[] | undefined;
     },
     ip?: string,
   ): Promise<ResumoDaEmpresa> {
@@ -366,6 +374,11 @@ export class ServicoDaPlataforma {
             ? { razaoSocial: alteracao.razaoSocial.trim() }
             : {}),
           ...(alteracao.ativa === undefined ? {} : { ativa: alteracao.ativa }),
+          ...(alteracao.modulosLiberados === undefined
+            ? {}
+            : {
+                modulosLiberados: normalizarModulos(alteracao.modulosLiberados),
+              }),
         },
       });
       if (alteracao.ativa === false && atual.ativa) {

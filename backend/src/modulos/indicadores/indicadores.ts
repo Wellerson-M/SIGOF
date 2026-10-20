@@ -10,12 +10,14 @@ import {
   type Indicadores,
   type SolicitacaoParaIndicadores,
 } from '../../dominio/indicadores.js';
+import { moduloLigado } from '../../dominio/modulos.js';
 import { expedienteDaEmpresa } from '../../dominio/sla.js';
 import {
   autenticar,
   exigirPerfil,
   usuarioDa,
 } from '../../http/autenticacao.js';
+import { ErroDeRegraDeNegocio } from '../../http/erros.js';
 import { validar } from '../../http/validacao.js';
 import { registrar } from '../auditoria/auditoria.js';
 import type { UsuarioAutenticado } from '../auth/tokens.js';
@@ -178,6 +180,15 @@ export class ServicoDeIndicadores {
     mes: string,
     linhas: { digitador: string; ctesEmitidos: number }[],
   ): Promise<number> {
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: usuario.empresaId },
+      select: { modulosLiberados: true, modulosAtivos: true },
+    });
+    if (!moduloLigado(empresa, 'BALANCO')) {
+      throw new ErroDeRegraDeNegocio(
+        'O balanço por digitador está desligado na sua empresa',
+      );
+    }
     // A mesma pessoa em duas linhas: soma
     const somadas = new Map<
       string,
