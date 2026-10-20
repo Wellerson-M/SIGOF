@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ErroDaApi } from '@/lib/api';
@@ -319,7 +319,8 @@ describe('FormularioDeAbertura', () => {
       render(<FormularioDeAbertura />);
 
       const motivo = await screen.findByLabelText('Motivo');
-      expect(motivo).toHaveValue('Mercadoria devolvida');
+      // Os padrões entram logo depois de a configuração chegar
+      await waitFor(() => expect(motivo).toHaveValue('Mercadoria devolvida'));
       expect(screen.getByLabelText('O que precisa ser corrigido')).toHaveValue(
         'Cliente: ',
       );
