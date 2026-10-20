@@ -6,7 +6,8 @@
  *   npm run plataforma:criar-admin -- --nome "Fulano" --email fulano@x.com
  *
  * Mostra a senha provisória uma única vez; no primeiro acesso, em
- * /plataforma/entrar, ela é trocada.
+ * /plataforma/entrar, ela é trocada. Rodar de novo com o mesmo e-mail
+ * gera outra senha provisória (para quando a primeira se perdeu).
  */
 import { config } from 'dotenv';
 import { criarAdministradorDaPlataforma } from '../modulos/plataforma/servico.js';
@@ -37,8 +38,15 @@ async function main(): Promise<void> {
   }
   const prisma = criarPrismaClient(databaseUrl);
   try {
-    const senha = await criarAdministradorDaPlataforma(prisma, { nome, email });
-    console.log(`Administrador da plataforma criado: ${email}`);
+    const { senha, novo } = await criarAdministradorDaPlataforma(prisma, {
+      nome,
+      email,
+    });
+    console.log(
+      novo
+        ? `Administrador da plataforma criado: ${email}`
+        : `Já existia: ${email}. Senha provisória nova gerada.`,
+    );
     console.log(
       `Senha provisória (anote agora, não aparece de novo): ${senha}`,
     );
