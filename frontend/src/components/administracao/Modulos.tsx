@@ -67,8 +67,10 @@ export function Modulos() {
     );
   }
 
+  // Mesmos módulos, em qualquer ordem: nada a salvar
   const mudou =
-    [...ligados].sort().join() !== [...modulos.ligados].sort().join();
+    ligados.length !== modulos.ligados.length ||
+    ligados.some((m) => !modulos.ligados.includes(m));
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
