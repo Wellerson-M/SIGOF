@@ -24,6 +24,8 @@ export interface UsuarioLogado {
     exigirCausaAoResolver?: boolean;
     /** Módulos em uso (liberados pela plataforma e ligados pela empresa). */
     modulos?: Modulo[];
+    /** Encerradas ficam no quadro por estes dias. */
+    diasNoQuadroDepoisDeEncerrar?: number;
   };
 }
 

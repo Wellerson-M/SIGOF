@@ -17,7 +17,9 @@ export type Modulo =
   | 'REGISTRO_RAPIDO'
   | 'EMAIL'
   | 'BALANCO'
-  | 'FORMULARIO';
+  | 'FORMULARIO'
+  | 'EXCLUSAO_DE_SOLICITACOES'
+  | 'EXCLUSAO_DE_ANEXOS';
 
 /** O catálogo, na ordem em que aparece nas telas. */
 export const MODULOS: { id: Modulo; nome: string; descricao: string }[] = [
@@ -62,6 +64,18 @@ export const MODULOS: { id: Modulo; nome: string; descricao: string }[] = [
     nome: 'Balanço por digitador',
     descricao:
       'Importar a produção do mês e ver a taxa de erro de cada digitador nos Indicadores.',
+  },
+  {
+    id: 'EXCLUSAO_DE_SOLICITACOES',
+    nome: 'Excluir solicitações encerradas',
+    descricao:
+      'Supervisor e administrador excluem resolvidas e canceladas (somem das telas e dos números; ficam na auditoria).',
+  },
+  {
+    id: 'EXCLUSAO_DE_ANEXOS',
+    nome: 'Excluir anexo enviado',
+    descricao:
+      'Quem enviou um arquivo pode excluí-lo por alguns minutos (o prazo fica em Empresa e expediente).',
   },
 ];
 

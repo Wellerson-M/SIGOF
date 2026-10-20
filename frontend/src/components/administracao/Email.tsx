@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeSenha } from '@/components/CampoDeSenha';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   Alerta,
@@ -273,8 +274,7 @@ export function Email() {
           </label>
           <label className={ROTULO}>
             Senha de app
-            <input
-              type="password"
+            <CampoDeSenha
               value={formulario.senha}
               onChange={(e) => mudar({ senha: e.target.value })}
               placeholder={

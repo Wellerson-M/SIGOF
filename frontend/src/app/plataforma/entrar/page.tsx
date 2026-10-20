@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeSenha } from '@/components/CampoDeSenha';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Logo } from '@/components/Logo';
@@ -54,8 +55,7 @@ export default function EntradaDaPlataforma() {
           </label>
           <label className={ROTULO}>
             Senha
-            <input
-              type="password"
+            <CampoDeSenha
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               autoComplete="current-password"

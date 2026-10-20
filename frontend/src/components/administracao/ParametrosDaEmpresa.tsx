@@ -28,6 +28,9 @@ interface Formulario {
   slaHoras: string;
   janelaDuplicidadeDias: string;
   exigirCausaAoResolver: boolean;
+  diasNoQuadro: string;
+  minutosParaExcluirAnexo: string;
+  analistaAtribui: boolean;
 }
 
 function paraFormulario(p: Parametros): Formulario {
@@ -40,6 +43,9 @@ function paraFormulario(p: Parametros): Formulario {
     slaHoras: String(p.slaAtendimentoMinutos / 60),
     janelaDuplicidadeDias: String(p.janelaDuplicidadeDias),
     exigirCausaAoResolver: p.exigirCausaAoResolver,
+    diasNoQuadro: String(p.diasNoQuadroDepoisDeEncerrar ?? 30),
+    minutosParaExcluirAnexo: String(p.minutosParaExcluirAnexo ?? 15),
+    analistaAtribui: p.analistaAtribui ?? true,
   };
 }
 
@@ -106,6 +112,9 @@ export function ParametrosDaEmpresa() {
         ),
         janelaDuplicidadeDias: Number(formulario.janelaDuplicidadeDias),
         exigirCausaAoResolver: formulario.exigirCausaAoResolver,
+        diasNoQuadroDepoisDeEncerrar: Number(formulario.diasNoQuadro),
+        minutosParaExcluirAnexo: Number(formulario.minutosParaExcluirAnexo),
+        analistaAtribui: formulario.analistaAtribui,
       });
       setParametros(dados);
       setFormulario(paraFormulario(dados));
@@ -271,6 +280,61 @@ export function ParametrosDaEmpresa() {
             <span className="block text-xs text-texto-suave">
               A lista de causas fica na aba Causas de erro. Desligado, o campo
               aparece mas pode ficar em branco.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3 rounded-lg border border-borda bg-superficie p-4">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+          Quadro e anexos
+        </legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className={ROTULO}>
+            Encerradas ficam no quadro por (dias)
+            <input
+              type="number"
+              min={0}
+              max={90}
+              step={1}
+              value={formulario.diasNoQuadro}
+              onChange={(e) => mudar({ diasNoQuadro: e.target.value })}
+              required
+              className={CAMPO}
+            />
+          </label>
+          <label className={ROTULO}>
+            Prazo para excluir um anexo enviado (minutos)
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              step={1}
+              value={formulario.minutosParaExcluirAnexo}
+              onChange={(e) =>
+                mudar({ minutosParaExcluirAnexo: e.target.value })
+              }
+              required
+              className={CAMPO}
+            />
+          </label>
+        </div>
+        <p className="text-sm text-texto-suave">
+          Depois do prazo do quadro, a encerrada continua na Lista. Só quem
+          enviou exclui o anexo, e só dentro do prazo (módulo “Excluir anexo
+          enviado”).
+        </p>
+        <label className="flex items-start gap-2 text-sm text-texto">
+          <input
+            type="checkbox"
+            checked={formulario.analistaAtribui}
+            onChange={(e) => mudar({ analistaAtribui: e.target.checked })}
+            className="mt-0.5"
+          />
+          <span>
+            O analista também passa a solicitação para alguém
+            <span className="block text-xs text-texto-suave">
+              O supervisor sempre pode. Desligado, o analista só assume a dele.
             </span>
           </span>
         </label>

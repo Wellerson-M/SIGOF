@@ -118,6 +118,17 @@ export function Anexos({
     setEnviando(false);
   }
 
+  async function excluir(anexo: Anexo) {
+    if (!window.confirm(`Excluir ${anexo.nomeArquivo}?`)) return;
+    setErros([]);
+    try {
+      await api.excluirAnexo(solicitacaoId, anexo.id);
+      await aoMudar();
+    } catch (falha) {
+      setErros([mensagemDoErro(falha)]);
+    }
+  }
+
   async function abrir(anexo: Anexo) {
     setErros([]);
     try {
@@ -193,10 +204,22 @@ export function Anexos({
                   >
                     {anexo.nomeArquivo}
                   </button>
-                  <span className="text-xs text-texto-suave">
-                    {tamanhoLegivel(anexo.tamanhoBytes)} ·{' '}
-                    {anexo.enviadoPor.nome} · {dataCurta(anexo.criadoEm)}
-                    {anexo.mensagemId && ' · na conversa'}
+                  <span className="flex items-center gap-2 text-xs text-texto-suave">
+                    <span>
+                      {tamanhoLegivel(anexo.tamanhoBytes)} ·{' '}
+                      {anexo.enviadoPor.nome} · {dataCurta(anexo.criadoEm)}
+                      {anexo.mensagemId && ' · na conversa'}
+                    </span>
+                    {anexo.podeExcluirAte && (
+                      <button
+                        type="button"
+                        onClick={() => void excluir(anexo)}
+                        title={`Dá para excluir até ${dataCurta(anexo.podeExcluirAte)}`}
+                        className="text-critico underline"
+                      >
+                        Excluir
+                      </button>
+                    )}
                   </span>
                 </li>
               ))}

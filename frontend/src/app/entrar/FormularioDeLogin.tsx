@@ -1,5 +1,6 @@
 'use client';
 
+import { CampoDeSenha } from '@/components/CampoDeSenha';
 import { useRouter } from 'next/navigation';
 import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { ErroDaApi, entrar } from '@/lib/api';
@@ -107,6 +108,9 @@ export function FormularioDeLogin() {
   );
 }
 
+const CLASSE_DO_CAMPO =
+  'h-10 rounded-md border border-borda bg-superficie px-3 text-sm text-texto outline-none focus:border-foco';
+
 interface PropriedadesDoCampo {
   id: string;
   rotulo: string;
@@ -131,16 +135,28 @@ function Campo({
       <label htmlFor={id} className="text-sm font-medium text-texto">
         {rotulo}
       </label>
-      <input
-        id={id}
-        name={id}
-        type={tipo}
-        value={valor}
-        onChange={(evento) => aoMudar(evento.target.value)}
-        autoComplete={autoComplete}
-        aria-describedby={dica ? `${id}-dica` : undefined}
-        className="h-10 rounded-md border border-borda bg-superficie px-3 text-sm text-texto outline-none focus:border-foco"
-      />
+      {tipo === 'password' ? (
+        <CampoDeSenha
+          id={id}
+          name={id}
+          value={valor}
+          onChange={(evento) => aoMudar(evento.target.value)}
+          autoComplete={autoComplete}
+          aria-describedby={dica ? `${id}-dica` : undefined}
+          className={CLASSE_DO_CAMPO}
+        />
+      ) : (
+        <input
+          id={id}
+          name={id}
+          type={tipo}
+          value={valor}
+          onChange={(evento) => aoMudar(evento.target.value)}
+          autoComplete={autoComplete}
+          aria-describedby={dica ? `${id}-dica` : undefined}
+          className={CLASSE_DO_CAMPO}
+        />
+      )}
       {dica && (
         <span id={`${id}-dica`} className="text-xs text-texto-suave">
           {dica}

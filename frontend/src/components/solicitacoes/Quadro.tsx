@@ -8,6 +8,7 @@ import {
   useState,
   type DragEvent,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { ErroDaApi } from '@/lib/api';
 import { usaModulo } from '@/lib/configuracao';
 import { useSessao } from '@/lib/sessao';
@@ -18,8 +19,10 @@ import {
   NOME_DO_TIPO,
   PEDE_OBSERVACAO,
   api,
+  dataCurta,
   documentos,
   mensagemDoErro,
+  tempoDesde,
   type Resumo,
   type Status,
 } from '@/lib/solicitacoes';
@@ -33,6 +36,32 @@ import { EtiquetaDePrioridade, IndicadorDeSla } from './Etiquetas';
 
 /** O quadro se atualiza sozinho: o que outra pessoa mover aparece aqui. */
 export const SEGUNDOS_ENTRE_ATUALIZACOES = 30;
+
+/** Parada há mais que isso em "Aguardando documento", o cartão chama atenção. */
+const HORAS_PARA_DESTACAR_ESPERA = 24;
+
+/**
+ * Faz a troca de coluna deslizar: o navegador fotografa a tela antes e
+ * depois e anima o cartão de um lugar para o outro (View Transitions).
+ * Sem suporte, ou para quem pediu menos movimento, só troca.
+ */
+function animarTroca(trocar: () => void): Promise<void> {
+  const documento = document as Document & {
+    startViewTransition?: (atualizar: () => void) => {
+      finished: Promise<void>;
+    };
+  };
+  const menosMovimento = window.matchMedia?.(
+    '(prefers-reduced-motion: reduce)',
+  ).matches;
+  if (!documento.startViewTransition || menosMovimento) {
+    trocar();
+    return Promise.resolve();
+  }
+  return documento
+    .startViewTransition(() => flushSync(trocar))
+    .finished.catch(() => undefined);
+}
 
 /**
  * Quadro kanban das solicitações: uma coluna por status, cartões
@@ -63,6 +92,11 @@ export function Quadro() {
   const [soMinhas, setSoMinhas] = useState(false);
   const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
   const [arrastando, setArrastando] = useState<Resumo | null>(null);
+  // O cartão que acabou de mudar de coluna: ganha o nome da animação e um
+  // brilho rápido ao chegar
+  const [movido, setMovido] = useState<string | null>(null);
+  // "Há quanto tempo" é calculado contra a hora da última atualização
+  const [agora, setAgora] = useState(() => Date.now());
   // O estado acima só serve para colorir as colunas. Quem decide se a
   // coluna aceita o cartão é esta referência, que vale na hora: um arraste
   // rápido pode soltar antes de a tela se redesenhar
@@ -80,6 +114,7 @@ export function Quadro() {
   const carregar = useCallback(async (termo: string) => {
     try {
       setItens(await api.listar(termo));
+      setAgora(Date.now());
       setErro(null);
     } catch (falha) {
       setErro(mensagemDoErro(falha));
@@ -118,12 +153,21 @@ export function Quadro() {
       }
     }
     const antes = itens;
-    // Mostra o cartão na coluna nova na hora; se a API recusar, volta
-    setItens(
-      (atuais) =>
-        atuais?.map((i) =>
-          i.id === item.id ? { ...i, status: para, acoes: [] } : i,
-        ) ?? null,
+    // Mostra o cartão na coluna nova na hora, deslizando; se a API
+    // recusar, volta
+    flushSync(() => setMovido(item.id));
+    void animarTroca(() =>
+      setItens(
+        (atuais) =>
+          atuais?.map((i) =>
+            i.id === item.id ? { ...i, status: para, acoes: [] } : i,
+          ) ?? null,
+      ),
+    ).then(() =>
+      setTimeout(
+        () => setMovido((atual) => (atual === item.id ? null : atual)),
+        900,
+      ),
     );
     try {
       const atualizado = await api.mover(
@@ -165,6 +209,7 @@ export function Quadro() {
   );
   const interno = usuario.perfil !== 'SOLICITANTE';
   const abre = usuario.perfil !== 'ADMIN';
+  const diasNoQuadro = usuario.empresa.diasNoQuadroDepoisDeEncerrar ?? 30;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -173,7 +218,7 @@ export function Quadro() {
           <h1 className="text-2xl font-semibold text-texto">Solicitações</h1>
           <p className="mt-1 text-sm text-texto-suave">
             {interno
-              ? 'Arraste os cartões entre as colunas para mudar o status. Resolvidas ficam aqui por 30 dias.'
+              ? `Arraste os cartões entre as colunas para mudar o status. Encerradas ficam aqui por ${diasNoQuadro} ${diasNoQuadro === 1 ? 'dia' : 'dias'}.`
               : 'Acompanhe aqui as solicitações que você abriu.'}
           </p>
         </div>
@@ -255,6 +300,8 @@ export function Quadro() {
               status={coluna}
               itens={itensDaColuna(visiveis, coluna)}
               arrastando={arrastando}
+              movido={movido}
+              agora={agora}
               obterArrastado={() => arrastado.current}
               aoComecar={(item) => {
                 arrastado.current = item;
@@ -294,6 +341,8 @@ function Coluna({
   status,
   itens,
   arrastando,
+  movido,
+  agora,
   obterArrastado,
   aoComecar,
   aoTerminar,
@@ -302,6 +351,8 @@ function Coluna({
   status: Status;
   itens: Resumo[];
   arrastando: Resumo | null;
+  movido: string | null;
+  agora: number;
   obterArrastado: () => Resumo | null;
   aoComecar: (item: Resumo) => void;
   aoTerminar: () => void;
@@ -325,8 +376,10 @@ function Coluna({
         if (item) aoSoltar(status, item);
         aoTerminar();
       }}
-      className={`flex min-w-52 flex-1 basis-0 flex-col rounded-lg border bg-fundo transition-colors ${
-        aceita ? 'border-destaque ring-2 ring-destaque/40' : 'border-borda'
+      className={`flex min-w-52 flex-1 basis-0 flex-col rounded-lg border bg-fundo transition-[border-color,box-shadow,opacity,background-color] duration-200 ease-out ${
+        aceita
+          ? 'border-destaque bg-destaque/5 ring-2 ring-destaque/40'
+          : 'border-borda'
       } ${recusa ? 'opacity-50' : ''}`}
     >
       <h2 className="flex items-center justify-between px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-texto-suave">
@@ -340,6 +393,9 @@ function Coluna({
           <li key={item.id}>
             <Cartao
               item={item}
+              sendoArrastado={arrastando?.id === item.id}
+              acabouDeMudar={movido === item.id}
+              agora={agora}
               aoComecar={() => aoComecar(item)}
               aoTerminar={aoTerminar}
             />
@@ -357,10 +413,16 @@ function Coluna({
 
 function Cartao({
   item,
+  sendoArrastado,
+  acabouDeMudar,
+  agora,
   aoComecar,
   aoTerminar,
 }: {
   item: Resumo;
+  sendoArrastado: boolean;
+  acabouDeMudar: boolean;
+  agora: number;
   aoComecar: () => void;
   aoTerminar: () => void;
 }) {
@@ -377,8 +439,13 @@ function Cartao({
         aoComecar();
       }}
       onDragEnd={aoTerminar}
-      className={`flex flex-col gap-1.5 rounded-md border border-borda bg-superficie p-3 shadow-sm hover:border-primaria/50 ${
+      style={
+        acabouDeMudar ? { viewTransitionName: 'cartao-movido' } : undefined
+      }
+      className={`flex flex-col gap-1.5 rounded-md border border-borda bg-superficie p-3 shadow-sm transition-[opacity,transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-px hover:border-primaria/50 hover:shadow-md ${
         movel ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${sendoArrastado ? 'scale-[0.97] opacity-40' : ''} ${
+        acabouDeMudar ? 'cartao-chegou' : ''
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -392,6 +459,7 @@ function Cartao({
         {docs && ` · ${docs}`}
       </p>
       <p className="line-clamp-2 text-sm text-texto">{item.descricao}</p>
+      <UltimaMovimentacao item={item} agora={agora} />
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
         <IndicadorDeSla sla={item.sla} />
         <span className="flex items-center gap-2 truncate text-xs text-texto-suave">
@@ -407,5 +475,27 @@ function Cartao({
         </span>
       </div>
     </Link>
+  );
+}
+
+/**
+ * Há quanto tempo nada acontece (status, mensagem ou anexo). Em
+ * "Aguardando documento" é o que mais importa: parada há mais de um dia,
+ * fica em destaque.
+ */
+function UltimaMovimentacao({ item, agora }: { item: Resumo; agora: number }) {
+  const quando = item.ultimaMovimentacaoEm ?? item.atualizadoEm;
+  const aguardando = item.status === 'AGUARDANDO_DOC';
+  const horas = (agora - Date.parse(quando)) / 3_600_000;
+  const parada = aguardando && horas >= HORAS_PARA_DESTACAR_ESPERA;
+  return (
+    <p
+      title={`Última movimentação: ${dataCurta(quando)}`}
+      className={`text-[11px] ${
+        parada ? 'font-semibold text-atencao' : 'text-texto-suave'
+      }`}
+    >
+      {aguardando ? 'Aguardando' : 'Movimentada'} {tempoDesde(quando, agora)}
+    </p>
   );
 }

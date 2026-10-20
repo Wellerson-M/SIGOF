@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CampoDoQual, temQual } from './CampoDoQual';
 import { cadastros, type CausaDeErro } from '@/lib/cadastros';
 import { ANEXO, type Classificacao } from '@/lib/solicitacoes';
+import { EscolhaDeArquivos } from './EscolhaDeArquivos';
 
 /** O que vai junto com a resolução, além da ação tomada. */
 export interface ExtrasDaResolucao {
@@ -176,18 +177,12 @@ export function DialogoDeObservacao({
           )}
 
           {resolucao && (
-            <label className="flex flex-col gap-1.5 text-sm text-texto">
-              Anexar documento
-              <input
-                type="file"
-                multiple
-                accept={ANEXO.aceitos}
-                onChange={(evento) =>
-                  setArquivos([...(evento.target.files ?? [])])
-                }
-                className="text-sm text-texto file:mr-3 file:h-8 file:rounded-md file:border file:border-borda file:bg-superficie file:px-3 file:text-sm file:text-texto"
-              />
-            </label>
+            <EscolhaDeArquivos
+              rotulo="Anexar documento"
+              arquivos={arquivos}
+              aoMudar={setArquivos}
+              tamanho="compacto"
+            />
           )}
 
           <div className="flex justify-end gap-2">

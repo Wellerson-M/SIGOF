@@ -44,6 +44,12 @@ export interface ParametrosDaEmpresa {
   janelaDuplicidadeDias: number;
   /** Ao resolver, a causa do erro (controle interno) é obrigatória. */
   exigirCausaAoResolver: boolean;
+  /** Encerradas ficam no quadro por estes dias. */
+  diasNoQuadroDepoisDeEncerrar?: number;
+  /** Quem enviou um anexo pode excluí-lo durante estes minutos. */
+  minutosParaExcluirAnexo?: number;
+  /** O analista também passa a solicitação para alguém. */
+  analistaAtribui?: boolean;
 }
 
 export type AcaoDeAuditoria =
