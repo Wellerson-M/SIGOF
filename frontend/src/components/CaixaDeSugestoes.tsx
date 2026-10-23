@@ -75,7 +75,10 @@ export function CaixaDeSugestoes() {
         >
           {enviada ? (
             <div className="flex flex-col gap-4">
-              <Aviso>Recebido, obrigado! Sua mensagem foi enviada.</Aviso>
+              <Aviso>
+                Recebido, obrigado! Sua mensagem entrou na fila e chega ao
+                desenvolvedor em instantes.
+              </Aviso>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"

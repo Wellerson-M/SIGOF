@@ -127,21 +127,6 @@ export class ServicoDeSugestoes {
     }
 
     const agora = this.agora();
-    const recentes = await this.prisma.emailSaida.count({
-      where: {
-        empresaId: empresa.id,
-        assunto: { startsWith: PREFIXO_DO_ASSUNTO },
-        criadoEm: { gte: new Date(agora.getTime() - HORA) },
-      },
-    });
-    if (recentes >= LIMITE_POR_HORA) {
-      throw new ErroDeAplicacao(
-        429,
-        'LIMITE',
-        'Muitas sugestões em pouco tempo. Tente de novo daqui a pouco.',
-      );
-    }
-
     const email = emailDeSugestao(sugestao, {
       nome: eu.nome,
       email: eu.email,
@@ -155,13 +140,32 @@ export class ServicoDeSugestoes {
         timeStyle: 'short',
       }).format(agora),
     });
-    await this.prisma.emailSaida.create({
-      data: {
-        empresaId: empresa.id,
-        para: [destino],
-        ...email,
-        messageId: `<sigof.sugestao.${randomUUID()}@${this.dominio}>`,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      // Uma de cada vez por empresa: sem a trava, pedidos simultâneos leriam
+      // a mesma contagem e passariam todos do limite
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`sugestoes:${empresa.id}`}))`;
+      const recentes = await tx.emailSaida.count({
+        where: {
+          empresaId: empresa.id,
+          assunto: { startsWith: PREFIXO_DO_ASSUNTO },
+          criadoEm: { gte: new Date(agora.getTime() - HORA) },
+        },
+      });
+      if (recentes >= LIMITE_POR_HORA) {
+        throw new ErroDeAplicacao(
+          429,
+          'LIMITE',
+          'Muitas sugestões em pouco tempo. Tente de novo daqui a pouco.',
+        );
+      }
+      await tx.emailSaida.create({
+        data: {
+          empresaId: empresa.id,
+          para: [destino],
+          ...email,
+          messageId: `<sigof.sugestao.${randomUUID()}@${this.dominio}>`,
+        },
+      });
     });
   }
 }

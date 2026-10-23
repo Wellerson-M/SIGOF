@@ -16,7 +16,7 @@ describe('emailDeSugestao', () => {
     {
       categoria: 'PROBLEMA',
       titulo: 'Botão <b>sumiu</b>',
-      texto: 'Na tela de indicadores\nnão acho o filtro.',
+      texto: 'Na tela de indicadores\nnão acho o filtro <script>x</script>.',
       pagina: '/indicadores',
     },
     CONTEXTO,
@@ -33,12 +33,14 @@ describe('emailDeSugestao', () => {
     expect(email.texto).toContain('De: Ana <ana@exemplo.test> (SUPERVISOR)');
     expect(email.texto).toContain('Tela: /indicadores');
     expect(email.texto).toContain('Ambiente: staging · versão a1b2c3d');
-    expect(email.texto).toContain('não acho o filtro.');
+    expect(email.texto).toContain('não acho o filtro <script>x</script>.');
   });
 
   it('o HTML escapa o que a pessoa digitou', () => {
     expect(email.html).toContain('&lt;b&gt;sumiu&lt;/b&gt;');
     expect(email.html).not.toContain('<b>sumiu</b>');
+    expect(email.html).toContain('&lt;script&gt;x&lt;/script&gt;');
+    expect(email.html).not.toContain('<script>');
   });
 
   it('sem a tela informada, diz que não foi informada', () => {

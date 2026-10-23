@@ -157,14 +157,25 @@ describe('página de indicadores', () => {
     });
     render(<PaginaDeIndicadores />);
 
-    expect(await screen.findByText('CTe com reversão')).toBeInTheDocument();
-    expect(screen.getByText('Solicitações de reversão')).toBeInTheDocument();
+    const cte = (await screen.findByText('CTe com reversão')).parentElement;
+    expect(cte).toHaveTextContent('5');
+    const tickets = screen.getByText('Solicitações de reversão').parentElement;
+    expect(tickets).toHaveTextContent('2');
     expect(
       screen.getByText('CTe com reversão, por filial'),
     ).toBeInTheDocument();
     expect(screen.getByText('Curitiba')).toBeInTheDocument();
     expect(screen.getByText('Joinville')).toBeInTheDocument();
     expect(screen.getByText('Erro do cliente')).toBeInTheDocument();
+    // Totais da filial e de cada causa, na tabela de erros por filial
+    const linha = (nome: string) => screen.getByText(nome).closest('tr');
+    expect(linha('Joinville')).toHaveTextContent('Joinville3');
+    expect(linha('Erro do cliente')).toHaveTextContent('Erro do cliente1');
+    expect(
+      screen
+        .getAllByText('Erro de digitação')
+        .map((e) => e.closest('tr')?.textContent),
+    ).toContain('Erro de digitação2');
   });
 
   it('sem erro com causa no período, avisa em vez de mostrar tabela vazia', async () => {
