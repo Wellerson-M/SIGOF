@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import { CaixaDeSugestoes } from '@/components/CaixaDeSugestoes';
 import { Logo } from '@/components/Logo';
 import { Sino } from '@/components/Sino';
 import { VersaoDoSistema } from '@/components/VersaoDoSistema';
@@ -175,6 +176,7 @@ export function Moldura({ children }: { children: ReactNode }) {
         </nav>
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
+      <CaixaDeSugestoes />
     </div>
   );
 }
