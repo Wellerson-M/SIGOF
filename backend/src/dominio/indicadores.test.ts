@@ -3,7 +3,9 @@ import {
   balancoDoMes,
   calcularIndicadores,
   celulaCsv,
+  contarReversoesPorCte,
   diaLocal,
+  indiceDeReversao,
   montarCsv,
   type SolicitacaoParaIndicadores,
 } from './indicadores.js';
@@ -341,6 +343,128 @@ describe('painel: filial, quem abre e tempo por tipo', () => {
     ]);
     expect(resultado.tempoAteResolverPorTipo).toEqual([
       { tipo: 'AJUSTE_FISCAL', resolvidas: 1, minutos: 120 },
+    ]);
+  });
+});
+
+describe('reversões por CTe', () => {
+  const reversao = (parte: Partial<SolicitacaoParaIndicadores> = {}) =>
+    s({ tipo: 'REVERSAO', ...parte });
+
+  it('conta os CTe, e não os tickets: uma fatura com três CTe são três', () => {
+    const r = contarReversoesPorCte([
+      reversao({ ctes: ['100', '101', '102'] }),
+      reversao({ ctes: ['200'] }),
+      s({ tipo: 'AJUSTE_FISCAL', ctes: ['300', '301'] }),
+    ]);
+    expect(r.tickets).toBe(2);
+    expect(r.ctes).toBe(4);
+  });
+
+  it('o mesmo CTe pedido duas vezes na mesma filial conta uma vez só', () => {
+    const r = contarReversoesPorCte([
+      reversao({ filial: 'Curitiba', ctes: ['12345'] }),
+      reversao({ filial: 'Curitiba', ctes: ['CTe 012.345'] }),
+    ]);
+    expect(r.tickets).toBe(2);
+    expect(r.ctes).toBe(1);
+  });
+
+  it('o mesmo número em filiais diferentes são CTe diferentes', () => {
+    const r = contarReversoesPorCte([
+      reversao({ filial: 'Curitiba', ctes: ['500'] }),
+      reversao({ filial: 'Joinville', ctes: ['500', '501'] }),
+      reversao({ ctes: ['900'] }),
+    ]);
+    expect(r.ctes).toBe(4);
+    expect(r.porFilial).toEqual([
+      { filial: 'Joinville', ctes: 2 },
+      { filial: 'Curitiba', ctes: 1 },
+      { filial: 'Sem filial', ctes: 1 },
+    ]);
+  });
+
+  it('cancelada não conta; reversão sem CTe conta só como ticket', () => {
+    const r = contarReversoesPorCte([
+      reversao({ status: 'CANCELADO', ctes: ['1', '2'] }),
+      reversao(),
+      reversao({ ctes: ['  ', 'abc'] }),
+    ]);
+    expect(r.tickets).toBe(2);
+    // "abc" não tem dígitos: vale como texto; o vazio é ignorado
+    expect(r.ctes).toBe(1);
+  });
+
+  it('entra nos indicadores do período, só com o que foi aberto nele', () => {
+    const r = calcularIndicadores(
+      [
+        reversao({ ctes: ['1', '2'] }),
+        reversao({ ctes: ['3'], criadoEm: antes(60 * DIA) }),
+      ],
+      AGORA,
+      30,
+      EXPEDIENTE_PADRAO,
+    );
+    expect(r.reversoes).toMatchObject({ tickets: 1, ctes: 2 });
+  });
+});
+
+describe('índice de reversão', () => {
+  it('é a quantidade de reversões a cada 100 CTe emitidos', () => {
+    expect(indiceDeReversao(3, 1200)).toBe(0.25);
+    expect(indiceDeReversao(0, 500)).toBe(0);
+  });
+
+  it('sem produção importada, não há índice', () => {
+    expect(indiceDeReversao(3, null)).toBeNull();
+    expect(indiceDeReversao(3, 0)).toBeNull();
+  });
+});
+
+describe('erros por filial', () => {
+  const resolvida = (filial: string | null, causa: string | null) =>
+    s({
+      status: 'RESOLVIDO',
+      criadoEm: antes(2 * DIA),
+      resolvidoEm: antes(HORA),
+      filial,
+      causa: causa ? { nome: causa, detalhe: null } : null,
+    });
+
+  it('agrupa por filial, com a causa de cada erro', () => {
+    const r = calcularIndicadores(
+      [
+        resolvida('Curitiba', 'Erro de digitação'),
+        resolvida('Curitiba', 'Erro de digitação'),
+        resolvida('Curitiba', 'Erro do cliente'),
+        resolvida('Joinville', 'Erro de digitação'),
+        resolvida(null, 'Erro do cliente'),
+        // sem causa informada não é erro registrado
+        resolvida('Joinville', null),
+      ],
+      AGORA,
+      7,
+      EXPEDIENTE_PADRAO,
+    );
+    expect(r.errosPorFilial).toEqual([
+      {
+        filial: 'Curitiba',
+        total: 3,
+        porCausa: [
+          { causa: 'Erro de digitação', total: 2 },
+          { causa: 'Erro do cliente', total: 1 },
+        ],
+      },
+      {
+        filial: 'Joinville',
+        total: 1,
+        porCausa: [{ causa: 'Erro de digitação', total: 1 }],
+      },
+      {
+        filial: 'Sem filial',
+        total: 1,
+        porCausa: [{ causa: 'Erro do cliente', total: 1 }],
+      },
     ]);
   });
 });

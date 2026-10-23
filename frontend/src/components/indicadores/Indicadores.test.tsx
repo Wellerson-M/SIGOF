@@ -133,6 +133,55 @@ describe('página de indicadores', () => {
     expect(calcular).toHaveBeenLastCalledWith(7);
   });
 
+  it('mostra as reversões por CTe e os erros por filial', async () => {
+    vi.spyOn(indicadores, 'calcular').mockResolvedValue({
+      ...DADOS,
+      reversoes: {
+        tickets: 2,
+        ctes: 5,
+        porFilial: [
+          { filial: 'Curitiba', ctes: 4 },
+          { filial: 'Sem filial', ctes: 1 },
+        ],
+      },
+      errosPorFilial: [
+        {
+          filial: 'Joinville',
+          total: 3,
+          porCausa: [
+            { causa: 'Erro de digitação', total: 2 },
+            { causa: 'Erro do cliente', total: 1 },
+          ],
+        },
+      ],
+    });
+    render(<PaginaDeIndicadores />);
+
+    expect(await screen.findByText('CTe com reversão')).toBeInTheDocument();
+    expect(screen.getByText('Solicitações de reversão')).toBeInTheDocument();
+    expect(
+      screen.getByText('CTe com reversão, por filial'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Curitiba')).toBeInTheDocument();
+    expect(screen.getByText('Joinville')).toBeInTheDocument();
+    expect(screen.getByText('Erro do cliente')).toBeInTheDocument();
+  });
+
+  it('sem erro com causa no período, avisa em vez de mostrar tabela vazia', async () => {
+    vi.spyOn(indicadores, 'calcular').mockResolvedValue({
+      ...DADOS,
+      errosPorFilial: [],
+    });
+    render(<PaginaDeIndicadores />);
+
+    expect(
+      await screen.findByText('Erros por filial (resolvidas no período)'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Nenhuma solicitação resolvida com a causa/),
+    ).toBeInTheDocument();
+  });
+
   it('baixa o CSV do período', async () => {
     vi.spyOn(indicadores, 'calcular').mockResolvedValue(DADOS);
     const csv = vi
