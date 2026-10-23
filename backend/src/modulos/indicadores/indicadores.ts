@@ -2,9 +2,13 @@ import { Router } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import {
+  TIPO_REVERSAO,
   balancoDoMes,
   calcularIndicadores,
+  contarReversoesPorCte,
+  indiceDeReversao,
   type LinhaDoBalanco,
+  type ReversoesPorCte,
   diaLocal,
   montarCsv,
   type Indicadores,
@@ -34,6 +38,20 @@ function atendidaNoPrazo(s: SolicitacaoParaIndicadores): string | null {
   return noPrazo ? 'sim' : 'não';
 }
 const ALERTA_DE_DUPLICIDADE = 'Aberta mesmo com o alerta de duplicidade';
+
+/** Reversões do mês contra a produção importada (índice por 100 CTe). */
+export interface ReversoesDoMes extends ReversoesPorCte {
+  /** Null: a produção do mês ainda não foi importada. */
+  ctesEmitidos: number | null;
+  /** Reversões (CTe) a cada 100 CTe emitidos; null sem produção. */
+  indice: number | null;
+}
+
+/** Todos os CTe da solicitação (a lista, ou o único CTe das antigas). */
+function ctesDa(r: { ctes: string[]; cte: string | null }): string[] {
+  if (r.ctes.length > 0) return r.ctes;
+  return r.cte ? [r.cte] : [];
+}
 
 /** Painel do supervisor e exportação em CSV (RF10). */
 export class ServicoDeIndicadores {
@@ -133,6 +151,7 @@ export class ServicoDeIndicadores {
     mes: string;
     linhas: LinhaDoBalanco[];
     importadoEm: Date | null;
+    reversoes: ReversoesDoMes;
   }> {
     const empresa = await this.prisma.empresa.findUniqueOrThrow({
       where: { id: usuario.empresaId },
@@ -146,7 +165,7 @@ export class ServicoDeIndicadores {
     const de = inicioDoDia(`${mes}-01`, empresa.fusoHorario);
     const ate = inicioDoDia(proximo, empresa.fusoHorario);
 
-    const [producao, comErro] = await Promise.all([
+    const [producao, comErro, reversoes] = await Promise.all([
       this.prisma.producaoDoDigitador.findMany({
         where: { empresaId: usuario.empresaId, mes },
       }),
@@ -160,9 +179,41 @@ export class ServicoDeIndicadores {
         },
         select: { causaDetalhe: true },
       }),
+      this.prisma.solicitacao.findMany({
+        where: {
+          empresaId: usuario.empresaId,
+          excluidaEm: null,
+          tipo: TIPO_REVERSAO,
+          criadoEm: { gte: de, lt: ate },
+        },
+        select: {
+          tipo: true,
+          status: true,
+          cte: true,
+          ctes: true,
+          filial: { select: { nome: true } },
+        },
+      }),
     ]);
+    const ctesEmitidos =
+      producao.length > 0
+        ? producao.reduce((soma, p) => soma + p.ctesEmitidos, 0)
+        : null;
+    const porCte = contarReversoesPorCte(
+      reversoes.map((r) => ({
+        tipo: r.tipo,
+        status: r.status,
+        filial: r.filial?.nome ?? null,
+        ctes: ctesDa(r),
+      })),
+    );
     return {
       mes,
+      reversoes: {
+        ...porCte,
+        ctesEmitidos,
+        indice: indiceDeReversao(porCte.ctes, ctesEmitidos),
+      },
       linhas: balancoDoMes(
         producao,
         comErro.map((s) => ({ digitador: s.causaDetalhe! })),
@@ -309,6 +360,7 @@ export class ServicoDeIndicadores {
       registroRapido: r.registroRapido,
       filial: r.filial?.nome ?? null,
       solicitante: r.solicitante.nome,
+      ctes: ctesDa(r),
     }));
     const extras = registros.map((r) => ({
       protocolo: r.protocolo,

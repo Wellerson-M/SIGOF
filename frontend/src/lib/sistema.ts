@@ -10,6 +10,8 @@ export interface VersaoNoAr {
   ambiente: 'development' | 'test' | 'staging' | 'production';
   /** Data do commit, quando a imagem foi gerada pelo pipeline. */
   construidoEm: string | null;
+  /** A caixa de sugestões está ligada neste ambiente. */
+  sugestoes?: boolean;
 }
 
 export function versaoNoAr(): Promise<VersaoNoAr> {

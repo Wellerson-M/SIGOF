@@ -210,6 +210,44 @@ export default function PaginaDeIndicadores() {
             </Cartao>
           </div>
 
+          {dados.reversoes && (
+            <div className="grid gap-5 lg:grid-cols-2">
+              <Cartao>
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+                  Reversões abertas no período
+                </h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Numero
+                    rotulo="CTe com reversão"
+                    valor={dados.reversoes.ctes}
+                    detalhe="cada CTe conta uma vez, mesmo numa fatura com vários"
+                    pequeno
+                  />
+                  <Numero
+                    rotulo="Solicitações de reversão"
+                    valor={dados.reversoes.tickets}
+                    detalhe="os tickets abertos"
+                    pequeno
+                  />
+                </div>
+                <p className="mt-3 text-xs text-texto-suave">
+                  O índice de reversão (a cada 100 CTe emitidos) está no balanço
+                  do mês, mais abaixo.
+                </p>
+              </Cartao>
+              <Cartao>
+                <Barras
+                  titulo="CTe com reversão, por filial"
+                  itens={dados.reversoes.porFilial.map((f) => ({
+                    nome: f.filial,
+                    valor: f.ctes,
+                  }))}
+                  vazio="Nenhuma reversão com CTe informado no período."
+                />
+              </Cartao>
+            </div>
+          )}
+
           <Cartao>
             <Barras
               titulo="Tempo médio até resolver, por tipo"
@@ -304,6 +342,48 @@ export default function PaginaDeIndicadores() {
               <p className="mt-2 text-xs text-texto-suave">
                 {dados.resolvidasSemCausa} resolvida(s) sem a causa informada.
               </p>
+            )}
+          </Cartao>
+
+          <Cartao>
+            <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-texto-suave">
+              Erros por filial (resolvidas no período)
+            </h2>
+            {(dados.errosPorFilial ?? []).length === 0 ? (
+              <p className="text-sm text-texto-suave">
+                Nenhuma solicitação resolvida com a causa informada no período.
+              </p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-texto-suave">
+                  <tr>
+                    <th className="py-1.5 font-semibold">Filial</th>
+                    <th className="py-1.5 text-right font-semibold">Erros</th>
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {(dados.errosPorFilial ?? []).map((f) => (
+                    <Fragment key={f.filial}>
+                      <tr className="border-t border-borda">
+                        <td className="py-1.5 font-medium">{f.filial}</td>
+                        <td className="py-1.5 text-right font-medium">
+                          {f.total}
+                        </td>
+                      </tr>
+                      {f.porCausa.map((c) => (
+                        <tr key={c.causa}>
+                          <td className="py-1 pl-4 text-texto-suave">
+                            {c.causa}
+                          </td>
+                          <td className="py-1 text-right text-texto-suave">
+                            {c.total}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
             )}
           </Cartao>
 

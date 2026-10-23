@@ -71,6 +71,12 @@ const esquemaEnv = z
     STORAGE_SECRET_KEY: z.string().optional(),
     STORAGE_REGIAO: z.string().default('us-east-1'),
 
+    /**
+     * Para onde vai o que as pessoas escrevem na caixa de sugestões do
+     * ambiente de testes. Sem ela, a caixa não aparece nas telas.
+     */
+    SUGESTOES_EMAIL: z.string().email().optional(),
+
     /** Intervalo entre as rodadas de envio da fila de e-mails. */
     EMAIL_INTERVALO_SEGUNDOS: z.coerce.number().int().positive().default(15),
   })

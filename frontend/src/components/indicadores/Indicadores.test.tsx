@@ -133,6 +133,66 @@ describe('página de indicadores', () => {
     expect(calcular).toHaveBeenLastCalledWith(7);
   });
 
+  it('mostra as reversões por CTe e os erros por filial', async () => {
+    vi.spyOn(indicadores, 'calcular').mockResolvedValue({
+      ...DADOS,
+      reversoes: {
+        tickets: 2,
+        ctes: 5,
+        porFilial: [
+          { filial: 'Curitiba', ctes: 4 },
+          { filial: 'Sem filial', ctes: 1 },
+        ],
+      },
+      errosPorFilial: [
+        {
+          filial: 'Joinville',
+          total: 3,
+          porCausa: [
+            { causa: 'Erro de digitação', total: 2 },
+            { causa: 'Erro do cliente', total: 1 },
+          ],
+        },
+      ],
+    });
+    render(<PaginaDeIndicadores />);
+
+    const cte = (await screen.findByText('CTe com reversão')).parentElement;
+    expect(cte).toHaveTextContent('5');
+    const tickets = screen.getByText('Solicitações de reversão').parentElement;
+    expect(tickets).toHaveTextContent('2');
+    expect(
+      screen.getByText('CTe com reversão, por filial'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Curitiba')).toBeInTheDocument();
+    expect(screen.getByText('Joinville')).toBeInTheDocument();
+    expect(screen.getByText('Erro do cliente')).toBeInTheDocument();
+    // Totais da filial e de cada causa, na tabela de erros por filial
+    const linha = (nome: string) => screen.getByText(nome).closest('tr');
+    expect(linha('Joinville')).toHaveTextContent('Joinville3');
+    expect(linha('Erro do cliente')).toHaveTextContent('Erro do cliente1');
+    expect(
+      screen
+        .getAllByText('Erro de digitação')
+        .map((e) => e.closest('tr')?.textContent),
+    ).toContain('Erro de digitação2');
+  });
+
+  it('sem erro com causa no período, avisa em vez de mostrar tabela vazia', async () => {
+    vi.spyOn(indicadores, 'calcular').mockResolvedValue({
+      ...DADOS,
+      errosPorFilial: [],
+    });
+    render(<PaginaDeIndicadores />);
+
+    expect(
+      await screen.findByText('Erros por filial (resolvidas no período)'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Nenhuma solicitação resolvida com a causa/),
+    ).toBeInTheDocument();
+  });
+
   it('baixa o CSV do período', async () => {
     vi.spyOn(indicadores, 'calcular').mockResolvedValue(DADOS);
     const csv = vi

@@ -17,6 +17,47 @@ describe('planilha de produção', () => {
 });
 
 describe('BalancoDoMes', () => {
+  it('mostra o índice de reversão a cada 100 CTe emitidos', async () => {
+    vi.spyOn(indicadores, 'balanco').mockResolvedValue({
+      mes: '2026-10',
+      linhas: [],
+      importadoEm: null,
+      reversoes: {
+        tickets: 3,
+        ctes: 6,
+        porFilial: [],
+        ctesEmitidos: 1200,
+        indice: 0.5,
+      },
+    });
+    render(<BalancoDoMes />);
+
+    expect(await screen.findByText('0,5 a cada 100 CTe')).toBeInTheDocument();
+    expect(
+      screen.getByText(/6 CTe com reversão pedida \(3 solicitações\)/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/de 1\.200 CTe emitidos/)).toBeInTheDocument();
+  });
+
+  it('sem produção importada, pede a importação em vez do índice', async () => {
+    vi.spyOn(indicadores, 'balanco').mockResolvedValue({
+      mes: '2026-10',
+      linhas: [],
+      importadoEm: null,
+      reversoes: {
+        tickets: 1,
+        ctes: 2,
+        porFilial: [],
+        ctesEmitidos: null,
+        indice: null,
+      },
+    });
+    render(<BalancoDoMes />);
+
+    expect(await screen.findByText('—')).toBeInTheDocument();
+    expect(screen.getByText(/Importe a produção do mês/)).toBeInTheDocument();
+  });
+
   it('mostra a taxa por digitador e importa a produção do mês', async () => {
     const balanco = vi
       .spyOn(indicadores, 'balanco')
