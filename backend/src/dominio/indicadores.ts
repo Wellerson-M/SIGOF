@@ -12,6 +12,7 @@
  *    abertura até o evento. Corrido, e não útil, porque é o tempo que o
  *    cliente de fato esperou.
  */
+import { normalizarDocumento } from './duplicidade.js';
 import { indicadorDeSla, type Prioridade } from './fila.js';
 import type { Expediente } from './sla.js';
 import type { Status } from './status.js';
@@ -33,6 +34,8 @@ export interface SolicitacaoParaIndicadores {
   abertaComAlertaDeDuplicidade: boolean;
   filial?: string | null | undefined;
   solicitante?: string | undefined;
+  /** Todos os CTe da solicitação (uma fatura pode trazer vários). */
+  ctes?: readonly string[] | undefined;
   /** Já resolvida por fora: não conta no tempo até resolver. */
   registroRapido?: boolean | undefined;
   /** Causa do erro registrada ao resolver (controle interno). */
@@ -89,6 +92,81 @@ export interface Indicadores {
     minutos: number;
     resolvidas: number;
   }[];
+  /** Reversões abertas no período, contadas por CTe (e não por ticket). */
+  reversoes: ReversoesPorCte;
+  /**
+   * Em que filial estava o documento das solicitações resolvidas com causa
+   * do erro no período, com a causa de cada uma.
+   */
+  errosPorFilial: {
+    filial: string;
+    total: number;
+    porCausa: { causa: string; total: number }[];
+  }[];
+}
+
+/** Código do tipo de ocorrência "reversão" (um dos do sistema). */
+export const TIPO_REVERSAO = 'REVERSAO';
+
+export interface ReversoesPorCte {
+  /** Solicitações de reversão (tickets) abertas e não canceladas. */
+  tickets: number;
+  /**
+   * CTe distintos nessas solicitações: o mesmo CTe em dois tickets conta
+   * uma vez só (mesma filial e mesmo número).
+   */
+  ctes: number;
+  porFilial: { filial: string; ctes: number }[];
+}
+
+const SEM_FILIAL = 'Sem filial';
+
+/**
+ * Conta as reversões por CTe. A chave é filial + número normalizado: duas
+ * filiais podem ter o mesmo número de CTe, mas o mesmo CTe pedido em duas
+ * solicitações é uma reversão só.
+ */
+export function contarReversoesPorCte(
+  solicitacoes: readonly Pick<
+    SolicitacaoParaIndicadores,
+    'tipo' | 'status' | 'filial' | 'ctes'
+  >[],
+): ReversoesPorCte {
+  const reversoes = solicitacoes.filter(
+    (s) => s.tipo === TIPO_REVERSAO && s.status !== 'CANCELADO',
+  );
+  const vistos = new Set<string>();
+  const porFilial = new Map<string, number>();
+  for (const s of reversoes) {
+    const filial = s.filial ?? SEM_FILIAL;
+    for (const cte of s.ctes ?? []) {
+      const numero = normalizarDocumento(cte) ?? cte.trim();
+      if (numero === '') continue;
+      const chave = `${filial}|${numero}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      porFilial.set(filial, (porFilial.get(filial) ?? 0) + 1);
+    }
+  }
+  return {
+    tickets: reversoes.length,
+    ctes: vistos.size,
+    porFilial: [...porFilial.entries()]
+      .map(([filial, ctes]) => ({ filial, ctes }))
+      .sort((a, b) => b.ctes - a.ctes || a.filial.localeCompare(b.filial)),
+  };
+}
+
+/**
+ * Índice de reversão: reversões (CTe) a cada 100 CTe emitidos. Null sem a
+ * produção do mês importada.
+ */
+export function indiceDeReversao(
+  ctesRevertidos: number,
+  ctesEmitidos: number | null,
+): number | null {
+  if (ctesEmitidos === null || ctesEmitidos <= 0) return null;
+  return Math.round((ctesRevertidos / ctesEmitidos) * 10_000) / 100;
 }
 
 /** Uma linha do balanço mensal: o que o digitador emitiu e quanto errou. */
@@ -326,6 +404,18 @@ export function calcularIndicadores(
   )
     .slice(0, 8)
     .map(([nome, total]) => ({ nome, total }));
+  const comCausa = resolvidasNoPeriodo.flatMap((s) =>
+    s.causa ? [{ filial: s.filial ?? SEM_FILIAL, causa: s.causa.nome }] : [],
+  );
+  const errosPorFilial = contar(comCausa.map((e) => e.filial)).map(
+    ([filial, total]) => ({
+      filial,
+      total,
+      porCausa: contar(
+        comCausa.filter((e) => e.filial === filial).map((e) => e.causa),
+      ).map(([causa, n]) => ({ causa, total: n })),
+    }),
+  );
   const tempoAteResolverPorTipo = tipos
     .map((tipo) => {
       const daqui = resolvidasNoPeriodo.filter(
@@ -393,6 +483,8 @@ export function calcularIndicadores(
     porFilial,
     porSolicitante,
     tempoAteResolverPorTipo,
+    reversoes: contarReversoesPorCte(abertasNoPeriodo),
+    errosPorFilial,
   };
 }
 

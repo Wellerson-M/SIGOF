@@ -77,6 +77,9 @@ services:
       STORAGE_ACCESS_KEY: sigof
       STORAGE_SECRET_KEY: ${STAGING_STORAGE_SEGREDO}
       FRONTEND_URL: https://${DOMINIO_STAGING}
+      # Caixa de sugestões do ambiente de testes: chega neste e-mail, com
+      # o assunto começando por "[SIGOF Sugestão]"
+      SUGESTOES_EMAIL: ${STAGING_SUGESTOES_EMAIL:-wellersonmeredyk1@gmail.com}
       SEMEAR_SE_VAZIO: "true"
       # O staging é público: a senha dos usuários de demonstração é aleatória,
       # gerada na VM, e não a do README

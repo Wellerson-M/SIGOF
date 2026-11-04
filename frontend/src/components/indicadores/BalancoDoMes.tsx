@@ -123,6 +123,24 @@ export function BalancoDoMes() {
         </p>
       )}
 
+      {dados?.reversoes && (
+        <div className="mb-4 rounded-md border border-borda bg-fundo p-3">
+          <p className="text-sm text-texto-suave">Índice de reversão</p>
+          <p className="mt-0.5 text-xl font-semibold tabular-nums text-texto">
+            {dados.reversoes.indice === null
+              ? '—'
+              : `${dados.reversoes.indice.toLocaleString('pt-BR')} a cada 100 CTe`}
+          </p>
+          <p className="mt-0.5 text-xs text-texto-suave">
+            {dados.reversoes.ctes} CTe com reversão pedida (
+            {dados.reversoes.tickets} solicitações)
+            {dados.reversoes.ctesEmitidos === null
+              ? '. Importe a produção do mês para ver o índice.'
+              : ` de ${dados.reversoes.ctesEmitidos.toLocaleString('pt-BR')} CTe emitidos em ${mes}.`}
+          </p>
+        </div>
+      )}
+
       {dados && dados.linhas.length === 0 && (
         <p className="text-sm text-texto-suave">
           Nenhum erro com digitador registrado e nenhuma produção importada em{' '}

@@ -235,6 +235,62 @@ describe.skipIf(!temBanco)('indicadores (integração, banco real)', () => {
       ).toMatchObject({ ctesEmitidos: null, erros: 1 });
     });
 
+    it('conta as reversões por CTe e calcula o índice sobre a produção', async () => {
+      // Um ticket só, com três CTe: são três reversões
+      const fatura = await post('SOLICITANTE', '/api/solicitacoes', {
+        tipo: 'REVERSAO',
+        ctes: ['40001', '40002', '40003'],
+        descricao: 'Fatura inteira com o tomador errado.',
+      });
+      expect(fatura.status).toBe(201);
+      await put('SUPERVISOR', '/api/indicadores/producao', {
+        mes: mesAtual,
+        linhas: [{ digitador: 'Ana', ctesEmitidos: 300 }],
+      });
+
+      // Já existiam 3 tickets de reversão (30001, 30002 e 31999)
+      const periodo = await request(app)
+        .get('/api/indicadores?dias=30')
+        .set('Cookie', await cookieDe('SUPERVISOR'));
+      expect(periodo.body.reversoes).toEqual({
+        tickets: 4,
+        ctes: 6,
+        porFilial: [{ filial: 'Sem filial', ctes: 6 }],
+      });
+      // Só a de 31999 foi resolvida com a causa informada
+      expect(periodo.body.errosPorFilial).toEqual([
+        {
+          filial: 'Sem filial',
+          total: 1,
+          porCausa: [{ causa: 'Erro de digitação', total: 1 }],
+        },
+      ]);
+
+      const balanco = await request(app)
+        .get(`/api/indicadores/digitadores?mes=${mesAtual}`)
+        .set('Cookie', await cookieDe('SUPERVISOR'));
+      expect(balanco.body.reversoes).toEqual({
+        tickets: 4,
+        ctes: 6,
+        porFilial: [{ filial: 'Sem filial', ctes: 6 }],
+        ctesEmitidos: 300,
+        indice: 2,
+      });
+    });
+
+    it('sem produção importada, o índice de reversão fica vazio', async () => {
+      const balanco = await request(app)
+        .get('/api/indicadores/digitadores?mes=2020-01')
+        .set('Cookie', await cookieDe('SUPERVISOR'));
+      expect(balanco.body.reversoes).toEqual({
+        tickets: 0,
+        ctes: 0,
+        porFilial: [],
+        ctesEmitidos: null,
+        indice: null,
+      });
+    });
+
     it('mês inválido e perfil sem acesso são recusados', async () => {
       expect(
         (

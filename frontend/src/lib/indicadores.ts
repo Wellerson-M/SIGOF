@@ -47,6 +47,20 @@ export interface Indicadores {
     minutos: number;
     resolvidas: number;
   }[];
+  /** Reversões abertas no período, contadas por CTe e não por ticket. */
+  reversoes?: Reversoes;
+  /** Em que filial estavam as solicitações resolvidas com causa do erro. */
+  errosPorFilial?: {
+    filial: string;
+    total: number;
+    porCausa: { causa: string; total: number }[];
+  }[];
+}
+
+export interface Reversoes {
+  tickets: number;
+  ctes: number;
+  porFilial: { filial: string; ctes: number }[];
 }
 
 export interface Balanco {
@@ -59,6 +73,13 @@ export interface Balanco {
     taxaDeErro: number | null;
   }[];
   importadoEm: string | null;
+  /** Reversões do mês (por CTe) contra os CTe emitidos. */
+  reversoes?: Reversoes & {
+    /** Null: a produção do mês ainda não foi importada. */
+    ctesEmitidos: number | null;
+    /** Reversões a cada 100 CTe emitidos; null sem produção. */
+    indice: number | null;
+  };
 }
 
 /**

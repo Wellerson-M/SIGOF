@@ -35,6 +35,8 @@ import {
   rotasDeIndicadores,
 } from '../modulos/indicadores/indicadores.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
+import { rotasDeSugestoes } from '../modulos/sugestoes/rotas.js';
+import { ServicoDeSugestoes } from '../modulos/sugestoes/servico.js';
 import { rotasDeSolicitacoes } from '../modulos/solicitacoes/rotas.js';
 import { ServicoDeSolicitacoes } from '../modulos/solicitacoes/servico.js';
 import { Cifra } from '../seguranca/cifra.js';
@@ -146,6 +148,8 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       versao: modulos?.env.VERSAO ?? 'local',
       ambiente: modulos?.env.NODE_ENV ?? 'development',
       construidoEm: modulos?.env.CONSTRUIDO_EM || null,
+      // Mostra (ou não) a caixa de sugestões nas telas
+      sugestoes: Boolean(modulos?.env.SUGESTOES_EMAIL),
     });
   });
 
@@ -238,6 +242,19 @@ export function criarApp(modulos?: ModulosDaApp): Express {
       '/api/notificacoes',
       rotasDeNotificacoes({
         servico: new ServicoDeNotificacoes(prisma),
+        jwtSecret: env.JWT_SECRET,
+      }),
+    );
+
+    app.use(
+      '/api/sugestoes',
+      rotasDeSugestoes({
+        servico: new ServicoDeSugestoes(prisma, {
+          destino: env.SUGESTOES_EMAIL ?? null,
+          urlDoSistema: env.FRONTEND_URL,
+          ambiente: env.NODE_ENV,
+          versao: env.VERSAO,
+        }),
         jwtSecret: env.JWT_SECRET,
       }),
     );

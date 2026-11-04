@@ -24,6 +24,7 @@ describe('GET /api/sistema', () => {
       versao: 'local',
       ambiente: 'development',
       construidoEm: null,
+      sugestoes: false,
     });
   });
 });
