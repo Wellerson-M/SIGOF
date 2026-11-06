@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ErroDaApi, entrar, pedir, pedirArquivo } from './api';
+import {
+  ErroDaApi,
+  entrar,
+  pedir,
+  pedirArquivo,
+  pedirLinkDeSenha,
+  redefinirSenha,
+} from './api';
 
 function resposta(status: number, corpo?: unknown): Response {
   return new Response(corpo === undefined ? null : JSON.stringify(corpo), {
@@ -166,5 +173,80 @@ describe('entrar', () => {
       'Empresa, e-mail ou senha inválidos',
     );
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('recuperação de senha', () => {
+  it('pedirLinkDeSenha envia empresa e e-mail e devolve o texto da API', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(resposta(202, { mensagem: 'Enviamos o link.' }));
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(pedirLinkDeSenha('demo', 'ana@demo.test')).resolves.toBe(
+      'Enviamos o link.',
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/esqueci-senha',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ empresa: 'demo', email: 'ana@demo.test' }),
+      }),
+    );
+  });
+
+  it('pedirLinkDeSenha devolve o erro da API (ex.: limite de tentativas)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          resposta(429, {
+            erro: 'Muitas tentativas.',
+            codigo: 'MUITAS_TENTATIVAS',
+          }),
+        ),
+    );
+
+    await expect(pedirLinkDeSenha('demo', 'a@b.test')).rejects.toMatchObject({
+      status: 429,
+      codigo: 'MUITAS_TENTATIVAS',
+    });
+  });
+
+  it('redefinirSenha envia o token e a senha nova', async () => {
+    const fetch = vi.fn().mockResolvedValue(resposta(204));
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(
+      redefinirSenha('T'.repeat(43), 'Nova@123a'),
+    ).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/redefinir-senha',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ token: 'T'.repeat(43), novaSenha: 'Nova@123a' }),
+      }),
+    );
+  });
+
+  it('redefinirSenha mostra a mensagem do link vencido', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          resposta(422, {
+            erro: 'Este link não vale mais.',
+            codigo: 'REGRA_DE_NEGOCIO',
+          }),
+        ),
+    );
+
+    const falha = await redefinirSenha('T'.repeat(43), 'Nova@123a').catch(
+      (e: unknown) => e,
+    );
+    expect(falha).toBeInstanceOf(ErroDaApi);
+    expect((falha as ErroDaApi).message).toBe('Este link não vale mais.');
   });
 });

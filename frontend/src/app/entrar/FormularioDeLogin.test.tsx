@@ -32,6 +32,14 @@ describe('FormularioDeLogin', () => {
     localStorage.clear();
   });
 
+  it('oferece o caminho do "Esqueci minha senha"', () => {
+    render(<FormularioDeLogin />);
+
+    expect(
+      screen.getByRole('link', { name: 'Esqueci minha senha' }),
+    ).toHaveAttribute('href', '/esqueci-senha');
+  });
+
   it('pede para preencher tudo antes de enviar', async () => {
     render(<FormularioDeLogin />);
 

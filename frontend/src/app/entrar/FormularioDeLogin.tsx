@@ -1,6 +1,7 @@
 'use client';
 
-import { CampoDeSenha } from '@/components/CampoDeSenha';
+import Link from 'next/link';
+import { CampoDeFormulario as Campo } from '@/components/CampoDeFormulario';
 import { useRouter } from 'next/navigation';
 import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { ErroDaApi, entrar } from '@/lib/api';
@@ -87,6 +88,12 @@ export function FormularioDeLogin() {
         aoMudar={setSenha}
         autoComplete="current-password"
       />
+      <Link
+        href="/esqueci-senha"
+        className="-mt-2 self-start text-sm text-primaria hover:underline"
+      >
+        Esqueci minha senha
+      </Link>
 
       {erro && (
         <p
@@ -105,64 +112,6 @@ export function FormularioDeLogin() {
         {enviando ? 'Entrando…' : 'Entrar'}
       </button>
     </form>
-  );
-}
-
-const CLASSE_DO_CAMPO =
-  'h-10 rounded-md border border-borda bg-superficie px-3 text-sm text-texto outline-none focus:border-foco';
-
-interface PropriedadesDoCampo {
-  id: string;
-  rotulo: string;
-  valor: string;
-  aoMudar: (valor: string) => void;
-  tipo?: 'text' | 'email' | 'password';
-  dica?: string;
-  autoComplete?: string;
-}
-
-function Campo({
-  id,
-  rotulo,
-  valor,
-  aoMudar,
-  tipo = 'text',
-  dica,
-  autoComplete,
-}: PropriedadesDoCampo) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-texto">
-        {rotulo}
-      </label>
-      {tipo === 'password' ? (
-        <CampoDeSenha
-          id={id}
-          name={id}
-          value={valor}
-          onChange={(evento) => aoMudar(evento.target.value)}
-          autoComplete={autoComplete}
-          aria-describedby={dica ? `${id}-dica` : undefined}
-          className={CLASSE_DO_CAMPO}
-        />
-      ) : (
-        <input
-          id={id}
-          name={id}
-          type={tipo}
-          value={valor}
-          onChange={(evento) => aoMudar(evento.target.value)}
-          autoComplete={autoComplete}
-          aria-describedby={dica ? `${id}-dica` : undefined}
-          className={CLASSE_DO_CAMPO}
-        />
-      )}
-      {dica && (
-        <span id={`${id}-dica`} className="text-xs text-texto-suave">
-          {dica}
-        </span>
-      )}
-    </div>
   );
 }
 

@@ -164,6 +164,37 @@ export async function entrar(
   }
 }
 
+/**
+ * "Esqueci minha senha": a API responde o mesmo texto exista o e-mail ou
+ * não, e a tela mostra esse texto como veio.
+ */
+export async function pedirLinkDeSenha(
+  empresa: string,
+  email: string,
+): Promise<string> {
+  const resposta = await chamar('/auth/esqueci-senha', {
+    method: 'POST',
+    body: JSON.stringify({ empresa, email }),
+  });
+  if (!resposta.ok) {
+    throw await erroDa(resposta);
+  }
+  return ((await resposta.json()) as { mensagem: string }).mensagem;
+}
+
+export async function redefinirSenha(
+  token: string,
+  novaSenha: string,
+): Promise<void> {
+  const resposta = await chamar('/auth/redefinir-senha', {
+    method: 'POST',
+    body: JSON.stringify({ token, novaSenha }),
+  });
+  if (!resposta.ok) {
+    throw await erroDa(resposta);
+  }
+}
+
 export function sair(): Promise<void> {
   return pedir<void>('/auth/sair', { method: 'POST' });
 }
