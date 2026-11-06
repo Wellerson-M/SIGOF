@@ -64,6 +64,10 @@ enum AcaoDeAuditoria {
   FORMULARIO_ALTERADO
   /// Solicitação encerrada excluída (exclusão lógica).
   SOLICITACAO_EXCLUIDA
+  /// Alguém pediu o link de "esqueci minha senha" (e o e-mail foi para a fila).
+  RECUPERACAO_SOLICITADA
+  /// A senha foi trocada pelo link recebido por e-mail.
+  SENHA_RECUPERADA
 }
 
 /// Em que momento o arquivo entrou: o detalhe mostra cada grupo separado.
@@ -169,6 +173,7 @@ model Empresa {
   historicos   StatusHistorico[]
   notificacoes Notificacao[]
   sessoes      Sessao[]
+  recuperacoesDeSenha RecuperacaoDeSenha[]
   auditoria    EventoAuditoria[]
   emails       EmailSaida[]
   filiais      Filial[]
@@ -212,6 +217,7 @@ model Usuario {
   notificacoes           Notificacao[]
   anexos                 Anexo[]
   sessoes                Sessao[]
+  recuperacoesDeSenha    RecuperacaoDeSenha[]
   auditoriaFeita         EventoAuditoria[] @relation("AuditoriaAutor")
   auditoriaSofrida       EventoAuditoria[] @relation("AuditoriaAlvo")
   marcacoes              MarcacaoDeVerificacao[]
@@ -256,6 +262,27 @@ model Sessao {
   @@index([usuarioId])
   @@index([familia])
   @@map("sessoes")
+}
+
+/// Link de "esqueci minha senha". Só o hash do token fica aqui: quem lê o
+/// banco não consegue redefinir a senha de ninguém.
+model RecuperacaoDeSenha {
+  id        String    @id @default(uuid())
+  empresaId String    @map("empresa_id")
+  usuarioId String    @map("usuario_id")
+  tokenHash String    @unique @map("token_hash")
+  expiraEm  DateTime  @map("expira_em")
+  /// Preenchido quando o link é usado (ou perde a validade porque outro
+  /// link do mesmo usuário foi usado): vale uma única vez.
+  usadoEm   DateTime? @map("usado_em")
+  ip        String?
+  criadoEm  DateTime  @default(now()) @map("criado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, criadoEm])
+  @@map("recuperacoes_de_senha")
 }
 
 model Solicitacao {

@@ -34,6 +34,8 @@ import {
   ServicoDeIndicadores,
   rotasDeIndicadores,
 } from '../modulos/indicadores/indicadores.js';
+import { ServicoDeRecuperacao } from '../modulos/auth/recuperacao.js';
+import { rotasDeRecuperacao } from '../modulos/auth/rotas-recuperacao.js';
 import { ServicoDeAutenticacao } from '../modulos/auth/servico.js';
 import { rotasDeSugestoes } from '../modulos/sugestoes/rotas.js';
 import { ServicoDeSugestoes } from '../modulos/sugestoes/servico.js';
@@ -175,6 +177,22 @@ export function criarApp(modulos?: ModulosDaApp): Express {
         ...(modulos.limiteDeLoginPorMinuto === undefined
           ? {}
           : { limiteDeLoginPorMinuto: modulos.limiteDeLoginPorMinuto }),
+      }),
+    );
+    app.use(
+      '/api/auth',
+      rotasDeRecuperacao({
+        servico: new ServicoDeRecuperacao(prisma, {
+          urlDoSistema: env.FRONTEND_URL,
+        }),
+        // Os testes que passam um limite de login alto precisam do mesmo
+        // aqui; fora deles valem os padrões da rota
+        ...(modulos.limiteDeLoginPorMinuto === undefined
+          ? {}
+          : {
+              limiteDePedidos: modulos.limiteDeLoginPorMinuto,
+              limiteDeRedefinicoes: modulos.limiteDeLoginPorMinuto,
+            }),
       }),
     );
 
